@@ -7,6 +7,7 @@ import Input from '../components/Common/Input';
 import Button from '../components/Common/Button';
 import Loader from '../components/Common/Loader';
 import Toast from '../components/Common/Toast';
+import { Link } from 'react-router-dom';
 
 /**
  * User profile page
@@ -374,19 +375,20 @@ const formatSubscriptionStatus = () => {
                 </div>
               </div>
               
-              {profileStats?.subscriptionTier === 'free' && (
+               {profileStats?.subscriptionTier === 'free' && (
                 <div>
                   <h4 className="font-medium text-gray-800 mb-2">Upgrade for more features</h4>
                   <p className="text-sm text-gray-600 mb-4">
                     Upgrade to a premium plan for unlimited emails, AI generation, and more advanced features.
                   </p>
-                  <Button
-                    variant="primary"
-                    className="px-6 py-2"
-                    onClick={() => window.open('/subscription', '_blank')}
-                  >
-                    Upgrade Now
-                  </Button>
+                  <Link to="/subscription">
+                    <Button
+                      variant="primary"
+                      className="px-6 py-2"
+                    >
+                      Upgrade Now
+                    </Button>
+                  </Link>
                 </div>
               )}
             </div>

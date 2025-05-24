@@ -20,6 +20,7 @@ if (!supabaseAnonKey) {
 
 // Log for debugging (you can remove this later)
 console.log('Environment:', import.meta.env.MODE);
+console.log('Custom App Env:', import.meta.env.VITE_APP_ENV);
 console.log('Supabase URL:', supabaseUrl ? 'Set' : 'Missing');
 console.log('Supabase Key:', supabaseAnonKey ? 'Set' : 'Missing');
 

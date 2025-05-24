@@ -1,4 +1,4 @@
-// src/components/Layout/Header.jsx (partial example)
+// src/components/Layout/Header.jsx
 import React from 'react';
 import { Link } from 'react-router-dom';
 import useSupabase from '../../hooks/useSupabase';
@@ -37,6 +37,9 @@ const Header = () => {
               <Link to="/profile" className="text-gray-600 hover:text-indigo-600 mx-3">
                 My Profile
               </Link>
+              <Link to="/subscription" className="text-gray-600 hover:text-indigo-600 mx-3">
+                Subscription
+              </Link>
               <button
                 onClick={handleLogout}
                 className="ml-4 px-4 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200"
@@ -47,10 +50,10 @@ const Header = () => {
           ) : (
             // User is NOT logged in - show auth links
             <>
-              <Link to="/auth/login" className="text-gray-600 hover:text-indigo-600 mx-3">
+              <Link to="/login" className="text-gray-600 hover:text-indigo-600 mx-3">
                 Login
               </Link>
-              <Link to="/auth/register" className="text-indigo-600 font-medium ml-4 px-4 py-2 bg-indigo-100 rounded hover:bg-indigo-200">
+              <Link to="/register" className="text-indigo-600 font-medium ml-4 px-4 py-2 bg-indigo-100 rounded hover:bg-indigo-200">
                 Register
               </Link>
             </>

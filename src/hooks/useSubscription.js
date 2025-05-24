@@ -4,158 +4,271 @@ import { subscriptions } from '../services/supabase/subscriptions';
 import useSupabase from './useSupabase';
 import { useToast } from './useToast';
 
-export const useSubscription = () => {
+/**
+ * Custom hook for managing subscription state and operations
+ * @returns {Object} Subscription data and methods
+ */
+const useSubscription = () => {
   const { user } = useSupabase();
   const { showToast } = useToast();
-  const [subscription, setSubscription] = useState(null);
-  const [usage, setUsage] = useState(null);
-  const [tiers, setTiers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  
+  // State
+  const [loading, setLoading] = useState(false);
+  const [currentSubscription, setCurrentSubscription] = useState(null);
+  const [availableTiers, setAvailableTiers] = useState([]);
+  const [usageStats, setUsageStats] = useState(null);
+  const [subscriptionHistory, setSubscriptionHistory] = useState([]);
 
-  // Fetch subscription data
-  const fetchSubscription = useCallback(async () => {
+  // Fetch current subscription
+  const fetchCurrentSubscription = useCallback(async () => {
     if (!user) return;
-
+    
     try {
-      setLoading(true);
-      const [subData, usageData, tiersData] = await Promise.all([
-        subscriptions.getCurrentSubscription(),
-        subscriptions.getUsageStats(),
-        subscriptions.getTiers()
-      ]);
-
-      setSubscription(subData);
-      setUsage(usageData);
-      setTiers(tiersData);
-    } catch (err) {
-      console.error('Error fetching subscription:', err);
-      setError(err);
-    } finally {
-      setLoading(false);
+      const subscription = await subscriptions.getCurrentSubscription();
+      setCurrentSubscription(subscription);
+      return subscription;
+    } catch (error) {
+      console.error('Error fetching current subscription:', error);
+      throw error;
     }
   }, [user]);
 
-  useEffect(() => {
-    fetchSubscription();
-  }, [fetchSubscription]);
+  // Fetch available tiers
+  const fetchAvailableTiers = useCallback(async () => {
+    try {
+      const tiers = await subscriptions.getTiers();
+      setAvailableTiers(tiers);
+      return tiers;
+    } catch (error) {
+      console.error('Error fetching available tiers:', error);
+      throw error;
+    }
+  }, []);
 
-  // Check feature access
+  // Fetch usage statistics
+  const fetchUsageStats = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const usage = await subscriptions.getUsageStats();
+      setUsageStats(usage);
+      return usage;
+    } catch (error) {
+      console.error('Error fetching usage stats:', error);
+      throw error;
+    }
+  }, [user]);
+
+  // Fetch subscription history
+  const fetchSubscriptionHistory = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const history = await subscriptions.getSubscriptionHistory();
+      setSubscriptionHistory(history);
+      return history;
+    } catch (error) {
+      console.error('Error fetching subscription history:', error);
+      throw error;
+    }
+  }, [user]);
+
+  // Check if user has access to a feature
   const checkFeatureAccess = useCallback(async (feature) => {
+    if (!user) return false;
+    
     try {
       return await subscriptions.checkFeatureAccess(feature);
-    } catch (err) {
-      console.error('Error checking feature access:', err);
+    } catch (error) {
+      console.error('Error checking feature access:', error);
       return false;
     }
-  }, []);
+  }, [user]);
 
-  // Check usage limit
+  // Check usage limit for a resource
   const checkUsageLimit = useCallback(async (limitType) => {
+    if (!user) return { allowed: false, current_usage: 0, limit_value: 0, remaining: 0 };
+    
     try {
       return await subscriptions.checkUsageLimit(limitType);
-    } catch (err) {
-      console.error('Error checking usage limit:', err);
-      return {
-        allowed: false,
-        current_usage: 0,
-        limit_value: 0,
-        remaining: 0
-      };
+    } catch (error) {
+      console.error('Error checking usage limit:', error);
+      return { allowed: false, current_usage: 0, limit_value: 0, remaining: 0 };
+    }
+  }, [user]);
+
+  // Update usage tracking
+  const updateUsage = useCallback(async (usageType, amount = 1) => {
+    if (!user) return;
+    
+    try {
+      await subscriptions.updateUsage(usageType, amount);
+      // Refresh usage stats after update
+      await fetchUsageStats();
+    } catch (error) {
+      console.error('Error updating usage:', error);
+      throw error;
+    }
+  }, [user, fetchUsageStats]);
+
+  // Check if user is on a specific tier
+  const isOnTier = useCallback(async (tierName) => {
+    if (!user) return false;
+    
+    try {
+      return await subscriptions.isOnTier(tierName);
+    } catch (error) {
+      console.error('Error checking tier:', error);
+      return false;
+    }
+  }, [user]);
+
+  // Check if user is super admin
+  const isSuperAdmin = useCallback(async () => {
+    if (!user) return false;
+    
+    try {
+      return await subscriptions.isSuperAdmin();
+    } catch (error) {
+      console.error('Error checking super admin status:', error);
+      return false;
+    }
+  }, [user]);
+
+  // Load all subscription data
+  const loadSubscriptionData = useCallback(async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      await Promise.all([
+        fetchCurrentSubscription(),
+        fetchAvailableTiers(),
+        fetchUsageStats(),
+        fetchSubscriptionHistory()
+      ]);
+    } catch (error) {
+      console.error('Error loading subscription data:', error);
+      showToast('Error loading subscription data', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [user, fetchCurrentSubscription, fetchAvailableTiers, fetchUsageStats, fetchSubscriptionHistory, showToast]);
+
+  // Utility functions
+  const getTierDisplayName = useCallback((tierName) => {
+    const tier = availableTiers.find(t => t.name === tierName);
+    return tier?.display_name || tierName;
+  }, [availableTiers]);
+
+  const getTierBadgeColor = useCallback((tierName) => {
+    switch (tierName) {
+      case 'free':
+        return 'gray';
+      case 'pro':
+        return 'blue';
+      case 'superAdmin':
+        return 'purple';
+      default:
+        return 'gray';
     }
   }, []);
 
-  // Update usage
-  const updateUsage = useCallback(async (usageType, amount = 1) => {
-    try {
-      await subscriptions.updateUsage(usageType, amount);
-      // Refresh usage stats
-      const newUsage = await subscriptions.getUsageStats();
-      setUsage(newUsage);
-    } catch (err) {
-      console.error('Error updating usage:', err);
-      showToast('Error updating usage tracking', 'error');
+  const getUsagePercentage = useCallback((current, limit) => {
+    if (!limit || limit === -1) return 0; // Unlimited
+    return Math.min((current / limit) * 100, 100);
+  }, []);
+
+  const getUsageBarColor = useCallback((percentage) => {
+    if (percentage >= 90) return '#EF4444'; // Red
+    if (percentage >= 75) return '#F59E0B'; // Yellow
+    return '#10B981'; // Green
+  }, []);
+
+  const canUseFeature = useCallback((featureName) => {
+    if (!currentSubscription?.tier) return false;
+    
+    const tier = currentSubscription.tier;
+    
+    // Check specific feature limits
+    switch (featureName) {
+      case 'email_generation':
+        if (tier.email_limit === -1) return true; // Unlimited
+        return (usageStats?.emails_generated || 0) < tier.email_limit;
+      
+      case 'email_saving':
+        if (tier.storage_limit === -1) return true; // Unlimited
+        return (usageStats?.emails_saved || 0) < tier.storage_limit;
+      
+      case 'series_creation':
+        if (tier.series_limit === -1) return true; // Unlimited
+        return (usageStats?.series_created || 0) < tier.series_limit;
+      
+      default:
+        return true;
     }
-  }, [showToast]);
+  }, [currentSubscription, usageStats]);
 
-  // Check if limit reached before action
-  const canPerformAction = useCallback(async (actionType) => {
-    const limitCheck = await checkUsageLimit(actionType);
+  const getRemainingUsage = useCallback((featureType) => {
+    if (!currentSubscription?.tier || !usageStats) return 0;
     
-    if (!limitCheck.allowed) {
-      const tierName = subscription?.tier?.display_name || 'Pro';
-      showToast(
-        `You've reached your ${actionType} limit. Upgrade to ${tierName} for more.`,
-        'warning'
-      );
-      return false;
+    const tier = currentSubscription.tier;
+    
+    switch (featureType) {
+      case 'emails':
+        if (tier.email_limit === -1) return -1; // Unlimited
+        return Math.max(0, tier.email_limit - (usageStats.emails_generated || 0));
+      
+      case 'storage':
+        if (tier.storage_limit === -1) return -1; // Unlimited
+        return Math.max(0, tier.storage_limit - (usageStats.emails_saved || 0));
+      
+      case 'series':
+        if (tier.series_limit === -1) return -1; // Unlimited
+        return Math.max(0, tier.series_limit - (usageStats.series_created || 0));
+      
+      default:
+        return 0;
     }
-    
-    return true;
-  }, [checkUsageLimit, subscription, showToast]);
+  }, [currentSubscription, usageStats]);
 
-  // Helper functions
-  const isFreeTier = subscription?.subscription_tier === 'free';
-  const isProTier = subscription?.subscription_tier === 'pro';
-  const isSuperAdmin = subscription?.subscription_tier === 'superAdmin';
-
-  // Get tier display info
-  const getTierInfo = () => {
-    if (!subscription?.tier) return null;
-    
-    return {
-      name: subscription.tier.display_name,
-      color: subscription.tier.badge_color,
-      limits: {
-        emails: subscription.tier.email_quota === -1 ? 'Unlimited' : subscription.tier.email_quota,
-        series: subscription.tier.series_limit === -1 ? 'Unlimited' : subscription.tier.series_limit,
-        aiTokens: subscription.tier.ai_tokens_monthly === -1 ? 'Unlimited' : subscription.tier.ai_tokens_monthly
-      }
-    };
-  };
-
-  // Get usage percentage
-  const getUsagePercentage = (type) => {
-    if (!usage || !subscription?.tier) return 0;
-    
-    const limits = {
-      emails: subscription.tier.email_quota,
-      series: subscription.tier.series_limit,
-      aiTokens: subscription.tier.ai_tokens_monthly
-    };
-    
-    const current = {
-      emails: usage.emails_generated || 0,
-      series: usage.series_created || 0,
-      aiTokens: usage.ai_tokens_used || 0
-    };
-    
-    const limit = limits[type];
-    if (limit === -1) return 0; // Unlimited
-    if (limit === 0) return 100; // No access
-    
-    return Math.min(100, Math.round((current[type] / limit) * 100));
-  };
+  // Load subscription data when user changes
+  useEffect(() => {
+    if (user) {
+      loadSubscriptionData();
+    }
+  }, [user, loadSubscriptionData]);
 
   return {
-    subscription,
-    usage,
-    tiers,
+    // State
     loading,
-    error,
+    currentSubscription,
+    availableTiers,
+    usageStats,
+    subscriptionHistory,
     
-    // Actions
+    // Data fetching methods
+    fetchCurrentSubscription,
+    fetchAvailableTiers,
+    fetchUsageStats,
+    fetchSubscriptionHistory,
+    loadSubscriptionData,
+    
+    // Feature checking methods
     checkFeatureAccess,
     checkUsageLimit,
     updateUsage,
-    canPerformAction,
-    fetchSubscription,
-    
-    // Helpers
-    isFreeTier,
-    isProTier,
+    isOnTier,
     isSuperAdmin,
-    getTierInfo,
-    getUsagePercentage
+    canUseFeature,
+    getRemainingUsage,
+    
+    // Utility methods
+    getTierDisplayName,
+    getTierBadgeColor,
+    getUsagePercentage,
+    getUsageBarColor
   };
 };
+
+export default useSubscription;

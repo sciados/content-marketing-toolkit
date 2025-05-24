@@ -14,6 +14,10 @@ const Subscription = () => {
   const { user } = useSupabase();
   const { toast, showToast } = useToast();
   
+  // Debug logging
+  console.log('Subscription component - User:', user ? 'Authenticated' : 'Not authenticated');
+  console.log('Subscription component - User ID:', user?.id);
+  
   // State management
   const [loading, setLoading] = useState(true);
   const [currentSubscription, setCurrentSubscription] = useState(null);
@@ -25,7 +29,14 @@ const Subscription = () => {
   // Fetch subscription data on mount
   useEffect(() => {
     const fetchSubscriptionData = async () => {
-      if (!user) return;
+      // Don't fetch if user is not authenticated
+      if (!user) {
+        console.log('No authenticated user, skipping subscription data fetch');
+        setLoading(false);
+        return;
+      }
+      
+      console.log('Fetching subscription data for user:', user.id);
       
       try {
         setLoading(true);
@@ -104,6 +115,21 @@ const Subscription = () => {
     return (
       <div className="flex items-center justify-center h-80">
         <Loader size="lg" text="Loading subscription information..." />
+      </div>
+    );
+  }
+
+  // Redirect if not authenticated
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">Authentication Required</h1>
+          <p className="text-gray-600 mb-6">Please log in to view your subscription information.</p>
+          <Link to="/login" className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+            Sign In
+          </Link>
+        </div>
       </div>
     );
   }
