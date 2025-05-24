@@ -23,7 +23,7 @@ const TierProtectedRoute = ({
       
       try {
         // Check if user has required tier or higher
-        const tierHierarchy = ['free', 'pro', 'superAdmin'];
+        const tierHierarchy = ['free', 'pro', 'gold'];
         const userTierIndex = tierHierarchy.indexOf(subscription.subscription_tier);
         const requiredTierIndex = tierHierarchy.indexOf(requiredTier);
         
@@ -69,7 +69,7 @@ const UpgradePrompt = ({ requiredTier }) => {
   const tierDisplayNames = {
     free: 'Free',
     pro: 'Pro',
-    superAdmin: 'Super Admin'
+    gold: 'Gold'
   };
 
   return (

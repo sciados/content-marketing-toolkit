@@ -27,7 +27,7 @@ const SubscriptionBadge = ({ showUpgradeButton = false, className = '' }) => {
         {tier.display_name}
       </span>
       
-      {showUpgradeButton && tier.name !== 'superAdmin' && (
+      {showUpgradeButton && tier.name !== 'gold' && (
         <button
           onClick={() => window.location.href = '/pricing'}
           className="text-sm text-brand-600 hover:text-brand-700 font-medium"

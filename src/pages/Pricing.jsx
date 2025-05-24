@@ -20,8 +20,8 @@ const Pricing = () => {
   const fetchTiers = async () => {
     try {
       const data = await subscriptions.getTiers();
-      // Filter out superAdmin tier from public pricing
-      setTiers(data.filter(tier => tier.name !== 'superAdmin'));
+      // Filter out gold tier from public pricing
+      setTiers(data.filter(tier => tier.name !== 'gold'));
     } catch (error) {
       console.error('Error fetching tiers:', error);
     } finally {

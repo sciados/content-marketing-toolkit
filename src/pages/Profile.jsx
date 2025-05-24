@@ -128,7 +128,7 @@ const formatSubscriptionStatus = () => {
   const tierDisplayNames = {
     'free': 'Free Plan',
     'pro': 'Pro Plan',
-    'superAdmin': 'Super Admin'
+    'gold': 'Gold Plan'
   };
   
   const displayName = tierDisplayNames[subscriptionTier] || subscriptionTier;
@@ -233,9 +233,9 @@ const formatSubscriptionStatus = () => {
                   <p className="text-sm text-gray-500">Emails Saved</p>
                   <p className="font-medium text-gray-800">
                     {profileStats?.emailsSaved || 0}
-                    {profileStats?.emailQuota && (
+                    {profileStats?.email_quota && (
                       <span className="text-sm text-gray-500 ml-1">
-                        / {profileStats.emailQuota}
+                        / {profileStats.emailsSaved}
                       </span>
                     )}
                   </p>
@@ -368,7 +368,7 @@ const formatSubscriptionStatus = () => {
                     <h4 className="font-medium text-gray-800">Current Plan: {formatSubscriptionStatus()}</h4>
                     {profileStats?.subscriptionTier === 'free' && (
                       <p className="text-sm text-gray-600 mt-1">
-                        Free tier allows up to {profileStats?.emailQuota || 100} saved emails
+                        Free tier allows up to {profileStats?.email_quota || 20} saved emails
                       </p>
                     )}
                   </div>

@@ -204,7 +204,6 @@
 | File | Status | Description |
 |------|--------|-------------|
 | `README.md` | ✅ | Main project documentation (updated for Supabase) |
-| `SUPABASE-MIGRATION.md` | ✅ | Documentation for the Supabase migration |
 | `docs/API.md` | 🔄 | API documentation for services |
 | `docs/DEPLOYMENT.md` | 🔄 | Deployment guide for Vercel |
 | `docs/DEVELOPMENT.md` | 🔄 | Development setup guide |

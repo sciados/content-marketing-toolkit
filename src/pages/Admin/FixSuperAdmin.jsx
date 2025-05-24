@@ -1,14 +1,14 @@
-// src/pages/Admin/FixSuperAdmin.jsx
+// src/pages/Admin/FixsuperAdmin.jsx
 import React, { useState } from 'react';
 import { supabase } from '../../services/supabase/supabaseClient';
 import useSupabase from '../../hooks/useSupabase';
 
-const FixSuperAdmin = () => {
+const FixsuperAdmin = () => {
   const { user } = useSupabase();
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const fixSuperAdminStatus = async () => {
+  const fixsuperAdminStatus = async () => {
     if (user?.email !== 'appsmartdesk@gmail.com') {
       setStatus('This action is only available for appsmartdesk@gmail.com');
       return;
@@ -53,7 +53,7 @@ const FixSuperAdmin = () => {
 
   return (
     <div className="max-w-2xl mx-auto p-8">
-      <h1 className="text-2xl font-bold mb-6">Fix SuperAdmin Status</h1>
+      <h1 className="text-2xl font-bold mb-6">Fix superAdmin Status</h1>
       
       <div className="bg-white rounded-lg shadow p-6">
         <p className="mb-4">
@@ -65,11 +65,11 @@ const FixSuperAdmin = () => {
         </p>
         
         <button
-          onClick={fixSuperAdminStatus}
+          onClick={fixsuperAdminStatus}
           disabled={loading}
           className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
         >
-          {loading ? 'Updating...' : 'Update to SuperAdmin'}
+          {loading ? 'Updating...' : 'Update to superAdmin'}
         </button>
         
         {status && (
@@ -82,4 +82,4 @@ const FixSuperAdmin = () => {
   );
 };
 
-export default FixSuperAdmin;
+export default FixsuperAdmin;

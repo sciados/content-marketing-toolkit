@@ -161,7 +161,7 @@ const AdminUsers = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <h3 className="text-sm font-medium text-gray-500">Super Admins</h3>
           <p className="text-2xl font-bold text-purple-600 mt-2">
-            {users.filter(u => u.subscription_tier === 'superAdmin').length}
+            {users.filter(u => u.subscription_tier === 'gold').length}
           </p>
         </div>
       </div>

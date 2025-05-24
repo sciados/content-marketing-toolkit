@@ -124,11 +124,11 @@ const useSubscription = () => {
   }, [user]);
 
   // Check if user is super admin
-  const isSuperAdmin = useCallback(async () => {
+  const isGold = useCallback(async () => {
     if (!user) return false;
     
     try {
-      return await subscriptions.isSuperAdmin();
+      return await subscriptions.isGold();
     } catch (error) {
       console.error('Error checking super admin status:', error);
       return false;
@@ -167,7 +167,7 @@ const useSubscription = () => {
         return 'gray';
       case 'pro':
         return 'blue';
-      case 'superAdmin':
+      case 'gold':
         return 'purple';
       default:
         return 'gray';
@@ -259,7 +259,7 @@ const useSubscription = () => {
     checkUsageLimit,
     updateUsage,
     isOnTier,
-    isSuperAdmin,
+    isGold,
     canUseFeature,
     getRemainingUsage,
     

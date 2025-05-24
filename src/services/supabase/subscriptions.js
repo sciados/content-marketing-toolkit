@@ -199,7 +199,7 @@ export const subscriptions = {
       .eq('id', user.id)
       .single();
     
-    if (currentUserProfile?.subscription_tier !== 'superAdmin') {
+    if (currentUserProfile?.subscription_tier !== 'gold') {
       throw new Error('Unauthorized: Only super admins can change tiers');
     }
 
@@ -263,7 +263,7 @@ export const subscriptions = {
    * Check if user is super admin
    * @returns {Promise<boolean>} - Is super admin
    */
-  isSuperAdmin: async () => {
-    return await subscriptions.isOnTier('superAdmin');
+  isGold: async () => {
+    return await subscriptions.isOnTier('gold');
   }
 };
