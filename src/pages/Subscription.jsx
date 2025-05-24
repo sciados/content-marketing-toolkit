@@ -1,6 +1,6 @@
 // src/pages/Subscription.jsx
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import useSupabase from '../hooks/useSupabase';
 import { useToast } from '../hooks/useToast';
 import { subscriptions } from '../services/supabase/subscriptions';
@@ -11,14 +11,10 @@ import Loader from '../components/Common/Loader';
 import Toast from '../components/Common/Toast';
 
 const Subscription = () => {
-  const { user } = useSupabase();
+  const { user, loading: authLoading } = useSupabase();
   const { toast, showToast } = useToast();
   
-  // Debug logging
-  console.log('Subscription component - User:', user ? 'Authenticated' : 'Not authenticated');
-  console.log('Subscription component - User ID:', user?.id);
-  
-  // State management
+  // State management (hooks must come first)
   const [loading, setLoading] = useState(true);
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [availableTiers, setAvailableTiers] = useState([]);
@@ -26,7 +22,7 @@ const Subscription = () => {
   const [subscriptionHistory, setSubscriptionHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
 
-  // Fetch subscription data on mount
+  // Fetch subscription data on mount (hooks must be called unconditionally)
   useEffect(() => {
     const fetchSubscriptionData = async () => {
       // Don't fetch if user is not authenticated
@@ -67,6 +63,26 @@ const Subscription = () => {
 
     fetchSubscriptionData();
   }, [user, showToast]);
+
+  // Debug logging
+  console.log('Subscription component - Auth Loading:', authLoading);
+  console.log('Subscription component - User:', user ? 'Authenticated' : 'Not authenticated');
+  console.log('Subscription component - User ID:', user?.id);
+
+  // Redirect to login if not authenticated (after auth loading is complete)
+  if (!authLoading && !user) {
+    console.log('Redirecting to login - no authenticated user');
+    return <Navigate to="/login" replace />;
+  }
+
+  // Show loading while authentication is being checked
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center h-80">
+        <Loader size="lg" text="Checking authentication..." />
+      </div>
+    );
+  }
 
   // Get tier badge color
   const getTierBadgeColor = (tierName) => {
@@ -115,21 +131,6 @@ const Subscription = () => {
     return (
       <div className="flex items-center justify-center h-80">
         <Loader size="lg" text="Loading subscription information..." />
-      </div>
-    );
-  }
-
-  // Redirect if not authenticated
-  if (!user) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">Authentication Required</h1>
-          <p className="text-gray-600 mb-6">Please log in to view your subscription information.</p>
-          <Link to="/login" className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
-            Sign In
-          </Link>
-        </div>
       </div>
     );
   }
