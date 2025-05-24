@@ -11,8 +11,17 @@ import Loader from '../components/Common/Loader';
 import Toast from '../components/Common/Toast';
 
 const Subscription = () => {
-  const { user, loading: authLoading } = useSupabase();
+  const supabaseContext = useSupabase();
+  const { user, loading: authLoading } = supabaseContext;
   const { toast, showToast } = useToast();
+  
+  // Debug logging - let's see what the hook returns
+  console.log('=== SUBSCRIPTION DEBUG ===');
+  console.log('Full Supabase Context:', supabaseContext);
+  console.log('Auth Loading:', authLoading);
+  console.log('User:', user);
+  console.log('User exists:', !!user);
+  console.log('========================');
   
   // State management (hooks must come first)
   const [loading, setLoading] = useState(true);
@@ -71,12 +80,13 @@ const Subscription = () => {
 
   // Redirect to login if not authenticated (after auth loading is complete)
   if (!authLoading && !user) {
-    console.log('Redirecting to login - no authenticated user');
+    console.log('🔄 SHOULD REDIRECT: Auth loading complete, no user found');
     return <Navigate to="/login" replace />;
   }
 
   // Show loading while authentication is being checked
   if (authLoading) {
+    console.log('🔄 SHOWING AUTH LOADING');
     return (
       <div className="flex items-center justify-center h-80">
         <Loader size="lg" text="Checking authentication..." />
