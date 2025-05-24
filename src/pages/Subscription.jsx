@@ -306,15 +306,60 @@ const Subscription = () => {
                     </div>
                     
                     {currentSubscription?.subscription_tier !== tier.name && (
-                      <Button
-                        variant={tier.name === 'pro' ? 'primary' : 'outline'}
-                        size="sm"
-                        className="w-full"
-                        onClick={() => showToast('Contact support to change your plan', 'info')}
-                      >
-                        {tier.name === 'pro' ? 'Upgrade to Pro' : 'Contact Support'}
-                      </Button>
-                    )}
+  <Button
+    variant={
+      ['free'].includes(tier.name) ? 'outline' : 'primary'
+    }
+    size="sm"
+    className="w-full"
+    onClick={() => {
+      if (
+        currentSubscription?.subscription_tier === 'free' &&
+        ['pro', 'gold'].includes(tier.name)
+      ) {
+        showToast(`You have upgraded to ${tier.name}.`, 'info');
+        // upgrade logic
+      } else if (
+        currentSubscription?.subscription_tier === 'pro' &&
+        tier.name === 'free'
+      ) {
+        showToast('You have downgraded to Free.', 'info');
+        // downgrade logic
+      } else if (
+        currentSubscription?.subscription_tier === 'pro' &&
+        tier.name === 'gold'
+      ) {
+        showToast('You have upgraded to Gold.', 'info');
+        // upgrade logic
+      } else if (
+        currentSubscription?.subscription_tier === 'gold' &&
+        ['free', 'pro'].includes(tier.name)
+      ) {
+        showToast(`You have downgraded to ${tier.name}.`, 'info');
+        // downgrade logic
+      } else {
+        showToast('Contact support to change your plan.', 'info');
+      }
+    }}
+  >
+    {currentSubscription?.subscription_tier === 'free' &&
+    ['pro', 'gold'].includes(tier.name)
+      ? `Upgrade to ${tier.name}`
+      : currentSubscription?.subscription_tier === 'pro' &&
+        tier.name === 'free'
+        ? 'Downgrade to Free'
+        : currentSubscription?.subscription_tier === 'pro' &&
+          tier.name === 'gold'
+          ? 'Upgrade to Gold'
+          : currentSubscription?.subscription_tier === 'gold' &&
+            ['free', 'pro'].includes(tier.name)
+            ? `Downgrade to ${tier.name}`
+            : `Upgrade to Gold`}
+  </Button>
+)}
+
+
+
                   </div>
                 ))}
               </div>
