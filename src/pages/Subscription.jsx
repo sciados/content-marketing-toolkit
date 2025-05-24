@@ -15,6 +15,14 @@ const Subscription = () => {
   const { user, loading: authLoading } = supabaseContext;
   const { toast, showToast } = useToast();
   
+  // Debug logging - let's see what the hook returns
+  console.log('=== SUBSCRIPTION DEBUG ===');
+  console.log('Full Supabase Context:', supabaseContext);
+  console.log('Auth Loading:', authLoading);
+  console.log('User:', user);
+  console.log('User exists:', !!user);
+  console.log('========================');
+  
   // State management (hooks must come first)
   const [loading, setLoading] = useState(true);
   const [currentSubscription, setCurrentSubscription] = useState(null);
@@ -65,6 +73,11 @@ const Subscription = () => {
     fetchSubscriptionData();
   }, [user, showToast]);
 
+  // Debug logging
+  console.log('Subscription component - Auth Loading:', authLoading);
+  console.log('Subscription component - User:', user ? 'Authenticated' : 'Not authenticated');
+  console.log('Subscription component - User ID:', user?.id);
+
   // Redirect to login if not authenticated (after auth loading is complete)
   if (!authLoading && !user) {
     console.log('🔄 SHOULD REDIRECT: Auth loading complete, no user found');
@@ -88,7 +101,7 @@ const Subscription = () => {
         return 'gray';
       case 'pro':
         return 'blue';
-      case 'gold':
+      case 'superAdmin':
         return 'purple';
       default:
         return 'gray';
@@ -114,7 +127,7 @@ const Subscription = () => {
   // Calculate usage percentage
   const getUsagePercentage = (current, limit) => {
     if (!limit || limit === -1) return 0; // Unlimited
-    return Math.min((current / limit) * 100, limit);
+    return Math.min((current / limit) * 100, 100);
   };
 
   // Get usage bar color
@@ -288,7 +301,7 @@ const Subscription = () => {
                       <div className="flex justify-between text-sm">
                         <span>Emails per month:</span>
                         <span className="font-medium">
-                          {tier.email_limit === -1 ? 'Unlimited' : tier.email_quota}
+                          {tier.email_limit === -1 ? 'Unlimited' : tier.email_limit}
                         </span>
                       </div>
                       <div className="flex justify-between text-sm">
@@ -306,60 +319,15 @@ const Subscription = () => {
                     </div>
                     
                     {currentSubscription?.subscription_tier !== tier.name && (
-  <Button
-    variant={
-      ['free'].includes(tier.name) ? 'outline' : 'primary'
-    }
-    size="sm"
-    className="w-full"
-    onClick={() => {
-      if (
-        currentSubscription?.subscription_tier === 'free' &&
-        ['pro', 'gold'].includes(tier.name)
-      ) {
-        showToast(`You have upgraded to ${tier.name}.`, 'info');
-        // upgrade logic
-      } else if (
-        currentSubscription?.subscription_tier === 'pro' &&
-        tier.name === 'free'
-      ) {
-        showToast('You have downgraded to Free.', 'info');
-        // downgrade logic
-      } else if (
-        currentSubscription?.subscription_tier === 'pro' &&
-        tier.name === 'gold'
-      ) {
-        showToast('You have upgraded to Gold.', 'info');
-        // upgrade logic
-      } else if (
-        currentSubscription?.subscription_tier === 'gold' &&
-        ['free', 'pro'].includes(tier.name)
-      ) {
-        showToast(`You have downgraded to ${tier.name}.`, 'info');
-        // downgrade logic
-      } else {
-        showToast('Contact support to change your plan.', 'info');
-      }
-    }}
-  >
-    {currentSubscription?.subscription_tier === 'free' &&
-    ['pro', 'gold'].includes(tier.name)
-      ? `Upgrade to ${tier.name}`
-      : currentSubscription?.subscription_tier === 'pro' &&
-        tier.name === 'free'
-        ? 'Downgrade to Free'
-        : currentSubscription?.subscription_tier === 'pro' &&
-          tier.name === 'gold'
-          ? 'Upgrade to Gold'
-          : currentSubscription?.subscription_tier === 'gold' &&
-            ['free', 'pro'].includes(tier.name)
-            ? `Downgrade to ${tier.name}`
-            : `Upgrade to Gold`}
-  </Button>
-)}
-
-
-
+                      <Button
+                        variant={tier.name === 'pro' ? 'primary' : 'outline'}
+                        size="sm"
+                        className="w-full"
+                        onClick={() => showToast('Contact support to change your plan', 'info')}
+                      >
+                        {tier.name === 'pro' ? 'Upgrade to Pro' : 'Contact Support'}
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -375,18 +343,6 @@ const Subscription = () => {
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
               
               <div className="space-y-3">
-                <Link 
-                  to="/dashboard" 
-                  className="block w-full"
-                >
-                  <Button variant="outline" className="w-full justify-start">
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                    </svg>
-                    Dashboard
-                  </Button>
-                </Link>
-              
                 <Link 
                   to="/tools/email-generator" 
                   className="block w-full"
