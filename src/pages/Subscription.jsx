@@ -145,9 +145,54 @@ const Subscription = () => {
     );
   }
 
+  // ===== COMPREHENSIVE DEBUG SECTION =====
+  console.log('=== SUBSCRIPTION PAGE DEBUG DATA ===');
+  console.log('1. Raw currentSubscription object:', currentSubscription);
+  console.log('2. Raw availableTiers array:', availableTiers);
+  console.log('3. User object:', user);
+  
+  // Test tier extraction
+  const currentTier = currentSubscription?.subscription_tier || 'free';
+  console.log('4. Extracted currentTier:', currentTier);
+  console.log('5. Type of currentTier:', typeof currentTier);
+  
+  // Test tier filtering
+  console.log('6. Available tier names:', availableTiers.map(t => ({ name: t.name, display_name: t.display_name })));
+  
+  // Test specific tier checks
+  console.log('7. Tier check results:');
+  console.log('   - Is current tier "free"?', currentTier === 'free');
+  console.log('   - Is current tier "pro"?', currentTier === 'pro');
+  console.log('   - Is current tier "gold"?', currentTier === 'gold');
+  console.log('   - Is current tier "superAdmin"?', currentTier === 'superAdmin');
+  
+  // Test filtering logic step by step
+  availableTiers.forEach(tier => {
+    const isHidden = tier.name === 'free' || tier.name === 'superAdmin';
+    const shouldShow = !isHidden && (
+      (currentTier === 'free' && (tier.name === 'pro' || tier.name === 'gold')) ||
+      (currentTier === 'pro' && tier.name === 'gold')
+    );
+    console.log(`   - Tier "${tier.name}": hidden=${isHidden}, shouldShow=${shouldShow}`);
+  });
+  
+  console.log('======================================');
+
   return (
     <div className="container mx-auto px-4 py-8">
       {toast && <Toast message={toast.message} type={toast.type} />}
+      
+      {/* TEMPORARY DEBUG SECTION - Remove after testing */}
+      <div className="mb-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <h3 className="font-bold text-yellow-800 mb-2">🐛 DEBUG INFO (Remove after testing)</h3>
+        <div className="text-sm space-y-1">
+          <p><strong>Current User Tier:</strong> {currentSubscription?.subscription_tier || 'undefined'} (Type: {typeof currentSubscription?.subscription_tier})</p>
+          <p><strong>Available Tiers:</strong> {availableTiers.map(t => t.name).join(', ')}</p>
+          <p><strong>User ID:</strong> {user?.id}</p>
+          <p><strong>Total Tiers Loaded:</strong> {availableTiers.length}</p>
+          <p><strong>Current Subscription Object:</strong> {JSON.stringify(currentSubscription, null, 2)}</p>
+        </div>
+      </div>
       
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-800">Subscription Management</h1>
