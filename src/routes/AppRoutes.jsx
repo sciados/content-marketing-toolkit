@@ -1,399 +1,386 @@
-// src/pages/Subscription.jsx
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import useSupabase from '../hooks/useSupabase';
-import { useToast } from '../hooks/useToast';
-import { subscriptions } from '../services/supabase/subscriptions';
-import Card from '../components/Common/Card';
-import Button from '../components/Common/Button';
-import Badge from '../components/Common/Badge';
+// src/routes/AppRoutes.jsx - Optimized with Lazy Loading and Preloading
+import React, { Suspense, lazy } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { preloadEmailComponents } from '../utils/emailPreloaderUtils';
+import { trackLazyLoading, useRenderTime } from '../utils/performanceUtils';
+
+// Check if we're in development mode
+const isDevelopment = import.meta.env.DEV;
+
+// Layout components (keep these as regular imports since they're used on every page)
+import MainLayout from '../components/Layout/MainLayout';
+import AuthLayout from '../components/Layout/AuthLayout';
 import Loader from '../components/Common/Loader';
-import Toast from '../components/Common/Toast';
 
-const Subscription = () => {
-  const { user } = useSupabase();
-  const { toast, showToast } = useToast();
-  
-  // State management
-  const [loading, setLoading] = useState(true);
-  const [currentSubscription, setCurrentSubscription] = useState(null);
-  const [availableTiers, setAvailableTiers] = useState([]);
-  const [usageStats, setUsageStats] = useState(null);
-  const [subscriptionHistory, setSubscriptionHistory] = useState([]);
-  const [showHistory, setShowHistory] = useState(false);
+const AdminUsers = lazy(() => {
+  const tracker = trackLazyLoading('AdminUsers');
+  return import('../pages/Admin/AdminUsers').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
 
-  // Fetch subscription data on mount
-  useEffect(() => {
-    const fetchSubscriptionData = async () => {
-      if (!user) return;
-      
-      try {
-        setLoading(true);
-        
-        // Fetch current subscription
-        const subscription = await subscriptions.getCurrentSubscription();
-        setCurrentSubscription(subscription);
-        
-        // Fetch available tiers
-        const tiers = await subscriptions.getTiers();
-        setAvailableTiers(tiers);
-        
-        // Fetch usage statistics
-        const usage = await subscriptions.getUsageStats();
-        setUsageStats(usage);
-        
-        // Fetch subscription history
-        const history = await subscriptions.getSubscriptionHistory();
-        setSubscriptionHistory(history);
-        
-      } catch (error) {
-        console.error('Error fetching subscription data:', error);
-        showToast('Error loading subscription information', 'error');
-      } finally {
-        setLoading(false);
-      }
+const FixSuperAdmin = lazy(() => {
+  const tracker = trackLazyLoading('FixSuperAdmin');
+  return import('../pages/Admin/FixSuperAdmin').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
+// Lazy load page components for better code splitting
+const Welcome = lazy(() => {
+  const tracker = trackLazyLoading('Welcome');
+  return import('../pages/Welcome').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
+const Login = lazy(() => {
+  const tracker = trackLazyLoading('Login');
+  return import('../pages/Auth/Login').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
+const Register = lazy(() => {
+  const tracker = trackLazyLoading('Register');
+  return import('../pages/Auth/Register').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
+const ResetPassword = lazy(() => {
+  const tracker = trackLazyLoading('ResetPassword');
+  return import('../pages/Auth/ResetPassword').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
+const Dashboard = lazy(() => {
+  const tracker = trackLazyLoading('Dashboard');
+  return import('../pages/Dashboard').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
+const Profile = lazy(() => {
+  const tracker = trackLazyLoading('Profile');
+  return import('../pages/Profile').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
+const SalesPageEmailGenerator = lazy(() => {
+  const tracker = trackLazyLoading('SalesPageEmailGenerator');
+  return import('../pages/SalesPageEmailGenerator').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
+const EmailSeriesListPage = lazy(() => {
+  const tracker = trackLazyLoading('EmailSeriesListPage');
+  return import('../pages/EmailSeriesListPage').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
+const EmailSeriesDetailPage = lazy(() => {
+  const tracker = trackLazyLoading('EmailSeriesDetailPage');
+  return import('../pages/EmailSeriesDetailPage').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
+// Future pages - already lazy loaded for when you implement them
+const BlogPostCreator = lazy(() => {
+  const tracker = trackLazyLoading('BlogPostCreator');
+  return import('../pages/BlogPostCreator').catch(() => {
+    // Fallback component for non-existent pages
+    return { 
+      default: () => (
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          <h2>Blog Post Creator</h2>
+          <p>This feature is coming soon!</p>
+        </div>
+      )
     };
+  }).then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
 
-    fetchSubscriptionData();
-  }, [user, showToast]);
+const NewsletterCreator = lazy(() => {
+  const tracker = trackLazyLoading('NewsletterCreator');
+  return import('../pages/NewsletterCreator').catch(() => {
+    // Fallback component for non-existent pages
+    return { 
+      default: () => (
+        <div style={{ padding: '2rem', textAlign: 'center' }}>
+          <h2>Newsletter Creator</h2>
+          <p>This feature is coming soon!</p>
+        </div>
+      )
+    };
+  }).then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
 
-  // Get tier badge color
-  const getTierBadgeColor = (tierName) => {
-    switch (tierName) {
-      case 'free':
-        return 'gray';
-      case 'pro':
-        return 'blue';
-      case 'superAdmin':
-        return 'purple';
-      default:
-        return 'gray';
-    }
-  };
+const Subscription = lazy(() => {
+  const tracker = trackLazyLoading('Subscription');
+  return import('../pages/Subscription').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
 
-  // Get tier display name
-  const getTierDisplayName = (tierName) => {
-    const tier = availableTiers.find(t => t.name === tierName);
-    return tier?.display_name || tierName;
-  };
+const AdminAds = lazy(() => {
+  const tracker = trackLazyLoading('AdminAds');
+  return import('../pages/Admin/AdminAds').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
 
-  // Format date
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-  };
+// Protected route wrapper - removed import since it doesn't exist
 
-  // Calculate usage percentage
-  const getUsagePercentage = (current, limit) => {
-    if (!limit || limit === -1) return 0; // Unlimited
-    return Math.min((current / limit) * 100, 100);
-  };
-
-  // Get usage bar color
-  const getUsageBarColor = (percentage) => {
-    if (percentage >= 90) return '#EF4444'; // Red
-    if (percentage >= 75) return '#F59E0B'; // Yellow
-    return '#10B981'; // Green
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-80">
-        <Loader size="lg" text="Loading subscription information..." />
-      </div>
-    );
-  }
-
+// Enhanced loading component with preloading hints
+const PageLoader = ({ pageName }) => {
+  useRenderTime('PageLoader', isDevelopment);
+  
   return (
-    <div className="container mx-auto px-4 py-8">
-      {toast && <Toast message={toast.message} type={toast.type} />}
-      
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-800">Subscription Management</h1>
-        <p className="text-gray-600">Manage your plan and track your usage</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Current Plan Section */}
-        <div className="lg:col-span-2">
-          <Card>
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-gray-800">Current Plan</h2>
-                <Badge colorScheme={getTierBadgeColor(currentSubscription?.subscription_tier || 'free')}>
-                  {getTierDisplayName(currentSubscription?.subscription_tier || 'free')}
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">Plan Status</h3>
-                  <p className="text-lg font-medium text-gray-900">
-                    {currentSubscription?.subscription_status || 'Active'}
-                  </p>
-                </div>
-                
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 mb-1">Started</h3>
-                  <p className="text-lg font-medium text-gray-900">
-                    {formatDate(currentSubscription?.subscription_started_at)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Usage Statistics */}
-              {usageStats && (
-                <div className="border-t border-gray-200 pt-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Usage This Month</h3>
-                  
-                  <div className="space-y-4">
-                    {/* Emails Generated */}
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-700">Emails Generated</span>
-                        <span className="text-sm text-gray-500">
-                          {usageStats.emails_generated || 0}
-                          {currentSubscription?.tier?.email_limit && 
-                            ` / ${currentSubscription.tier.email_limit === -1 ? 'Unlimited' : currentSubscription.tier.email_limit}`
-                          }
-                        </span>
-                      </div>
-                      {currentSubscription?.tier?.email_limit && currentSubscription.tier.email_limit !== -1 && (
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="h-2 rounded-full transition-all duration-300"
-                            style={{
-                              width: `${getUsagePercentage(usageStats.emails_generated || 0, currentSubscription.tier.email_limit)}%`,
-                              backgroundColor: getUsageBarColor(getUsagePercentage(usageStats.emails_generated || 0, currentSubscription.tier.email_limit))
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Emails Saved */}
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-700">Emails Saved</span>
-                        <span className="text-sm text-gray-500">
-                          {usageStats.emails_saved || 0}
-                          {currentSubscription?.tier?.storage_limit && 
-                            ` / ${currentSubscription.tier.storage_limit === -1 ? 'Unlimited' : currentSubscription.tier.storage_limit}`
-                          }
-                        </span>
-                      </div>
-                      {currentSubscription?.tier?.storage_limit && currentSubscription.tier.storage_limit !== -1 && (
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="h-2 rounded-full transition-all duration-300"
-                            style={{
-                              width: `${getUsagePercentage(usageStats.emails_saved || 0, currentSubscription.tier.storage_limit)}%`,
-                              backgroundColor: getUsageBarColor(getUsagePercentage(usageStats.emails_saved || 0, currentSubscription.tier.storage_limit))
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Series Created */}
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-700">Email Series Created</span>
-                        <span className="text-sm text-gray-500">
-                          {usageStats.series_created || 0}
-                          {currentSubscription?.tier?.series_limit && 
-                            ` / ${currentSubscription.tier.series_limit === -1 ? 'Unlimited' : currentSubscription.tier.series_limit}`
-                          }
-                        </span>
-                      </div>
-                      {currentSubscription?.tier?.series_limit && currentSubscription.tier.series_limit !== -1 && (
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="h-2 rounded-full transition-all duration-300"
-                            style={{
-                              width: `${getUsagePercentage(usageStats.series_created || 0, currentSubscription.tier.series_limit)}%`,
-                              backgroundColor: getUsageBarColor(getUsagePercentage(usageStats.series_created || 0, currentSubscription.tier.series_limit))
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </Card>
-
-          {/* Available Plans */}
-          <Card className="mt-6">
-            <div className="p-6">
-              <h2 className="text-xl font-semibold text-gray-800 mb-6">Available Plans</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {availableTiers.map((tier) => (
-                  <div 
-                    key={tier.name}
-                    className={`border rounded-lg p-4 ${
-                      currentSubscription?.subscription_tier === tier.name 
-                        ? 'border-blue-500 bg-blue-50' 
-                        : 'border-gray-200'
-                    }`}
-                  >
-                    <div className="flex justify-between items-start mb-3">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">{tier.display_name}</h3>
-                        {tier.price && (
-                          <p className="text-xl font-bold text-gray-900">
-                            ${tier.price}
-                            <span className="text-sm font-normal text-gray-500">/month</span>
-                          </p>
-                        )}
-                      </div>
-                      {currentSubscription?.subscription_tier === tier.name && (
-                        <Badge colorScheme="blue">Current</Badge>
-                      )}
-                    </div>
-                    
-                    <p className="text-gray-600 text-sm mb-4">{tier.description}</p>
-                    
-                    <div className="space-y-2 mb-4">
-                      <div className="flex justify-between text-sm">
-                        <span>Emails per month:</span>
-                        <span className="font-medium">
-                          {tier.email_limit === -1 ? 'Unlimited' : tier.email_limit}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Saved emails:</span>
-                        <span className="font-medium">
-                          {tier.storage_limit === -1 ? 'Unlimited' : tier.storage_limit}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm">
-                        <span>Email series:</span>
-                        <span className="font-medium">
-                          {tier.series_limit === -1 ? 'Unlimited' : tier.series_limit}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {currentSubscription?.subscription_tier !== tier.name && (
-                      <Button
-                        variant={tier.name === 'pro' ? 'primary' : 'outline'}
-                        size="sm"
-                        className="w-full"
-                        onClick={() => showToast('Contact support to change your plan', 'info')}
-                      >
-                        {tier.name === 'pro' ? 'Upgrade to Pro' : 'Contact Support'}
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="lg:col-span-1">
-          {/* Quick Actions */}
-          <Card>
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
-              
-              <div className="space-y-3">
-                <Link 
-                  to="/tools/email-generator" 
-                  className="block w-full"
-                >
-                  <Button variant="outline" className="w-full justify-start">
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    Generate Emails
-                  </Button>
-                </Link>
-                
-                <Link 
-                  to="/profile" 
-                  className="block w-full"
-                >
-                  <Button variant="outline" className="w-full justify-start">
-                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    Edit Profile
-                  </Button>
-                </Link>
-                
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => setShowHistory(!showHistory)}
-                >
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                  </svg>
-                  View History
-                </Button>
-              </div>
-            </div>
-          </Card>
-
-          {/* Subscription History */}
-          {showHistory && subscriptionHistory.length > 0 && (
-            <Card className="mt-6">
-              <div className="p-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Subscription History</h3>
-                
-                <div className="space-y-3">
-                  {subscriptionHistory.slice(0, 5).map((history, index) => (
-                    <div key={index} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-b-0">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {history.action === 'upgrade' ? '↑' : history.action === 'downgrade' ? '↓' : '→'} 
-                          {' '}{getTierDisplayName(history.to_tier)}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {formatDate(history.created_at)}
-                        </p>
-                      </div>
-                      <Badge colorScheme={getTierBadgeColor(history.to_tier)} variant="subtle">
-                        {history.action}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </Card>
-          )}
-
-          {/* Support Contact */}
-          <Card className="mt-6">
-            <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Need Help?</h3>
-              
-              <p className="text-gray-600 text-sm mb-4">
-                Have questions about your subscription or need to make changes? Our support team is here to help.
-              </p>
-              
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => showToast('Contact support at support@example.com', 'info')}
-              >
-                Contact Support
-              </Button>
-            </div>
-          </Card>
-        </div>
-      </div>
+    <div style={{ 
+      display: 'flex', 
+      justifyContent: 'center', 
+      alignItems: 'center', 
+      height: '50vh',
+      flexDirection: 'column',
+      gap: '1rem'
+    }}>
+      <Loader />
+      <p>Loading {pageName || 'page'}...</p>
+      {isDevelopment && (
+        <small style={{ color: '#666', fontSize: '0.8rem' }}>
+          Bundle: {pageName || 'Unknown'}
+        </small>
+      )}
     </div>
   );
 };
 
-export default Subscription;
+// Enhanced route wrapper with preloading
+const LazyRoute = ({ 
+  children, 
+  pageName, 
+  preloadOnHover = false, 
+  preloadFunction = null 
+}) => (
+  <Suspense 
+    fallback={<PageLoader pageName={pageName} />}
+    onMouseEnter={preloadOnHover && preloadFunction ? preloadFunction : undefined}
+  >
+    {children}
+  </Suspense>
+);
+
+const AppRoutes = () => {
+  // Track overall routing performance
+  useRenderTime('AppRoutes', isDevelopment);
+
+  return (
+    <Routes>
+      {/* Welcome Page - Root Route for Unauthenticated Users */}
+  <Route 
+    path="/" 
+    element={
+      <LazyRoute pageName="Welcome">
+        <Welcome />
+      </LazyRoute>
+    } 
+  />
+      {/* Auth Routes */}
+      <Route element={<AuthLayout />}>
+        <Route 
+          path="/login" 
+          element={
+            <LazyRoute pageName="Login">
+              <Login />
+            </LazyRoute>
+          } 
+        />
+        <Route 
+          path="/register" 
+          element={
+            <LazyRoute pageName="Register">
+              <Register />
+            </LazyRoute>
+          } 
+        />
+        <Route 
+          path="/reset-password" 
+          element={
+            <LazyRoute pageName="Reset Password">
+              <ResetPassword />
+            </LazyRoute>
+          } 
+        />
+      </Route>
+      
+      {/* Protected Routes - Main Application */}
+      <Route element={<MainLayout />}>
+        {/* <Route path="/" element={<Navigate to="/dashboard" replace />} /> */}
+
+        <Route 
+  path="/admin/users" 
+  element={
+    <LazyRoute pageName="Admin Users">
+      <AdminUsers />
+    </LazyRoute>
+  } 
+/>
+
+<Route 
+  path="/admin/fix-status" 
+  element={
+    <LazyRoute pageName="Fix Status">
+      <FixSuperAdmin />
+    </LazyRoute>
+  } 
+/>
+        
+        <Route 
+          path="/admin/ads" 
+          element={
+            <LazyRoute pageName="Admin Ads">
+              <AdminAds />
+            </LazyRoute>
+          } 
+        />
+        
+        <Route 
+          path="/dashboard" 
+          element={
+            <LazyRoute pageName="Dashboard">
+              <Dashboard />
+            </LazyRoute>
+          } 
+        />
+        
+        <Route 
+          path="/profile" 
+          element={
+            <LazyRoute pageName="Profile">
+              <Profile />
+            </LazyRoute>
+          } 
+        />
+        
+        {/* Email Generator Routes with Smart Preloading */}
+        <Route 
+          path="/email-generator" 
+          element={
+            <LazyRoute 
+              pageName="Email Generator"
+              preloadOnHover={true}
+              preloadFunction={preloadEmailComponents}
+            >
+              <SalesPageEmailGenerator />
+            </LazyRoute>
+          } 
+        />
+        <Route 
+          path="/tools/email-generator" 
+          element={
+            <LazyRoute 
+              pageName="Email Generator"
+              preloadOnHover={true}
+              preloadFunction={preloadEmailComponents}
+            >
+              <SalesPageEmailGenerator />
+            </LazyRoute>
+          } 
+        />
+        
+        {/* Email Series Routes */}
+        <Route 
+          path="/email-series" 
+          element={
+            <LazyRoute pageName="Email Series List">
+              <EmailSeriesListPage />
+            </LazyRoute>
+          } 
+        />
+        <Route 
+          path="/email-series/:seriesId" 
+          element={
+            <LazyRoute pageName="Email Series Detail">
+              <EmailSeriesDetailPage />
+            </LazyRoute>
+          } 
+        />
+        <Route 
+          path="/tools/email-series" 
+          element={
+            <LazyRoute pageName="Email Series List">
+              <EmailSeriesListPage />
+            </LazyRoute>
+          } 
+        />
+        <Route 
+          path="/tools/email-series/:seriesId" 
+          element={
+            <LazyRoute pageName="Email Series Detail">
+              <EmailSeriesDetailPage />
+            </LazyRoute>
+          } 
+        />
+        
+        {/* Future Features - Blog Post Creator */}
+        <Route 
+          path="/blog-creator" 
+          element={
+            <LazyRoute pageName="Blog Post Creator">
+              <BlogPostCreator />
+            </LazyRoute>
+          } 
+        />
+        
+        {/* Future Features - Newsletter Creator */}
+        <Route 
+          path="/newsletter-creator" 
+          element={
+            <LazyRoute pageName="Newsletter Creator">
+              <NewsletterCreator />
+            </LazyRoute>
+          } 
+        />
+      </Route>
+
+      <Route 
+  path="/subscription" 
+  element={
+    <LazyRoute pageName="Subscription">
+      <Subscription />
+    </LazyRoute>
+  } 
+/>
+      
+      {/* Fallback for undefined routes */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+};
+
+export default AppRoutes;
