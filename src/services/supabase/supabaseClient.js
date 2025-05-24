@@ -5,6 +5,24 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Validate environment variables
+if (!supabaseUrl) {
+  console.error('Missing VITE_SUPABASE_URL environment variable');
+  console.error('Available env vars:', Object.keys(import.meta.env));
+  throw new Error('Supabase URL is required. Please check your environment variables.');
+}
+
+if (!supabaseAnonKey) {
+  console.error('Missing VITE_SUPABASE_ANON_KEY environment variable');
+  console.error('Available env vars:', Object.keys(import.meta.env));
+  throw new Error('Supabase anon key is required. Please check your environment variables.');
+}
+
+// Log for debugging (you can remove this later)
+console.log('Environment:', import.meta.env.MODE);
+console.log('Supabase URL:', supabaseUrl ? 'Set' : 'Missing');
+console.log('Supabase Key:', supabaseAnonKey ? 'Set' : 'Missing');
+
 // Create a single supabase client for interacting with your database
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -36,7 +54,7 @@ export const supabaseDatabase = {
    */
   healthCheck: async () => {
     try {
-      const { data, error } = await supabase.from('email_series').select('id').limit(1);
+      const { error } = await supabase.from('email_series').select('id').limit(1);
       return !error;
     } catch (error) {
       console.error('Database health check failed:', error);
