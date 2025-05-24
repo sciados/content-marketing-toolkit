@@ -25,26 +25,38 @@ const AdminUsers = () => {
       try {
         setLoading(true);
         
-        // Fetch users
+        // Fetch users with basic profile data first
         const { data: usersData, error: usersError } = await supabase
           .from('profiles')
-          .select(`
-            *,
-            email_series:email_series(count),
-            emails:emails(count)
-          `)
+          .select('*')
           .order('created_at', { ascending: false });
 
         if (usersError) throw usersError;
         
-        // Format the data
-        const formattedUsers = usersData.map(user => ({
-          ...user,
-          series_count: user.email_series?.[0]?.count || 0,
-          email_count: user.emails?.[0]?.count || 0
-        }));
+        // Get counts for each user separately
+        const usersWithCounts = await Promise.all(
+          usersData.map(async (user) => {
+            // Count email series for this user
+            const { count: seriesCount } = await supabase
+              .from('email_series')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', user.id);
+            
+            // Count emails for this user
+            const { count: emailCount } = await supabase
+              .from('emails')
+              .select('*', { count: 'exact', head: true })
+              .eq('user_id', user.id);
+            
+            return {
+              ...user,
+              series_count: seriesCount || 0,
+              email_count: emailCount || 0
+            };
+          })
+        );
         
-        setUsers(formattedUsers);
+        setUsers(usersWithCounts);
         
         // Fetch tiers
         const tiersData = await subscriptions.getTiers();
@@ -137,7 +149,7 @@ const AdminUsers = () => {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <h3 className="text-sm font-medium text-gray-500">Free Users</h3>
           <p className="text-2xl font-bold text-gray-900 mt-2">
-            {users.filter(u => u.subscription_tier === 'free').length}
+            {users.filter(u => u.subscription_tier === 'free' || !u.subscription_tier).length}
           </p>
         </div>
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -199,8 +211,8 @@ const AdminUsers = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     <div className="text-xs">
-                      <div>Emails: {user.emails_generated || 0}</div>
-                      <div>Series: {user.series_count || 0}</div>
+                      <div>Emails: {user.email_count}</div>
+                      <div>Series: {user.series_count}</div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
