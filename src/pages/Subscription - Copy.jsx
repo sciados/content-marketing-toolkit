@@ -11,28 +11,25 @@ import Loader from '../components/Common/Loader';
 import Toast from '../components/Common/Toast';
 
 const Subscription = () => {
-  const { user } = useSupabase(); // Remove loading: authLoading if it's not working
+  const supabaseContext = useSupabase();
+  const { user, loading: authLoading } = supabaseContext;
   const { toast, showToast } = useToast();
   
-  // Add a local loading state for initial auth check
-  const [authReady, setAuthReady] = useState(false);
+  // Debug logging - let's see what the hook returns
+  console.log('=== SUBSCRIPTION DEBUG ===');
+  console.log('Full Supabase Context:', supabaseContext);
+  console.log('Auth Loading:', authLoading);
+  console.log('User:', user);
+  console.log('User exists:', !!user);
+  console.log('========================');
   
-  // State management
+  // State management (hooks must come first)
   const [loading, setLoading] = useState(true);
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [availableTiers, setAvailableTiers] = useState([]);
   const [usageStats, setUsageStats] = useState(null);
   const [subscriptionHistory, setSubscriptionHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
-
-  // Check auth state on mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setAuthReady(true);
-    }, 1000); // Give auth system time to load
-    
-    return () => clearTimeout(timer);
-  }, []);
 
   // Fetch subscription data on mount (hooks must be called unconditionally)
   useEffect(() => {
@@ -76,25 +73,26 @@ const Subscription = () => {
     fetchSubscriptionData();
   }, [user, showToast]);
 
-   // Debug logging
-  console.log('Auth Ready:', authReady);
-  console.log('User:', user);
+  // Debug logging
+  console.log('Subscription component - Auth Loading:', authLoading);
+  console.log('Subscription component - User:', user ? 'Authenticated' : 'Not authenticated');
+  console.log('Subscription component - User ID:', user?.id);
 
-  // Show initial loading
-  if (!authReady) {
+  // Redirect to login if not authenticated (after auth loading is complete)
+  if (!authLoading && !user) {
+    console.log('🔄 SHOULD REDIRECT: Auth loading complete, no user found');
+    return <Navigate to="/login" replace />;
+  }
+
+  // Show loading while authentication is being checked
+  if (authLoading) {
+    console.log('🔄 SHOWING AUTH LOADING');
     return (
       <div className="flex items-center justify-center h-80">
         <Loader size="lg" text="Checking authentication..." />
       </div>
     );
   }
-
-  // Redirect if no user after auth is ready
-  if (authReady && !user) {
-    console.log('🔄 REDIRECTING TO LOGIN');
-    return <Navigate to="/login" replace />;
-  }
-
 
   // Get tier badge color
   const getTierBadgeColor = (tierName) => {
