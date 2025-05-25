@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { extractDomain, createSeriesNameFromDomain } from '../services/emailGenerator';
 import { supabase } from '../services/supabase/supabaseClient';
+import { useUsageTracking } from './useUsageTracking'; // Add this import
 
 /**
  * Custom hook for saved emails management
@@ -23,6 +24,9 @@ export const useSavedEmails = ({
   const [emailCollections, setEmailCollections] = useState([]);
   const [loadingEmails, setLoadingEmails] = useState(true);
   const [emailLoadError, setEmailLoadError] = useState(null);
+  
+  // Add usage tracking hook
+  const { trackEmailSaved } = useUsageTracking();
   
   // Update profile statistics function
   const updateProfileStats = useCallback(async (statsToUpdate) => {
@@ -144,7 +148,6 @@ export const useSavedEmails = ({
     return result;
   }, []);
   
-  // Load saved emails
   // Load saved emails
 const loadSavedEmails = useCallback(async () => {
   setLoadingEmails(true);
@@ -312,6 +315,15 @@ const loadSavedEmails = useCallback(async () => {
           emailWithMetadata.id = data[0].id;
         }
         
+        // 🎯 TRACK USAGE: Email saved
+        try {
+          await trackEmailSaved(1);
+          console.log('✅ Usage tracked: 1 email saved');
+        } catch (trackingError) {
+          console.error('Error tracking email save:', trackingError);
+          // Don't fail the whole operation if tracking fails
+        }
+        
         // Update profile statistics
         await updateProfileStats({ emailsSaved: 1 });
       }
@@ -337,7 +349,8 @@ const loadSavedEmails = useCallback(async () => {
     isUsingAI, 
     showToast, 
     groupEmailsIntoCollections,
-    updateProfileStats
+    updateProfileStats,
+    trackEmailSaved // Add to dependencies
   ]);
   
   // Save the entire series
@@ -417,6 +430,15 @@ const loadSavedEmails = useCallback(async () => {
           
           if (emailsError) throw emailsError;
           
+          // 🎯 TRACK USAGE: Multiple emails saved
+          try {
+            await trackEmailSaved(newEmails.length);
+            console.log(`✅ Usage tracked: ${newEmails.length} emails saved`);
+          } catch (trackingError) {
+            console.error('Error tracking email series save:', trackingError);
+            // Don't fail the whole operation if tracking fails
+          }
+          
           // Update profile statistics
           await updateProfileStats({
             emailsSaved: newEmails.length,
@@ -463,12 +485,12 @@ const loadSavedEmails = useCallback(async () => {
         // For non-authenticated users, save to localStorage with generated IDs
         const seriesId = `series-${Date.now()}`;
         const seriesEmails = newEmails.map((email) => ({
-  ...email,
-  id: `email-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-  seriesId,
-  seriesName,
-  savedAt: new Date().toISOString()
-}));
+          ...email,
+          id: `email-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          seriesId,
+          seriesName,
+          savedAt: new Date().toISOString()
+        }));
         
         // Update local state
         setSavedEmails(prev => [...prev, ...seriesEmails]);
@@ -495,7 +517,8 @@ const loadSavedEmails = useCallback(async () => {
     emailLayout, 
     showToast, 
     groupEmailsIntoCollections,
-    updateProfileStats
+    updateProfileStats,
+    trackEmailSaved // Add to dependencies
   ]);
   
   // Delete a saved email
@@ -530,7 +553,6 @@ const loadSavedEmails = useCallback(async () => {
   }, [user, savedEmails, showToast, groupEmailsIntoCollections, updateProfileStats]);
   
   // Test Supabase connection - for debugging
-  // Test Supabase connection - for debugging
 const testSupabaseConnection = useCallback(async () => {
   try {
     // Change this line to not declare the unused variable
@@ -547,7 +569,6 @@ const testSupabaseConnection = useCallback(async () => {
     console.error('Supabase connection error:', error);
   }
 }, [loadSavedEmails, showToast]);
-
 
   return {
     savedEmails,

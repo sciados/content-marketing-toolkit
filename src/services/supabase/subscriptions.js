@@ -100,13 +100,14 @@ export const subscriptions = {
 
     const { data, error } = await supabase
       .rpc('check_usage_limit', {
-        user_id: user.id,
-        limit_type: limitType
+        p_user_id: user.id,
+        p_limit_type: limitType
       });
     
     if (error) throw error;
     
-    return data[0] || {
+    // The function returns JSON, so parse it
+    return data || {
       allowed: false,
       current_usage: 0,
       limit_value: 0,
@@ -126,9 +127,9 @@ export const subscriptions = {
 
     const { error } = await supabase
       .rpc('update_usage_tracking', {
-        user_id: user.id,
-        usage_type: usageType,
-        amount: amount
+        p_user_id: user.id,
+        p_usage_type: usageType,
+        p_amount: amount
       });
     
     if (error) throw error;
@@ -142,24 +143,54 @@ export const subscriptions = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Not authenticated');
 
-    const currentMonth = new Date();
-    currentMonth.setDate(1);
-    currentMonth.setHours(0, 0, 0, 0);
+    // Get first day of current month in UTC to avoid timezone issues
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth(); // 0-based (0 = January, 4 = May)
+    
+    // Create date in UTC to avoid timezone shifting
+    const currentMonthStart = new Date(Date.UTC(year, month, 1));
+    const monthString = currentMonthStart.toISOString().split('T')[0];
+
+    console.log('🔍 Usage tracking for current month:');
+    console.log('  - Today:', now.toISOString());
+    console.log('  - Current month start:', currentMonthStart.toISOString());
+    console.log('  - Querying for month:', monthString);
+    console.log('  - User ID:', user.id);
 
     const { data, error } = await supabase
       .from('usage_tracking')
       .select('*')
       .eq('user_id', user.id)
-      .eq('month', currentMonth.toISOString().split('T')[0])
+      .eq('month', monthString)
       .single();
     
-    if (error && error.code !== 'PGRST116') throw error;
+    console.log('🔍 Usage query result:', { data, error });
     
-    return data || {
-      emails_generated: 0,
-      emails_saved: 0,
-      ai_tokens_used: 0,
-      series_created: 0
+    // If no record exists (PGRST116 is "no rows returned"), return zeros
+    if (error && error.code === 'PGRST116') {
+      console.log('📊 No usage record found for', monthString, '- returning zeros');
+      return {
+        emails_generated: 0,
+        emails_saved: 0,
+        ai_tokens_used: 0,
+        series_created: 0
+      };
+    }
+    
+    // If other error, throw it
+    if (error) {
+      console.error('❌ Error fetching usage stats:', error);
+      throw error;
+    }
+    
+    console.log('📊 Found usage data for', monthString, ':', data);
+    
+    return {
+      emails_generated: data.emails_generated || 0,
+      emails_saved: data.emails_saved || 0,
+      ai_tokens_used: data.ai_tokens_used || 0,
+      series_created: data.series_created || 0
     };
   },
 
