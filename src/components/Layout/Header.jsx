@@ -1,10 +1,12 @@
-// src/components/Layout/Header.jsx - Fixed Complete Version
+// src/components/Layout/Header.jsx - With First Name Display
 import React from 'react';
 import { Link } from 'react-router-dom';
 import useSupabase from '../../hooks/useSupabase';
+import { useProfile } from '../../hooks/useProfile';
 
 const Header = () => {
   const { user, logout } = useSupabase();
+  const { firstName } = useProfile();
   
   const handleLogout = async () => {
     try {
@@ -26,7 +28,7 @@ const Header = () => {
         
         <div className="flex items-center">
           {user ? (
-            // User is logged in - show authenticated menu with Analytics
+            // User is logged in - show authenticated menu with first name
             <>
               <Link to="/dashboard" className="text-gray-600 hover:text-indigo-600 mx-3">
                 Dashboard
@@ -43,12 +45,19 @@ const Header = () => {
               <Link to="/subscription" className="text-gray-600 hover:text-indigo-600 mx-3">
                 Subscription
               </Link>
-              <button
-                onClick={handleLogout}
-                className="ml-4 px-4 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200"
-              >
-                Sign Out
-              </button>
+              
+              {/* User greeting with first name */}
+              <div className="ml-4 flex items-center">
+                <span className="text-sm text-gray-600 mr-3">
+                  Hi, <span className="font-medium text-gray-800">{firstName}</span>!
+                </span>
+                <button
+                  onClick={handleLogout}
+                  className="px-4 py-2 bg-red-100 text-red-600 rounded hover:bg-red-200 text-sm"
+                >
+                  Sign Out
+                </button>
+              </div>
             </>
           ) : (
             // User is NOT logged in - show auth links

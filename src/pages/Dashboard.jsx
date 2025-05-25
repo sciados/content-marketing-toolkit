@@ -1,11 +1,13 @@
-// src/pages/Dashboard.jsx - Updated with Analytics card
+// src/pages/Dashboard.jsx - With Personalized Greeting
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase/supabaseClient';
+import { useProfile } from '../hooks/useProfile';
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { firstName, profileStats } = useProfile();
   
   console.log("Dashboard component rendering");
   
@@ -90,13 +92,13 @@ const Dashboard = () => {
         <p className="text-gray-600">Welcome to your content marketing toolkit.</p>
       </div>
       
-      {/* User welcome section */}
+      {/* User welcome section with personalized greeting */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-md mb-8">
         <div className="p-6 text-white">
           <div className="flex items-center">
             <div className="flex-shrink-0">
               <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center text-white text-xl font-semibold">
-                {user?.email?.[0]?.toUpperCase() || '?'}
+                {firstName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || '?'}
               </div>
             </div>
             <div className="ml-4">
@@ -104,10 +106,19 @@ const Dashboard = () => {
                 {loading ? (
                   <span className="animate-pulse bg-white/20 h-6 w-40 inline-block rounded"></span>
                 ) : (
-                  `Welcome${user ? ', ' + (user.email || 'User') : ''}!`
+                  `Welcome back, ${firstName}!`
                 )}
               </h2>
               <p className="text-indigo-100">What would you like to create today?</p>
+              {profileStats && (
+                <p className="text-indigo-200 text-sm mt-1">
+                  {profileStats.subscriptionTier === 'free' ? 'Free Plan' : 
+                   profileStats.subscriptionTier === 'pro' ? 'Pro Plan' :
+                   profileStats.subscriptionTier === 'gold' ? 'Gold Plan' : 
+                   'Premium Plan'} • 
+                  {profileStats.emailsSaved || 0}/{profileStats.emailQuota || 0} emails used
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -126,7 +137,7 @@ const Dashboard = () => {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500">Emails Created</p>
-                  <p className="text-2xl font-semibold text-gray-900">-</p>
+                  <p className="text-2xl font-semibold text-gray-900">{profileStats?.emailsSaved || 0}</p>
                 </div>
               </div>
               <div className="mt-2">
@@ -145,7 +156,7 @@ const Dashboard = () => {
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500">Email Series</p>
-                  <p className="text-2xl font-semibold text-gray-900">-</p>
+                  <p className="text-2xl font-semibold text-gray-900">{profileStats?.seriesCount || 0}</p>
                 </div>
               </div>
               <div className="mt-2">
@@ -163,13 +174,15 @@ const Dashboard = () => {
                   </svg>
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-500">This Month</p>
-                  <p className="text-2xl font-semibold text-gray-900">-</p>
+                  <p className="text-sm font-medium text-gray-500">Plan Status</p>
+                  <p className="text-2xl font-semibold text-gray-900 capitalize">
+                    {profileStats?.subscriptionTier || 'Free'}
+                  </p>
                 </div>
               </div>
               <div className="mt-2">
                 <Link to="/subscription" className="text-sm text-purple-600 hover:text-purple-500">
-                  View Limits →
+                  Manage Plan →
                 </Link>
               </div>
             </div>

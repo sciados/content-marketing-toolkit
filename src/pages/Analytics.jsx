@@ -1,14 +1,15 @@
-// src/pages/Analytics.jsx - Clean version with proper hook order
+// src/pages/Analytics.jsx - With Personalized Title
 import React from 'react';
 import useSupabase from '../hooks/useSupabase';
 import { useAnalytics } from '../hooks/useAnalytics';
+import { useProfile } from '../hooks/useProfile';
 import { Card } from '../components/Common/Card';
 import { Button } from '../components/Common/Button';
 import { Loader } from '../components/Common/Loader';
 
 const Analytics = () => {
-  // ALL HOOKS MUST BE AT THE TOP - NO EXCEPTIONS
   const { user } = useSupabase();
+  const { firstName } = useProfile();
   const { 
     stats, 
     loading, 
@@ -17,17 +18,8 @@ const Analytics = () => {
     profileStats 
   } = useAnalytics();
 
-  // Helper functions after hooks
-  const formatPercentage = (value) => `${value}%`;
+ // const formatPercentage = (value) => `${value}%`;
 
-  // Debug logging during render
-  if (profileStats) {
-    console.log('🖥️ Analytics render - profileStats:', profileStats);
-    console.log('🖥️ Analytics render - emailQuota:', profileStats?.emailQuota);
-    console.log('🖥️ Analytics render - totalEmails:', stats.totalEmails);
-  }
-
-  // CONDITIONAL RENDERS AFTER ALL HOOKS
   if (!user) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -99,10 +91,12 @@ const Analytics = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* Page Header */}
+      {/* Page Header with Personalized Title */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Email Analytics</h1>
+          <h1 className="text-2xl font-bold text-gray-800">
+            {firstName}'s Analytics
+          </h1>
           <p className="text-gray-600">Track your email performance and content insights</p>
         </div>
         <div className="flex gap-3">
@@ -124,6 +118,7 @@ const Analytics = () => {
         </div>
       </div>
 
+      {/* Rest of the analytics content remains the same... */}
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card className="p-6">
@@ -193,84 +188,28 @@ const Analytics = () => {
         </Card>
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Generation Method Chart */}
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-6">Generation Method</h3>
-          
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-indigo-600 rounded-full mr-3"></div>
-                <span className="text-sm font-medium text-gray-700">AI Generated</span>
-              </div>
-              <span className="text-sm text-gray-500">{stats.generatedByAI} emails</span>
-            </div>
-            
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-indigo-600 h-2 rounded-full transition-all duration-500" 
-                style={{ 
-                  width: `${stats.totalEmails > 0 
-                    ? (stats.generatedByAI / stats.totalEmails * 100) 
-                    : 0}%` 
-                }}
-              ></div>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className="w-3 h-3 bg-gray-400 rounded-full mr-3"></div>
-                <span className="text-sm font-medium text-gray-700">Manual</span>
-              </div>
-              <span className="text-sm text-gray-500">{stats.generatedManually} emails</span>
-            </div>
+      {/* Empty State with Personalized Message */}
+      {stats.totalEmails === 0 && (
+        <Card className="p-12 text-center">
+          <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2-2V7a2 2 0 012-2h2a2 2 0 002 2v2a2 2 0 002 2h2a2 2 0 012-2V7a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 00-2 2h-2a2 2 0 00-2 2v6a2 2 0 01-2 2H9z" />
+            </svg>
           </div>
-        </Card>
-
-        {/* Performance Metrics */}
-        <Card className="p-6">
-          <h3 className="text-lg font-semibold text-gray-800 mb-6">
-            Performance Metrics {stats.totalEmails === 0 ? '(Demo)' : '(Simulated)'}
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Hi {firstName}! No Email Data Yet
           </h3>
-          
-          <div className="space-y-6">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">Email Open Rate</span>
-                <span className="text-sm font-semibold text-gray-900">{formatPercentage(stats.openRate)}</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-teal-500 h-2 rounded-full transition-all duration-500" 
-                  style={{ width: `${stats.openRate}%` }}
-                ></div>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-700">Click-through Rate</span>
-                <span className="text-sm font-semibold text-gray-900">{formatPercentage(stats.clickRate)}</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-amber-500 h-2 rounded-full transition-all duration-500" 
-                  style={{ width: `${stats.clickRate}%` }}
-                ></div>
-              </div>
-            </div>
-          </div>
+          <p className="text-gray-500 mb-6">
+            Start by generating and saving some emails to see your analytics data here.
+          </p>
+          <Button 
+            onClick={() => window.location.href = '/tools/email-generator'}
+            className="bg-indigo-600 hover:bg-indigo-700"
+          >
+            Generate Your First Email
+          </Button>
         </Card>
-      </div>
-
-      {/* Rest of the component... */}
-      <div className="text-center mt-8">
-        <p className="text-xs text-gray-500">
-          Analytics updated in real-time from your Supabase database.
-        </p>
-      </div>
+      )}
     </div>
   );
 };

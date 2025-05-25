@@ -1,4 +1,4 @@
-// src/hooks/useProfile.js - Fixed quota handling
+// src/hooks/useProfile.js - Enhanced with name support
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase/supabaseClient';
 import useSupabase from './useSupabase';
@@ -10,7 +10,8 @@ const DEFAULT_QUOTAS = {
   free: 10,
   pro: 200,
   gold: 1000,
-  enterprise: 5000
+  enterprise: 5000,
+  superadmin: 5000
 };
 
 export const useProfile = () => {
@@ -24,6 +25,44 @@ export const useProfile = () => {
   const getQuotaForTier = (tier) => {
     return DEFAULT_QUOTAS[tier?.toLowerCase()] || DEFAULT_QUOTAS.free;
   };
+  
+  // Helper function to get display name
+  const getDisplayName = useCallback((profileData) => {
+    if (!profileData) return 'User';
+    
+    const firstName = profileData.first_name;
+    const lastName = profileData.last_name;
+    const email = profileData.email;
+    
+    // Priority: First Name > First + Last > Email username > "User"
+    if (firstName && lastName) {
+      return `${firstName} ${lastName}`;
+    } else if (firstName) {
+      return firstName;
+    } else if (email) {
+      return email.split('@')[0]; // Use email username as fallback
+    }
+    
+    return 'User';
+  }, []);
+  
+  // Helper function to get first name only
+  const getFirstName = useCallback((profileData) => {
+    if (!profileData) return 'User';
+    
+    const firstName = profileData.first_name;
+    const email = profileData.email;
+    
+    if (firstName) {
+      return firstName;
+    } else if (email) {
+      // Capitalize first letter of email username
+      const emailUsername = email.split('@')[0];
+      return emailUsername.charAt(0).toUpperCase() + emailUsername.slice(1);
+    }
+    
+    return 'User';
+  }, []);
   
   // Refresh profile stats function
   const refreshProfileStats = useCallback(async () => {
@@ -69,7 +108,12 @@ export const useProfile = () => {
         seriesCount: freshProfile.series_count || 0,
         tokensUsed: freshProfile.tokens_used || 0,
         tokenQuota: freshProfile.token_quota || 2000,
-        lastReset: freshProfile.last_reset
+        lastReset: freshProfile.last_reset,
+        // Add name fields
+        firstName: freshProfile.first_name,
+        lastName: freshProfile.last_name,
+        displayName: getDisplayName(freshProfile),
+        firstNameOnly: getFirstName(freshProfile)
       };
       
       console.log('✅ Updated profile stats:', updatedStats);
@@ -82,7 +126,7 @@ export const useProfile = () => {
       console.error('❌ Error refreshing profile stats:', err);
       throw err;
     }
-  }, [user]);
+  }, [user, getDisplayName, getFirstName]);
   
   // Fetch profile data function
   const fetchProfile = useCallback(async () => {
@@ -143,7 +187,13 @@ export const useProfile = () => {
         // Try the profiles service first
         const stats = await profiles.getProfileStats();
         console.log('📊 Got stats from service:', stats);
-        setProfileStats(stats);
+        setProfileStats({
+          ...stats,
+          displayName: getDisplayName(data),
+          firstNameOnly: getFirstName(data),
+          firstName: data?.first_name,
+          lastName: data?.last_name
+        });
       } catch (statsError) {
         console.error('⚠️ Stats service failed, calculating manually:', statsError);
         
@@ -165,11 +215,16 @@ export const useProfile = () => {
           subscriptionStatus: profileData?.subscription_status || 'active',
           emailsGenerated: profileData?.emails_generated || 0,
           emailsSaved: profileData?.emails_saved || 0,
-          emailQuota: emailQuota, // Use calculated quota, not hardcoded 100!
+          emailQuota: emailQuota,
           seriesCount: profileData?.series_count || 0,
           tokensUsed: profileData?.tokens_used || 0,
           tokenQuota: profileData?.token_quota || 2000,
-          lastReset: profileData?.last_reset
+          lastReset: profileData?.last_reset,
+          // Add name fields
+          firstName: profileData?.first_name,
+          lastName: profileData?.last_name,
+          displayName: getDisplayName(profileData),
+          firstNameOnly: getFirstName(profileData)
         };
         
         console.log('🔧 Using fallback stats:', fallbackStats);
@@ -182,7 +237,7 @@ export const useProfile = () => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, getDisplayName, getFirstName]);
   
   // Initial fetch
   useEffect(() => {
@@ -282,6 +337,9 @@ export const useProfile = () => {
     updateProfile,
     updateAvatar,
     fetchProfile,
-    refreshProfileStats
+    refreshProfileStats,
+    // New convenience methods
+    displayName: profileStats?.displayName || 'User',
+    firstName: profileStats?.firstNameOnly || 'User'
   };
 };
