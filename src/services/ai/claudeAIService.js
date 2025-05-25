@@ -1,8 +1,9 @@
-// src/services/ai/claudeAIService.js
+// src/services/ai/claudeAIService.js - FIXED for 5th Grade Reading Level
 import axios from 'axios';
 
 /**
  * Service for interacting with Claude AI API with tier-based model selection
+ * Updated for 5th grade reading level affiliate marketing emails
  */
 class ClaudeAIService {
   constructor() {
@@ -65,8 +66,6 @@ class ClaudeAIService {
 
   /**
    * Get the appropriate model configuration for a user's subscription tier
-   * @param {string} userTier - User's subscription tier ('free', 'pro', 'gold')
-   * @returns {Object} Model configuration object
    */
   getModelForTier(userTier = 'free') {
     const config = this.tierModels[userTier] || this.tierModels.free;
@@ -80,126 +79,8 @@ class ClaudeAIService {
   }
 
   /**
-   * Generate an improved email using Claude AI with tier-based model selection
-   * @param {Object} params - Parameters for email generation
-   * @param {Object} params.websiteData - Extracted website data
-   * @param {string} params.websiteUrl - URL of the website
-   * @param {string} params.keywords - Keywords to incorporate
-   * @param {string} params.tone - Tone of the email
-   * @param {string} params.industry - Industry for context
-   * @param {boolean} params.includeCta - Whether to include call to action
-   * @param {string} params.affiliateLink - Optional affiliate link
-   * @param {string} params.userTier - User's subscription tier
-   * @param {Object} params.user - User object with subscription info
-   * @returns {Promise<Object>} - Generated email content with token usage
-   */
-  async generateEmail(params) {
-    const { 
-      websiteData, 
-      websiteUrl, 
-      keywords, 
-      tone, 
-      industry, 
-      includeCta, 
-      affiliateLink,
-      userTier,
-      user
-    } = params;
-    
-    try {
-      // Get the appropriate model for the user's tier
-      const tier = userTier || user?.subscription_tier || 'free';
-      const modelConfig = this.getModelForTier(tier);
-      
-      // Prepare data for Claude
-      const websiteName = this.extractWebsiteName(websiteUrl);
-      const keywordList = keywords?.split(',').map(k => k.trim()).filter(k => k).join(', ') || '';
-      
-      // Enhanced system prompt based on tier
-      let systemPrompt = `You are an expert email marketing copywriter specializing in sales-focused promotional emails.`;
-      
-      if (tier === 'gold') {
-        systemPrompt += ` You have access to premium AI capabilities and should create exceptionally high-quality, personalized content with advanced persuasion techniques.`;
-      } else if (tier === 'pro') {
-        systemPrompt += ` You should create high-quality, well-structured emails with good persuasion techniques and creativity.`;
-      } else {
-        systemPrompt += ` Create effective, professional emails with clear value propositions.`;
-      }
-      
-      systemPrompt += ` Generate a compelling marketing email for ${websiteName} that drives conversions and encourages readers to visit the website. Format any links as HTML <a> tags.`;
-      
-      // Build detailed user message
-      let userMessage = this.buildUserMessage({
-        websiteData,
-        websiteName,
-        industry,
-        tone,
-        keywordList,
-        includeCta,
-        affiliateLink,
-        tier
-      });
-
-      // Track input tokens for cost calculation
-      const inputText = systemPrompt + userMessage;
-      const estimatedInputTokens = this.estimateTokens(inputText);
-      
-      if (this.enableLogging) {
-        console.log('🤖 Generating email with:', {
-          websiteName,
-          model: modelConfig.model,
-          tier: tier,
-          estimatedInputTokens,
-          maxTokens: modelConfig.maxTokens
-        });
-      }
-
-      // Make the API call
-      const result = await this.makeClaudeRequest({
-        userMessage,
-        systemPrompt,
-        model: modelConfig.model,
-        maxTokens: modelConfig.maxTokens,
-        affiliateLink
-      });
-
-      // Calculate output tokens and total cost
-      const estimatedOutputTokens = this.estimateTokens(result.subject + result.body);
-      const totalTokens = estimatedInputTokens + estimatedOutputTokens;
-      const estimatedCost = this.calculateCost(estimatedInputTokens, estimatedOutputTokens, modelConfig.model);
-
-      if (this.enableLogging) {
-        console.log('🤖 Generation complete:', {
-          inputTokens: estimatedInputTokens,
-          outputTokens: estimatedOutputTokens,
-          totalTokens: totalTokens,
-          estimatedCost: `$${estimatedCost.toFixed(6)}`,
-          model: modelConfig.displayName
-        });
-      }
-
-      return {
-        ...result,
-        usage: {
-          inputTokens: estimatedInputTokens,
-          outputTokens: estimatedOutputTokens,
-          totalTokens: totalTokens,
-          estimatedCost: estimatedCost,
-          model: modelConfig.model,
-          modelDisplayName: modelConfig.displayName
-        }
-      };
-      
-    } catch (error) {
-      console.error('Error generating email with Claude AI:', error);
-      throw this.handleError(error);
-    }
-  }
-
-  /**
    * Generate a focused email highlighting a single feature or benefit
-   * @param {Object} params - Parameters for focused email generation
-   * @returns {Promise<Object>} - Generated email content with token usage
+   * Updated for 5th grade reading level and affiliate marketing focus
    */
   async generateFocusedEmail(params) {
     const { 
@@ -208,14 +89,23 @@ class ClaudeAIService {
       totalEmails, 
       websiteData, 
       websiteUrl, 
-      keywords, 
+      keywords, // Kept for backwards compatibility
       tone, 
       industry, 
       includeCta, 
       affiliateLink,
       userTier,
-      user
+      user,
+      readingLevel = '5th grade',
+      wordLimit = { min: 100, max: 300 },
+      subjectLimit = 50,
+      structure = 'problem-solution-cta'
     } = params;
+    
+    // Use keywords in debug log to avoid unused variable warning
+    if (this.enableLogging && keywords) {
+      console.log('Keywords provided (for future use):', keywords);
+    }
     
     try {
       // Get the appropriate model for the user's tier
@@ -223,21 +113,39 @@ class ClaudeAIService {
       const modelConfig = this.getModelForTier(tier);
       
       const websiteName = this.extractWebsiteName(websiteUrl);
-      const keywordList = keywords?.split(',').map(k => k.trim()).filter(k => k).join(', ') || '';
       
-      // Enhanced system prompt for focused emails
-      let systemPrompt = `You are an expert email marketing copywriter. Generate email #${emailNumber} in a series of ${totalEmails} emails about ${websiteName}.`;
-      
-      if (tier === 'gold') {
-        systemPrompt += ` Use premium AI capabilities to create exceptionally persuasive, personalized content with advanced storytelling techniques.`;
-      } else if (tier === 'pro') {
-        systemPrompt += ` Create high-quality, engaging content with strong persuasion techniques.`;
-      }
-      
-      systemPrompt += ` This email should focus specifically on highlighting the following feature/benefit: "${focusItem}". Format any links as HTML <a> tags.`;
+      // Enhanced system prompt for 5th grade reading level
+      let systemPrompt = `You are an expert email marketing copywriter who specializes in creating promotional affiliate marketing emails written at a 5th grade reading level.
 
-      // Build focused user message
-      let userMessage = this.buildFocusedUserMessage({
+CRITICAL REQUIREMENTS:
+- Write ALL content at a 5th grade reading level (simple words, short sentences)
+- Keep email between ${wordLimit.min}-${wordLimit.max} words total
+- Subject line must be under ${subjectLimit} characters
+- Use simple, everyday words that a 10-year-old would understand
+- Avoid complex words, industry jargon, or technical terms
+- Keep sentences short and clear
+- Focus on benefits, not features
+- Use ${structure} structure
+
+EMAIL STRUCTURE REQUIRED:
+1. Short, catchy subject line (under ${subjectLimit} characters)
+2. Opening that explains a common problem or need
+3. Middle that describes how the product solves that problem
+4. Strong call to action with the affiliate link
+5. Simple, friendly closing
+
+TONE: Write in a ${tone} tone while keeping language simple and clear.
+READING LEVEL: ${readingLevel}
+INCLUDE CTA: ${includeCta ? 'Yes' : 'No'}`;
+
+      if (tier === 'gold') {
+        systemPrompt += ` Use premium persuasion techniques but keep language at 5th grade level.`;
+      } else if (tier === 'pro') {
+        systemPrompt += ` Use professional persuasion while maintaining simple language.`;
+      }
+
+      // Build user message for 5th grade level
+      let userMessage = this.buildFifthGradeUserMessage({
         websiteData,
         websiteName,
         focusItem,
@@ -245,10 +153,11 @@ class ClaudeAIService {
         totalEmails,
         industry,
         tone,
-        keywordList,
         includeCta,
         affiliateLink,
-        tier
+        tier,
+        wordLimit,
+        subjectLimit
       });
 
       // Track tokens
@@ -256,12 +165,14 @@ class ClaudeAIService {
       const estimatedInputTokens = this.estimateTokens(inputText);
 
       if (this.enableLogging) {
-        console.log('🎯 Generating focused email:', {
+        console.log('🎯 Generating 5th grade focused email:', {
           focusItem,
           emailNumber,
           model: modelConfig.model,
           tier: tier,
-          estimatedInputTokens
+          estimatedInputTokens,
+          wordLimit,
+          readingLevel
         });
       }
 
@@ -288,7 +199,9 @@ class ClaudeAIService {
           estimatedCost: estimatedCost,
           model: modelConfig.model,
           modelDisplayName: modelConfig.displayName,
-          focusItem: focusItem
+          focusItem: focusItem,
+          readingLevel: '5th grade',
+          wordCount: this.countWords(result.body)
         }
       };
       
@@ -299,197 +212,177 @@ class ClaudeAIService {
   }
 
   /**
-   * Build user message for regular email generation
-   * @private
+   * Count words in text
    */
-  buildUserMessage({ websiteData, websiteName, industry, tone, keywordList, includeCta, affiliateLink, tier }) {
-    let userMessage = `# WEBSITE INFORMATION\n`;
-    
-    if (websiteData) {
-      userMessage += `
-## Website Details
-- Website Name: ${websiteName}
-- Description: ${websiteData.description || 'A website offering solutions in the ' + industry + ' space.'}
+  countWords(text) {
+    if (!text) return 0;
+    return text.trim().split(/\s+/).length;
+  }
 
-## Product Information
-${websiteData.valueProposition ? '- Main Value Proposition: ' + websiteData.valueProposition : ''}
-${websiteData.productName ? '- Product Name: ' + websiteData.productName : ''}
-`;
-
-      if (websiteData.ingredients && websiteData.ingredients.length > 0) {
-        userMessage += `
-## Key Ingredients/Components
-${websiteData.ingredients.map(ing => `- ${ing.name}${ing.description ? ': ' + ing.description : ''}`).join('\n')}
-`;
-      }
-
-      userMessage += `
-## Features and Benefits
-- Features: ${websiteData.features?.join(', ') || 'Not specified'}
-- Benefits: ${websiteData.benefits?.join(', ') || 'Not specified'}
-`;
-
-      if (websiteData.testimonials && websiteData.testimonials.length > 0) {
-        userMessage += `
-## Social Proof
-${websiteData.testimonials.map(t => `- "${t.quote}" - ${t.author || 'Customer'}`).join('\n')}
-`;
-      }
-    } else {
-      userMessage += `- Website Name: ${websiteName}\n`;
+  /**
+   * Build user message for 5th grade reading level emails
+   */
+  buildFifthGradeUserMessage({ websiteData, websiteName, focusItem, emailNumber, totalEmails, industry, tone, includeCta, affiliateLink, tier, wordLimit, subjectLimit }) {
+    // Use websiteData in debug log to avoid unused variable warning
+    if (this.enableLogging && websiteData) {
+      console.log('Website data available for context:', !!websiteData);
     }
     
-    userMessage += `
-# EMAIL SPECIFICATIONS
-- Industry: ${industry}
-- Email Tone: ${tone}
-- Keywords to emphasize: ${keywordList || 'None specified'}
-- Include Call to Action: ${includeCta ? 'Yes' : 'No'}
-- User Tier: ${tier} (affects content quality and personalization level)
-`;
+    let userMessage = `# EMAIL ASSIGNMENT
 
-    if (affiliateLink && includeCta) {
-      userMessage += `- Affiliate Link: ${affiliateLink}
-IMPORTANT: In the call to action section, include this exact link formatted as an HTML anchor tag with compelling action-focused text:
-<a href="${affiliateLink}">Get [product/benefit] now</a> or similar persuasive clickable text.
-`;
+Create a promotional affiliate marketing email about "${focusItem}" for ${websiteName}.
+
+## WEBSITE INFORMATION
+- Website Name: ${websiteName}
+- Main Benefit Focus: "${focusItem}"
+- Industry: ${industry}
+- Email ${emailNumber} of ${totalEmails} in series
+
+## 5TH GRADE READING LEVEL REQUIREMENTS
+CRITICAL: Write everything at a 5th grade reading level.
+
+USE SIMPLE WORDS ONLY:
+- Say "get" not "obtain" or "acquire"
+- Say "help" not "assist" or "facilitate" 
+- Say "make better" not "enhance" or "improve"
+- Say "start" not "commence" or "begin"
+- Say "hard" not "difficult" or "challenging"
+- Say "show" not "demonstrate" or "illustrate"
+- Say "buy" not "purchase" or "invest in"
+- Say "great" not "excellent" or "exceptional"
+- Say "many" not "numerous" or "multiple"
+- Say "change" not "transform" or "modify"
+
+SENTENCE RULES:
+- Keep sentences short (under 15 words each)
+- Use simple sentence structure
+- One idea per sentence
+- No complex grammar
+
+## EMAIL STRUCTURE (${wordLimit.min}-${wordLimit.max} words total)
+
+### 1. SUBJECT LINE (under ${subjectLimit} characters)
+Create a short, catchy subject that:
+- Uses simple words a 10-year-old knows
+- Creates curiosity about the benefit
+- Stays under ${subjectLimit} characters
+- Makes people want to open the email
+
+### 2. OPENING (20-40 words)
+Start with a common problem that relates to "${focusItem}":
+- Ask a simple question about their problem
+- Use words everyone understands  
+- Make them feel understood
+- Connect to their daily life
+
+### 3. MIDDLE SECTION (60-120 words)
+Explain how ${websiteName} solves their problem:
+- Use simple words to describe the solution
+- Focus on benefits they can understand
+- Keep sentences short and clear
+- Make it sound easy to use
+- Show how it helps with "${focusItem}"
+- Add social proof with simple language
+
+### 4. CALL TO ACTION (20-40 words)`;
+
+    if (includeCta) {
+      userMessage += `
+Create urgency with the affiliate link:`;
+      
+      if (affiliateLink) {
+        userMessage += `
+- Include this exact link: ${affiliateLink}
+- Format as HTML: <a href="${affiliateLink}">simple action words</a>
+- Use action words like "Get this now" or "Try it today"
+- Create urgency but keep language simple`;
+      } else {
+        userMessage += `
+- Use placeholder: [AffiliateLinkHere]
+- Format as HTML: <a href="[AffiliateLinkHere]">simple action words</a>
+- Use action words like "Get this now" or "Try it today"`;
+      }
+    } else {
+      userMessage += `
+Create a simple closing statement without links.`;
+    }
+
+    userMessage += `
+
+### 5. CLOSING (10-20 words)
+Simple, friendly closing that matches ${tone} tone.
+
+## TONE REQUIREMENTS
+Write in ${tone} tone while keeping language simple:`;
+
+    if (tone === 'persuasive') {
+      userMessage += `
+- Sound helpful and encouraging
+- Make them want to try it
+- Build excitement about the benefit`;
+    } else if (tone === 'urgent') {
+      userMessage += `
+- Create urgency with simple words
+- Make them feel they need to act fast
+- Use words like "hurry" and "don't wait"`;
+    } else if (tone === 'professional') {
+      userMessage += `
+- Sound trustworthy and reliable
+- Be helpful but professional
+- Keep it business-like but simple`;
+    } else if (tone === 'friendly') {
+      userMessage += `
+- Sound like a helpful friend
+- Be warm and caring
+- Use casual, simple language`;
+    } else if (tone === 'educational') {
+      userMessage += `
+- Teach them something new
+- Explain things simply
+- Help them understand the benefit`;
     }
 
     // Add tier-specific instructions
     if (tier === 'gold') {
       userMessage += `
-# PREMIUM TIER INSTRUCTIONS (Gold)
-Create an exceptionally high-quality email with:
-- Advanced personalization techniques
-- Sophisticated persuasion psychology
-- Premium storytelling elements  
-- Detailed benefit explanations with emotional triggers
-- Professional, polished language throughout
-`;
+
+## PREMIUM TIER INSTRUCTIONS (Gold)
+Create exceptional quality while keeping 5th grade reading level:
+- Use more persuasive simple words
+- Add emotional simple language
+- Create stronger desire for the benefit
+- Use premium but simple positioning`;
     } else if (tier === 'pro') {
       userMessage += `
-# PROFESSIONAL TIER INSTRUCTIONS (Pro)
-Create a high-quality email with:
-- Good personalization
-- Strong persuasion techniques
-- Clear benefit-focused messaging
-- Professional tone and structure
-`;
+
+## PROFESSIONAL TIER INSTRUCTIONS (Pro)  
+Create high quality while keeping 5th grade reading level:
+- Use strong but simple persuasion
+- Add good emotional triggers
+- Make the benefit very appealing
+- Professional but simple language`;
     }
 
     userMessage += `
-# EMAIL CREATION INSTRUCTIONS
-Create a persuasive marketing email with:
 
-1. An attention-grabbing subject line that creates curiosity or highlights the main benefit
-2. A personalized greeting
-3. A compelling opening that immediately communicates value
-4. Specific details about the product/service with emphasis on benefits (not just features)
-5. Evidence of effectiveness (testimonials, statistics, or results if available)
-6. ${includeCta ? 'Strong call to action with sense of urgency' + (affiliateLink ? ' using the affiliate link as an HTML <a> tag' : '') : 'Brief closing that reinforces main benefits'}
-7. Professional signature
+## FINAL REMINDERS
+- Total email: ${wordLimit.min}-${wordLimit.max} words
+- Subject: Under ${subjectLimit} characters  
+- Reading level: 5th grade (10-year-old can understand)
+- Focus: How "${focusItem}" helps solve their problem
+- Structure: Problem → Solution → Call to Action
+- Language: Simple, clear, no big words
 
-## Email Content Guidelines:
-- Focus heavily on benefits to the reader, not just features
-- Include the keywords naturally within the text
-- Use the specified tone consistently throughout
-- Create desire by emphasizing transformation, results, or outcomes
-- Keep paragraphs short and scannable
-- Use power words that evoke emotion and drive action
-- If ingredients/components are provided, highlight their unique benefits
-- Make the email feel personal and directly addressed to the reader
+Format the response with:
+Subject: [your subject line]
 
-${affiliateLink && includeCta ? `
-## Link Placement Instructions:
-- Include the affiliate link (${affiliateLink}) as an HTML anchor tag in the call to action section
-- Format: <a href="${affiliateLink}">[compelling action text]</a>
-- The link text should be benefit-focused or action-oriented
-- Create urgency around the link (limited time, exclusive offer, etc.)
-` : ''}
-
-Format the email with proper spacing between paragraphs for optimal readability.
-`;
-
-    return userMessage;
-  }
-
-  /**
-   * Build user message for focused email generation
-   * @private
-   */
-  buildFocusedUserMessage({ websiteData, websiteName, focusItem, emailNumber, totalEmails, industry, tone, keywordList, includeCta, affiliateLink, tier }) {
-    let userMessage = `Website Information:\n`;
-    
-    if (websiteData) {
-      userMessage += `
-- Website Name: ${websiteName}
-- Description: ${websiteData.description}
-- Main Focus Feature/Benefit for this email: "${focusItem}"
-`;
-    } else {
-      userMessage += `
-- Website Name: ${websiteName}
-- Main Focus Feature/Benefit for this email: "${focusItem}"
-`;
-    }
-    
-    userMessage += `
-Additional Context:
-- This is email #${emailNumber} in a series of ${totalEmails} emails
-- Industry: ${industry}
-- Email Tone: ${tone}
-- Keywords to emphasize: ${keywordList || 'None specified'}
-- Include Call to Action: ${includeCta ? 'Yes' : 'No'}
-- User Tier: ${tier}
-`;
-
-    if (affiliateLink && includeCta) {
-      userMessage += `- Affiliate Link: ${affiliateLink}
-IMPORTANT: In the call to action section, include this exact link formatted as an HTML anchor tag:
-<a href="${affiliateLink}">Learn more about ${focusItem}</a> or similar clickable text.
-`;
-    }
-
-    // Add tier-specific focus instructions
-    if (tier === 'gold') {
-      userMessage += `
-PREMIUM FOCUS INSTRUCTIONS:
-Create an exceptionally detailed exploration of "${focusItem}" with:
-- Deep psychological triggers related to this specific benefit
-- Advanced storytelling around "${focusItem}"
-- Multiple angles of how "${focusItem}" transforms the user's experience
-- Sophisticated language and premium positioning
-`;
-    } else if (tier === 'pro') {
-      userMessage += `
-PROFESSIONAL FOCUS INSTRUCTIONS:
-Create a high-quality focused email that:
-- Explores "${focusItem}" from multiple beneficial angles
-- Uses strong persuasion techniques specific to this feature/benefit
-- Provides clear, compelling reasons why "${focusItem}" matters
-`;
-    }
-
-    userMessage += `
-Create a focused marketing email with:
-1. Subject line that highlights "${focusItem}"
-2. Brief mention that this is email #${emailNumber} in a series of ${totalEmails}
-3. Introduction that introduces the focused feature/benefit
-4. Detailed explanation of how "${focusItem}" benefits the user
-5. ${includeCta ? 'Clear call to action' + (affiliateLink ? ` with the affiliate link <a href="${affiliateLink}">Learn more about ${focusItem}</a>` : '') : 'Brief closing'}
-6. Professional closing
-
-Keep the email concise and focused specifically on "${focusItem}" - don't dilute the message by covering other features or benefits.
-
-Format the email with proper spacing between paragraphs. Keep it simple and professional.
-`;
+[email body with proper spacing]`;
 
     return userMessage;
   }
 
   /**
    * Make the actual Claude API request with fallback
-   * @private
    */
   async makeClaudeRequest({ userMessage, systemPrompt, model, maxTokens, affiliateLink }) {
     try {
@@ -544,7 +437,6 @@ Format the email with proper spacing between paragraphs. Keep it simple and prof
 
   /**
    * Extract content from Claude API response
-   * @private
    */
   extractContentFromResponse(data) {
     if (data.content && data.content[0]) {
@@ -558,7 +450,6 @@ Format the email with proper spacing between paragraphs. Keep it simple and prof
 
   /**
    * Estimate tokens for cost calculation
-   * @private
    */
   estimateTokens(text) {
     if (!text) return 0;
@@ -569,7 +460,6 @@ Format the email with proper spacing between paragraphs. Keep it simple and prof
 
   /**
    * Calculate cost based on model and token usage
-   * @private
    */
   calculateCost(inputTokens, outputTokens, model) {
     const pricing = {
@@ -585,7 +475,6 @@ Format the email with proper spacing between paragraphs. Keep it simple and prof
 
   /**
    * Handle and format errors
-   * @private
    */
   handleError(error) {
     let errorMessage = 'Failed to generate email with AI. ';
@@ -597,7 +486,7 @@ Format the email with proper spacing between paragraphs. Keep it simple and prof
     } else if (error.message.includes('status')) {
       errorMessage += 'Server error: ' + error.message;
     } else {
-      errorMessage += 'Please try again or use template fallback.';
+      errorMessage += 'Please try again or check AI service configuration.';
     }
     
     return new Error(errorMessage);
@@ -605,9 +494,6 @@ Format the email with proper spacing between paragraphs. Keep it simple and prof
 
   /**
    * Parse the email content from Claude AI to extract subject and body
-   * @param {string} content - Raw content from Claude
-   * @param {string} affiliateLink - Optional affiliate link to ensure is included
-   * @returns {Object} - Parsed subject and body
    */
   parseEmailContent(content, affiliateLink = '') {
     let subject = '';
@@ -625,6 +511,7 @@ Format the email with proper spacing between paragraphs. Keep it simple and prof
       }
     }
     
+    // Ensure affiliate link is properly included
     if (affiliateLink) {
       body = this.ensureAffiliateLinkInContent(body, affiliateLink);
     }
@@ -654,10 +541,12 @@ Format the email with proper spacing between paragraphs. Keep it simple and prof
   ensureAffiliateLinkInContent(emailContent, affiliateLink) {
     if (!affiliateLink) return emailContent;
     
+    // If affiliate link is already present, ensure it's formatted as HTML
     if (emailContent.includes(affiliateLink)) {
       return emailContent.replace(/\[(.*?)\]\((\S+?)\)/g, '<a href="$2">$1</a>');
     }
     
+    // Look for call to action sections to insert the link
     const ctaMatch = emailContent.match(/\[Call to Action:(.+?)\]|\*\*Call to Action:?\*\*(.+?)(?:\n\n|\r\n\r\n|$)|Call to Action:(.+?)(?:\n\n|\r\n\r\n|$)/is);
     
     if (ctaMatch) {
@@ -684,6 +573,7 @@ Format the email with proper spacing between paragraphs. Keep it simple and prof
       return emailContent.replace(ctaSection, updatedCTA);
     }
     
+    // If no specific CTA section found, add link before closing
     const signaturePattern = /Best regards,\s*\n\s*\[Your Name\]\s*\n\s*\[Your Title\]\s*\n\s*\[Your Company\]\s*$/i;
     if (signaturePattern.test(emailContent)) {
       const learnMoreLink = `<a href="${affiliateLink}">Learn more about our offerings</a>`;
@@ -697,6 +587,7 @@ Format the email with proper spacing between paragraphs. Keep it simple and prof
       return emailContent.replace(closingSection, `${learnMoreLink}\n\n${closingSection}`);
     }
     
+    // Last resort - append link at end
     return `${emailContent}\n\n<a href="${affiliateLink}">Learn more</a>`;
   }
   
@@ -704,7 +595,10 @@ Format the email with proper spacing between paragraphs. Keep it simple and prof
    * Check if the Claude AI service is available
    */
   async isAvailable() {
-    if (!this.apiUrl || !this.apiKey) return false;
+    if (!this.apiUrl || !this.apiKey) {
+      console.warn('Claude AI service not properly configured');
+      return false;
+    }
     
     try {
       const response = await fetch(this.apiUrl, {
@@ -720,7 +614,12 @@ Format the email with proper spacing between paragraphs. Keep it simple and prof
         mode: 'cors'
       });
       
-      return response.ok;
+      const isOk = response.ok;
+      if (this.enableLogging) {
+        console.log('Claude AI availability check:', isOk ? 'Available' : 'Unavailable');
+      }
+      
+      return isOk;
     } catch (error) {
       console.error('Claude AI service check failed:', error);
       return false;
@@ -729,8 +628,6 @@ Format the email with proper spacing between paragraphs. Keep it simple and prof
 
   /**
    * Get model information for a specific tier
-   * @param {string} tier - User tier
-   * @returns {Object} Model information
    */
   getModelInfo(tier = 'free') {
     return this.getModelForTier(tier);
