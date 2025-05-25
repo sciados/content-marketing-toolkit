@@ -1,4 +1,4 @@
-// src/components/Layout/Header.jsx
+// src/components/Layout/Header.jsx - Fixed Complete Version
 import React from 'react';
 import { Link } from 'react-router-dom';
 import useSupabase from '../../hooks/useSupabase';
@@ -26,13 +26,16 @@ const Header = () => {
         
         <div className="flex items-center">
           {user ? (
-            // User is logged in - show authenticated menu
+            // User is logged in - show authenticated menu with Analytics
             <>
               <Link to="/dashboard" className="text-gray-600 hover:text-indigo-600 mx-3">
                 Dashboard
               </Link>
               <Link to="/tools/email-generator" className="text-gray-600 hover:text-indigo-600 mx-3">
                 Email Generator
+              </Link>
+              <Link to="/analytics" className="text-gray-600 hover:text-indigo-600 mx-3">
+                Analytics
               </Link>
               <Link to="/profile" className="text-gray-600 hover:text-indigo-600 mx-3">
                 My Profile

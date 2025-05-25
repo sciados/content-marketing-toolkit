@@ -1,4 +1,4 @@
-// src/routes/AppRoutes.jsx - Optimized with Lazy Loading and Preloading
+// src/routes/AppRoutes.jsx - Updated with Analytics Page
 import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { preloadEmailComponents } from '../utils/emailPreloaderUtils';
@@ -101,6 +101,15 @@ const EmailSeriesDetailPage = lazy(() => {
   });
 });
 
+// NEW: Analytics page
+const Analytics = lazy(() => {
+  const tracker = trackLazyLoading('Analytics');
+  return import('../pages/Analytics').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
 // Future pages - already lazy loaded for when you implement them
 const BlogPostCreator = lazy(() => {
   const tracker = trackLazyLoading('BlogPostCreator');
@@ -154,8 +163,6 @@ const AdminAds = lazy(() => {
   });
 });
 
-// Protected route wrapper - removed import since it doesn't exist
-
 // Enhanced loading component with preloading hints
 const PageLoader = ({ pageName }) => {
   useRenderTime('PageLoader', isDevelopment);
@@ -202,14 +209,15 @@ const AppRoutes = () => {
   return (
     <Routes>
       {/* Welcome Page - Root Route for Unauthenticated Users */}
-  <Route 
-    path="/" 
-    element={
-      <LazyRoute pageName="Welcome">
-        <Welcome />
-      </LazyRoute>
-    } 
-  />
+      <Route 
+        path="/" 
+        element={
+          <LazyRoute pageName="Welcome">
+            <Welcome />
+          </LazyRoute>
+        } 
+      />
+      
       {/* Auth Routes */}
       <Route element={<AuthLayout />}>
         <Route 
@@ -240,25 +248,23 @@ const AppRoutes = () => {
       
       {/* Protected Routes - Main Application */}
       <Route element={<MainLayout />}>
-        {/* <Route path="/" element={<Navigate to="/dashboard" replace />} /> */}
+        <Route 
+          path="/admin/users" 
+          element={
+            <LazyRoute pageName="Admin Users">
+              <AdminUsers />
+            </LazyRoute>
+          } 
+        />
 
         <Route 
-  path="/admin/users" 
-  element={
-    <LazyRoute pageName="Admin Users">
-      <AdminUsers />
-    </LazyRoute>
-  } 
-/>
-
-<Route 
-  path="/admin/fix-status" 
-  element={
-    <LazyRoute pageName="Fix Status">
-      <FixSuperAdmin />
-    </LazyRoute>
-  } 
-/>
+          path="/admin/fix-status" 
+          element={
+            <LazyRoute pageName="Fix Status">
+              <FixSuperAdmin />
+            </LazyRoute>
+          } 
+        />
         
         <Route 
           path="/admin/ads" 
@@ -283,6 +289,16 @@ const AppRoutes = () => {
           element={
             <LazyRoute pageName="Profile">
               <Profile />
+            </LazyRoute>
+          } 
+        />
+        
+        {/* NEW: Analytics Route */}
+        <Route 
+          path="/analytics" 
+          element={
+            <LazyRoute pageName="Analytics">
+              <Analytics />
             </LazyRoute>
           } 
         />
@@ -369,13 +385,13 @@ const AppRoutes = () => {
       </Route>
 
       <Route 
-  path="/subscription" 
-  element={
-    <LazyRoute pageName="Subscription">
-      <Subscription />
-    </LazyRoute>
-  } 
-/>
+        path="/subscription" 
+        element={
+          <LazyRoute pageName="Subscription">
+            <Subscription />
+          </LazyRoute>
+        } 
+      />
       
       {/* Fallback for undefined routes */}
       <Route path="*" element={<Navigate to="/" replace />} />

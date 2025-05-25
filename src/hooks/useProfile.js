@@ -1,9 +1,17 @@
-// src/hooks/useProfile.js - Fixed to use actual profile data
+// src/hooks/useProfile.js - Fixed quota handling
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase/supabaseClient';
 import useSupabase from './useSupabase';
 import { profiles } from '../services/supabase/profiles';
 import { v4 as uuidv4 } from 'uuid';
+
+// Default quotas by tier - these should match your actual system
+const DEFAULT_QUOTAS = {
+  free: 10,
+  pro: 200,
+  gold: 1000,
+  enterprise: 5000
+};
 
 export const useProfile = () => {
   const [profile, setProfile] = useState(null);
@@ -12,12 +20,79 @@ export const useProfile = () => {
   const [error, setError] = useState(null);
   const { user } = useSupabase();
   
+  // Helper function to determine quota based on tier
+  const getQuotaForTier = (tier) => {
+    return DEFAULT_QUOTAS[tier?.toLowerCase()] || DEFAULT_QUOTAS.free;
+  };
+  
+  // Refresh profile stats function
+  const refreshProfileStats = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      console.log('🔄 Refreshing profile statistics...');
+      
+      // Fetch fresh profile data from database
+      const { data: freshProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (profileError) throw profileError;
+      
+      console.log('📊 Fresh profile data:', freshProfile);
+      
+      // Calculate or use stored email quota
+      let emailQuota = freshProfile.email_quota;
+      
+      // If no quota stored, calculate based on subscription tier
+      if (!emailQuota || emailQuota <= 0) {
+        const tier = freshProfile.subscription_tier || 'free';
+        emailQuota = getQuotaForTier(tier);
+        
+        console.log(`⚠️ No quota found, using default for tier "${tier}": ${emailQuota}`);
+        
+        // Update the database with the calculated quota
+        await supabase
+          .from('profiles')
+          .update({ email_quota: emailQuota })
+          .eq('id', user.id);
+      }
+      
+      const updatedStats = {
+        subscriptionTier: freshProfile.subscription_tier || 'free',
+        subscriptionStatus: freshProfile.subscription_status || 'active',
+        emailsGenerated: freshProfile.emails_generated || 0,
+        emailsSaved: freshProfile.emails_saved || 0,
+        emailQuota: emailQuota,
+        seriesCount: freshProfile.series_count || 0,
+        tokensUsed: freshProfile.tokens_used || 0,
+        tokenQuota: freshProfile.token_quota || 2000,
+        lastReset: freshProfile.last_reset
+      };
+      
+      console.log('✅ Updated profile stats:', updatedStats);
+      
+      setProfile(freshProfile);
+      setProfileStats(updatedStats);
+      
+      return updatedStats;
+    } catch (err) {
+      console.error('❌ Error refreshing profile stats:', err);
+      throw err;
+    }
+  }, [user]);
+  
   // Fetch profile data function
   const fetchProfile = useCallback(async () => {
     if (!user) return;
     
     try {
       setLoading(true);
+      setError(null);
+      
+      console.log('🔍 Fetching profile for user:', user.id);
       
       // Fetch profile data
       const { data, error } = await supabase
@@ -32,16 +107,26 @@ export const useProfile = () => {
       
       // If profile doesn't exist, create it
       if (!data) {
-        console.log('Creating new profile for user', user.id);
+        console.log('👤 Creating new profile for user', user.id);
+        
+        const newProfileData = {
+          id: user.id,
+          email: user.email,
+          subscription_tier: 'free',
+          subscription_status: 'active',
+          email_quota: DEFAULT_QUOTAS.free,
+          token_quota: 2000,
+          emails_generated: 0,
+          emails_saved: 0,
+          series_count: 0,
+          tokens_used: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
         
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
-          .insert([{
-            id: user.id,
-            email: user.email,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }])
+          .insert([newProfileData])
           .select()
           .single();
         
@@ -49,28 +134,50 @@ export const useProfile = () => {
         
         setProfile(newProfile);
       } else {
+        console.log('📋 Found existing profile:', data);
         setProfile(data);
       }
       
-      // Get actual profile stats using the profiles service
+      // Get or calculate profile stats
       try {
+        // Try the profiles service first
         const stats = await profiles.getProfileStats();
+        console.log('📊 Got stats from service:', stats);
         setProfileStats(stats);
       } catch (statsError) {
-        console.error('Error fetching profile stats:', statsError);
-        // Fallback to data from profile if stats fetch fails
-        setProfileStats({
-          subscriptionTier: data?.subscription_tier || 'free',
-          subscriptionStatus: data?.subscription_status || 'active',
-          emailsGenerated: data?.emails_generated || 0,
-          emailsSaved: data?.emails_saved || 0,
-          emailQuota: data?.email_quota || 100,
-          seriesCount: data?.series_count || 0
-        });
+        console.error('⚠️ Stats service failed, calculating manually:', statsError);
+        
+        // Manual calculation with proper quota handling
+        const profileData = data;
+        
+        let emailQuota = profileData?.email_quota;
+        
+        // If no quota, calculate based on tier
+        if (!emailQuota || emailQuota <= 0) {
+          const tier = profileData?.subscription_tier || 'free';
+          emailQuota = getQuotaForTier(tier);
+          
+          console.log(`💡 Calculated quota for tier "${tier}": ${emailQuota}`);
+        }
+        
+        const fallbackStats = {
+          subscriptionTier: profileData?.subscription_tier || 'free',
+          subscriptionStatus: profileData?.subscription_status || 'active',
+          emailsGenerated: profileData?.emails_generated || 0,
+          emailsSaved: profileData?.emails_saved || 0,
+          emailQuota: emailQuota, // Use calculated quota, not hardcoded 100!
+          seriesCount: profileData?.series_count || 0,
+          tokensUsed: profileData?.tokens_used || 0,
+          tokenQuota: profileData?.token_quota || 2000,
+          lastReset: profileData?.last_reset
+        };
+        
+        console.log('🔧 Using fallback stats:', fallbackStats);
+        setProfileStats(fallbackStats);
       }
       
     } catch (err) {
-      console.error('Error fetching profile:', err);
+      console.error('❌ Error fetching profile:', err);
       setError(err);
     } finally {
       setLoading(false);
@@ -81,6 +188,10 @@ export const useProfile = () => {
   useEffect(() => {
     if (user) {
       fetchProfile();
+    } else {
+      setProfile(null);
+      setProfileStats(null);
+      setLoading(false);
     }
   }, [fetchProfile, user]);
   
@@ -109,7 +220,7 @@ export const useProfile = () => {
     }
   };
   
-  // Update avatar function - using the approach from the example
+  // Update avatar function
   const updateAvatar = async (file) => {
     try {
       if (!user) throw new Error('User not authenticated');
@@ -120,10 +231,10 @@ export const useProfile = () => {
       
       console.log('Uploading avatar to path:', filePath);
       
-      // Upload to Supabase storage - using the same approach as the example
+      // Upload to Supabase storage
       const { data, error: uploadError } = await supabase
         .storage
-        .from('avatars') // Make sure this bucket exists
+        .from('avatars')
         .upload(filePath, file);
       
       if (uploadError) {
@@ -170,6 +281,7 @@ export const useProfile = () => {
     error,
     updateProfile,
     updateAvatar,
-    fetchProfile
+    fetchProfile,
+    refreshProfileStats
   };
 };

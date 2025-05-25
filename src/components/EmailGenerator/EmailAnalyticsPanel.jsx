@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { Card } from '../Common/Card';
 import { Button } from '../Common/Button';
 import { Loader } from '../Common/Loader';
-// Remove unused import: import { db } from '../../services/supabase/db';
 import { useProfile } from '../../hooks/useProfile';
 import useSupabase from '../../hooks/useSupabase';
 
@@ -11,7 +10,7 @@ import useSupabase from '../../hooks/useSupabase';
  * Panel for displaying email analytics
  * Shows statistics and charts for email performance
  */
-const EmailAnalyticsPanel = ({ savedEmails, emailCollections, onCreateNewEmail }) => {
+const EmailAnalyticsPanel = ({ savedEmails = [], emailCollections = [], onCreateNewEmail }) => {
   const { user } = useSupabase();
   const { profileStats, refreshProfileStats } = useProfile();
   
@@ -40,33 +39,53 @@ const EmailAnalyticsPanel = ({ savedEmails, emailCollections, onCreateNewEmail }
       try {
         setLoading(true);
         
+        console.log('📊 Analytics - Processing data:');
+        console.log('- Saved emails:', savedEmails?.length || 0);
+        console.log('- Email collections:', emailCollections?.length || 0);
+        
         // Refresh profile stats to get latest counts
         await refreshProfileStats();
         
-        // Use savedEmails and emailCollections for initial stats
-        const emailCount = savedEmails?.length || 0;
-        const seriesCount = emailCollections?.length || 0;
+        // Use savedEmails and emailCollections for stats
+        const emailCount = Array.isArray(savedEmails) ? savedEmails.length : 0;
+        const seriesCount = Array.isArray(emailCollections) ? emailCollections.length : 0;
         
         // Count emails by month
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         
-        const emailsThisMonth = savedEmails.filter(email => {
-          const emailDate = new Date(email.createdAt || email.savedAt);
+        const emailsThisMonth = Array.isArray(savedEmails) ? savedEmails.filter(email => {
+          if (!email) return false;
+          
+          // Try multiple date fields
+          const emailDate = new Date(
+            email.createdAt || 
+            email.savedAt || 
+            email.created_at || 
+            email.updated_at ||
+            Date.now()
+          );
+          
           return emailDate >= startOfMonth;
-        }).length;
+        }).length : 0;
         
         // Count AI vs manual generation
-        const aiGenerated = savedEmails.filter(email => email.generatedWithAI).length;
+        const aiGenerated = Array.isArray(savedEmails) ? savedEmails.filter(email => {
+          return email?.generated_with_ai || email?.generatedWithAI || false;
+        }).length : 0;
+        
         const manuallyGenerated = emailCount - aiGenerated;
         
-        // Get top domains
-        const domains = savedEmails
-          .map(email => email.domain)
-          .filter(Boolean);
+        // Get top domains - improved logic
+        const domains = Array.isArray(savedEmails) ? savedEmails
+          .map(email => email?.domain)
+          .filter(Boolean) // Remove null/undefined/empty values
+          : [];
         
         const domainCounts = domains.reduce((acc, domain) => {
-          acc[domain] = (acc[domain] || 0) + 1;
+          if (domain && typeof domain === 'string') {
+            acc[domain] = (acc[domain] || 0) + 1;
+          }
           return acc;
         }, {});
         
@@ -75,37 +94,71 @@ const EmailAnalyticsPanel = ({ savedEmails, emailCollections, onCreateNewEmail }
           .slice(0, 5)
           .map(([domain, count]) => ({ domain, count }));
         
-        // Count emails by industry and tone
+        // Count emails by industry and tone - improved logic
         const industries = {};
         const tones = {};
         
-        emailCollections.forEach(collection => {
-          // Get the first email in the collection to extract metadata
-          const firstEmail = collection.emails[0];
-          
-          if (firstEmail) {
-            // Extract industry from the collection or email
-            const industry = collection.industry || firstEmail.industry || 'Unknown';
-            industries[industry] = (industries[industry] || 0) + collection.emails.length;
+        if (Array.isArray(emailCollections)) {
+          emailCollections.forEach(collection => {
+            if (!collection || !Array.isArray(collection.emails)) return;
             
-            // Extract tone from the collection or email
-            const tone = collection.tone || firstEmail.tone || 'Unknown';
-            tones[tone] = (tones[tone] || 0) + collection.emails.length;
-          }
-        });
+            // Get metadata from collection or first email
+            const firstEmail = collection.emails[0];
+            const emailCount = collection.emails.length;
+            
+            // Extract industry
+            const industry = collection.industry || 
+                            firstEmail?.industry || 
+                            'General';
+            industries[industry] = (industries[industry] || 0) + emailCount;
+            
+            // Extract tone
+            const tone = collection.tone || 
+                        firstEmail?.tone || 
+                        'Professional';
+            tones[tone] = (tones[tone] || 0) + emailCount;
+          });
+        }
         
-        // If available, fetch metrics from Supabase for open and click rates
+        // If no collections data, try to extract from individual emails
+        if (Object.keys(industries).length === 0 && Array.isArray(savedEmails)) {
+          savedEmails.forEach(email => {
+            if (!email) return;
+            
+            const industry = email.industry || 'General';
+            industries[industry] = (industries[industry] || 0) + 1;
+            
+            const tone = email.tone || 'Professional';
+            tones[tone] = (tones[tone] || 0) + 1;
+          });
+        }
+        
+        // Generate realistic demo metrics based on actual data
         let openRate = 0;
         let clickRate = 0;
         
-        try {
-          // This would typically connect to an analytics service
-          // For demo purposes, we'll simulate some data
-          openRate = Math.round(Math.random() * 40 + 10); // Random between 10-50%
-          clickRate = Math.round(Math.random() * 20 + 5); // Random between 5-25%
-        } catch (error) {
-          console.error('Error fetching metrics:', error);
+        if (emailCount > 0) {
+          // Generate more realistic rates based on email count and AI usage
+          const baseOpenRate = aiGenerated > manuallyGenerated ? 35 : 25; // AI emails perform better
+          const baseClickRate = aiGenerated > manuallyGenerated ? 8 : 5;
+          
+          openRate = Math.round(baseOpenRate + (Math.random() * 10 - 5)); // ±5% variation
+          clickRate = Math.round(baseClickRate + (Math.random() * 4 - 2)); // ±2% variation
+          
+          // Ensure reasonable bounds
+          openRate = Math.max(15, Math.min(55, openRate));
+          clickRate = Math.max(3, Math.min(15, clickRate));
         }
+        
+        console.log('📊 Calculated stats:', {
+          totalEmails: emailCount,
+          totalSeries: seriesCount,
+          createdThisMonth: emailsThisMonth,
+          topDomainsCount: topDomains.length,
+          industriesCount: Object.keys(industries).length,
+          aiGenerated,
+          manuallyGenerated
+        });
         
         // Set the stats
         setStats({
@@ -128,6 +181,7 @@ const EmailAnalyticsPanel = ({ savedEmails, emailCollections, onCreateNewEmail }
       }
     };
     
+    // Always run the analytics calculation
     fetchAnalytics();
   }, [user, savedEmails, emailCollections, refreshProfileStats]);
   
@@ -247,7 +301,7 @@ const EmailAnalyticsPanel = ({ savedEmails, emailCollections, onCreateNewEmail }
               {stats.topDomains.map((item, index) => (
                 <div key={index} className="flex justify-between items-center">
                   <span className="text-gray-700">{item.domain}</span>
-                  <span className="text-gray-500">{item.count} emails</span>
+                  <span className="text-gray-500">{item.count} email{item.count !== 1 ? 's' : ''}</span>
                 </div>
               ))}
             </div>
@@ -270,7 +324,7 @@ const EmailAnalyticsPanel = ({ savedEmails, emailCollections, onCreateNewEmail }
                 <div key={index}>
                   <div className="flex justify-between mb-1">
                     <span className="text-sm text-gray-700">{industry}</span>
-                    <span className="text-xs text-gray-500">{count} emails</span>
+                    <span className="text-xs text-gray-500">{count} email{count !== 1 ? 's' : ''}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
@@ -301,7 +355,7 @@ const EmailAnalyticsPanel = ({ savedEmails, emailCollections, onCreateNewEmail }
                 <div key={index}>
                   <div className="flex justify-between mb-1">
                     <span className="text-sm text-gray-700 capitalize">{tone}</span>
-                    <span className="text-xs text-gray-500">{count} emails</span>
+                    <span className="text-xs text-gray-500">{count} email{count !== 1 ? 's' : ''}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
@@ -325,7 +379,7 @@ const EmailAnalyticsPanel = ({ savedEmails, emailCollections, onCreateNewEmail }
       {/* Performance Metrics */}
       <Card className="p-4 mb-6">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">
-          Performance Metrics (Demo Data)
+          Performance Metrics {stats.totalEmails === 0 ? '(Demo Data)' : '(Simulated Based on Your Data)'}
         </h3>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -357,13 +411,33 @@ const EmailAnalyticsPanel = ({ savedEmails, emailCollections, onCreateNewEmail }
         </div>
         
         <p className="text-xs text-gray-500 mt-4">
-          Note: These metrics are simulated for demonstration purposes. In a production environment, 
-          these would be connected to your email service provider's analytics.
+          {stats.totalEmails === 0 
+            ? "Note: These metrics are simulated for demonstration purposes. Generate some emails to see data based on your content!"
+            : "Note: These performance metrics are simulated based on your email data and generation method. In a production environment, these would be connected to your email service provider's analytics."
+          }
         </p>
       </Card>
       
+      {/* Empty State Message */}
+      {stats.totalEmails === 0 && (
+        <Card className="p-6 text-center bg-gray-50">
+          <div className="mx-auto w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center mb-4">
+            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2-2V7a2 2 0 012-2h2a2 2 0 002 2v2a2 2 0 002 2h2a2 2 0 012-2V7a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 00-2 2h-2a2 2 0 00-2 2v6a2 2 0 01-2 2H9z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Email Data Yet</h3>
+          <p className="text-gray-500 mb-4">
+            Start by generating and saving some emails to see your analytics data here.
+          </p>
+          <Button onClick={onCreateNewEmail}>
+            Generate Your First Email
+          </Button>
+        </Card>
+      )}
+      
       {/* Pro Upgrade CTA */}
-      {profileStats && profileStats.subscriptionTier === 'free' && (
+      {profileStats && profileStats.subscriptionTier === 'free' && stats.totalEmails > 0 && (
         <Card className="p-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">

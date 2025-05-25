@@ -1,4 +1,4 @@
-// src/pages/Dashboard.jsx
+// src/pages/Dashboard.jsx - Updated with Analytics card
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase/supabaseClient';
@@ -6,9 +6,9 @@ import { supabase } from '../services/supabase/supabaseClient';
 const Dashboard = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  // Remove the unused state:
-  // const [recentEmails, setRecentEmails] = useState([]);
+  
   console.log("Dashboard component rendering");
+  
   // Tools offered by the application
   const tools = [
     {
@@ -19,6 +19,18 @@ const Dashboard = () => {
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      ),
+      available: true
+    },
+    {
+      id: 'analytics',
+      name: 'Email Analytics',
+      description: 'Track your email performance, view insights, and analyze your content creation patterns.',
+      path: '/analytics',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2-2V7a2 2 0 012-2h2a2 2 0 002 2v2a2 2 0 002 2h2a2 2 0 012-2V7a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 00-2 2h-2a2 2 0 00-2 2v6a2 2 0 01-2 2H9z" />
         </svg>
       ),
       available: true
@@ -100,6 +112,70 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+      
+      {/* Quick Stats for Authenticated Users */}
+      {user && (
+        <div className="mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-indigo-500">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-8 w-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-500">Emails Created</p>
+                  <p className="text-2xl font-semibold text-gray-900">-</p>
+                </div>
+              </div>
+              <div className="mt-2">
+                <Link to="/analytics" className="text-sm text-indigo-600 hover:text-indigo-500">
+                  View Analytics →
+                </Link>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2h10a2 2 0 012 2v2M7 19h10a2 2 0 002-2v-4a2 2 0 00-2-2H7a2 2 0 00-2 2v4a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-500">Email Series</p>
+                  <p className="text-2xl font-semibold text-gray-900">-</p>
+                </div>
+              </div>
+              <div className="mt-2">
+                <Link to="/tools/email-series" className="text-sm text-green-600 hover:text-green-500">
+                  Manage Series →
+                </Link>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
+              <div className="flex items-center">
+                <div className="flex-shrink-0">
+                  <svg className="h-8 w-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-500">This Month</p>
+                  <p className="text-2xl font-semibold text-gray-900">-</p>
+                </div>
+              </div>
+              <div className="mt-2">
+                <Link to="/subscription" className="text-sm text-purple-600 hover:text-purple-500">
+                  View Limits →
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Tools section */}
       <div className="mb-8">
