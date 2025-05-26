@@ -1,10 +1,10 @@
-// src/pages/Video2Promo.jsx
+// src/pages/Video2Promo.jsx - FIXED: Real profile integration
 import React, { useState, useEffect, useCallback } from 'react';
-// REMOVED: import MainLayout - this causes double-wrapping since AppRoutes already provides MainLayout
 import { 
   VideoUrlForm,
   TranscriptDisplay, 
-  AssetGenerator 
+  AssetGenerator,
+  GeneratedAssets
 } from '../components/Video2Promo';
 import { Card } from '../components/Common/Card';
 import { Button } from '../components/Common/Button';
@@ -12,18 +12,22 @@ import { Alert } from '../components/Common/Alert';
 import { Badge } from '../components/Common/Badge';
 import { useVideo2Promo } from '../hooks/useVideo2Promo';
 import { useSupabaseAuth } from '../hooks/useSupabaseAuth';
+import { useProfile } from '../hooks/useProfile'; // ADDED: Real profile hook
 import { useToast } from '../hooks/useToast';
+import { DebugPanel } from '../components/Video2Promo/DebugPanel';
 
 function Video2Promo() {
   const [selectedBenefits, setSelectedBenefits] = useState([]);
   const [remainingTokens, setRemainingTokens] = useState(0);
   
-  const { profile } = useSupabaseAuth();
+  const { user } = useSupabaseAuth();
+  const { profileStats, loading: profileLoading } = useProfile(); // FIXED: Only destructure what we use
   const { showToast } = useToast();
   
   const {
     project,
     projects,
+    assets,
     isLoading,
     error,
     createProject,
@@ -33,21 +37,39 @@ function Video2Promo() {
     getRemainingTokens
   } = useVideo2Promo();
 
-  // Load remaining tokens
+  // Load remaining tokens from real usage tracking
   const loadRemainingTokens = useCallback(async () => {
     try {
       const tokens = await getRemainingTokens();
       setRemainingTokens(tokens);
+      
+      if (import.meta.env.VITE_ENABLE_API_LOGGING === 'true') {
+        console.log('Video2Promo tokens loaded:', tokens);
+      }
     } catch (err) {
       console.error('Error loading remaining tokens:', err);
+      // Fallback to tier defaults
+      if (profileStats?.subscriptionTier) {
+        const defaults = { free: 2000, pro: 50000, gold: 200000 };
+        setRemainingTokens(defaults[profileStats.subscriptionTier] || 2000);
+      }
     }
-  }, [getRemainingTokens]);
+  }, [getRemainingTokens, profileStats]);
 
   // Load initial data
   useEffect(() => {
-    loadProjects();
-    loadRemainingTokens();
-  }, [loadProjects, loadRemainingTokens]);
+    if (user && profileStats) { // Wait for both user and profile
+      loadProjects();
+      loadRemainingTokens();
+    }
+  }, [user, profileStats, loadProjects, loadRemainingTokens]);
+
+  // Reload tokens when profile stats change (after token usage)
+  useEffect(() => {
+    if (profileStats) {
+      loadRemainingTokens();
+    }
+  }, [profileStats, loadRemainingTokens]);
 
   const handleCreateProject = async (formData) => {
     try {
@@ -62,10 +84,13 @@ function Video2Promo() {
 
   const handleGenerateAssets = async (generationParams) => {
     try {
+      console.log('🚀 Starting asset generation with params:', generationParams);
       const assets = await generateAssets(generationParams);
+      console.log('✅ Assets generated successfully:', assets);
       showToast(`Generated ${assets.length} marketing assets!`, 'success');
       await loadRemainingTokens(); // Refresh token count
     } catch (err) {
+      console.error('❌ Asset generation failed:', err);
       showToast(err.message, 'error');
     }
   };
@@ -79,14 +104,33 @@ function Video2Promo() {
     setSelectedBenefits([]); // Reset benefit selections when switching projects
   };
 
-  const userTier = profile?.subscription_tier || 'free';
+  // FIXED: Use real profile data
+  const userTier = profileStats?.subscriptionTier || 'free';
   const tierLimits = {
     free: { projects: 5, name: 'Free' },
     pro: { projects: 50, name: 'Pro' },
     gold: { projects: 200, name: 'Gold' }
   };
 
-  // FIXED: Removed <MainLayout> wrapper - AppRoutes already provides it
+  // Show loading state while profile is loading
+  if (profileLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              Loading Profile...
+            </h3>
+            <p className="text-gray-600">
+              Setting up your Video2Promo workspace
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Header */}
@@ -111,6 +155,12 @@ function Video2Promo() {
             <div className="mt-2 text-sm text-gray-500">
               {remainingTokens.toLocaleString()} tokens remaining
             </div>
+            {/* ADDED: Show actual user name */}
+            {profileStats?.displayName && (
+              <div className="mt-1 text-xs text-gray-400">
+                Welcome back, {profileStats.firstNameOnly}!
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -161,13 +211,19 @@ function Video2Promo() {
                         new Date(proj.created_at).toLocaleDateString()
                       }
                     </div>
-                    <Badge 
-                      variant={proj.status === 'ready' ? 'success' : 'warning'} 
-                      size="sm"
-                      className="mt-2"
-                    >
-                      {proj.status}
-                    </Badge>
+                    <div className="flex items-center justify-between mt-2">
+                      <Badge 
+                        variant={proj.status === 'ready' ? 'success' : 'warning'} 
+                        size="sm"
+                      >
+                        {proj.status}
+                      </Badge>
+                      {proj.tokens_used > 0 && (
+                        <span className="text-xs text-gray-400">
+                          {proj.tokens_used} tokens used
+                        </span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -180,7 +236,7 @@ function Video2Promo() {
             </Card>
           )}
 
-          {/* Usage Stats */}
+          {/* Usage Stats - FIXED: Real data */}
           <Card>
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
               Usage This Month
@@ -203,6 +259,7 @@ function Video2Promo() {
                 </span>
               </div>
               
+              {/* FIXED: Show upgrade prompt only for free users */}
               {userTier === 'free' && (
                 <div className="mt-4 p-3 bg-primary-50 rounded-lg">
                   <p className="text-sm text-primary-800">
@@ -233,6 +290,8 @@ function Video2Promo() {
                 Enter a YouTube URL to extract key benefits and generate email campaigns, 
                 blog posts, and newsletter content automatically.
               </p>
+              
+              {/* Feature highlights - same as before */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
                 <div className="text-center">
                   <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
@@ -287,6 +346,15 @@ function Video2Promo() {
             />
           )}
 
+          {/* Generated Assets Display */}
+          {assets && assets.length > 0 && (
+            <GeneratedAssets
+              assets={assets}
+              project={project}
+              onCopy={(message) => showToast(message, 'success')}
+            />
+          )}
+
           {/* Loading State */}
           {isLoading && (
             <Card>
@@ -299,6 +367,10 @@ function Video2Promo() {
                   <p className="text-gray-600">
                     {!project ? 'Analyzing transcript and extracting benefits' : 'Generating marketing content'}
                   </p>
+                  {/* ADDED: Show token usage estimate */}
+                  <p className="text-sm text-gray-500 mt-2">
+                    This may use {project ? 'AI tokens for content generation' : '~500-1000 tokens for analysis'}
+                  </p>
                 </div>
               </div>
             </Card>
@@ -306,7 +378,7 @@ function Video2Promo() {
         </div>
       </div>
 
-      {/* Feature Highlights */}
+      {/* Feature Highlights - Only show for new users */}
       {!project && !isLoading && projects.length === 0 && (
         <div className="mt-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="text-center">
@@ -361,6 +433,7 @@ function Video2Promo() {
     </div>
   );
 }
+{import.meta.env.DEV && <DebugPanel />}
 
-// CRITICAL FIX: Change to default export for React.lazy()
+// Export as default for React.lazy()
 export default Video2Promo;
