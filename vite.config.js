@@ -35,6 +35,9 @@ export default defineConfig(({ mode }) => {
       // Target modern browsers for better optimization
       target: 'es2020',
       
+      // Output directory for Vercel compatibility
+      outDir: 'dist',
+      
       // Increase chunk size warning limit
       chunkSizeWarningLimit: 1000,
       
@@ -88,6 +91,16 @@ export default defineConfig(({ mode }) => {
             
             // App chunks by feature/directory
             if (id.includes('/src/')) {
+              // Video2Promo components and services (NEW)
+              if (id.includes('Video2Promo') || 
+                  id.includes('video2promo') || 
+                  id.includes('VideoUrlForm') ||
+                  id.includes('TranscriptDisplay') ||
+                  id.includes('AssetGenerator') ||
+                  id.includes('GeneratedAssets')) {
+                return 'video2promo'
+              }
+              
               // Email generator components and services
               if (id.includes('EmailGenerator') || 
                   id.includes('email-generator') || 
@@ -116,6 +129,11 @@ export default defineConfig(({ mode }) => {
               // AI services
               if (id.includes('/services/ai')) {
                 return 'ai-services'
+              }
+              
+              // Video2Promo services (NEW)
+              if (id.includes('/services/video2promo')) {
+                return 'video2promo-services'
               }
               
               // Email generation services
@@ -204,6 +222,32 @@ export default defineConfig(({ mode }) => {
       }
     },
     
+    // Development server configuration
+    server: {
+      port: 5173,
+      strictPort: true,
+      host: true,
+      open: true,
+      // API proxy for development (optional)
+      proxy: {
+        '/api': {
+          target: 'http://localhost:5173',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, '/api')
+        }
+      }
+    },
+    
+    // Preview server configuration (for SPA routing)
+    preview: {
+      port: 3000,
+      strictPort: true,
+      host: true,
+      open: true,
+      // Handle SPA routing in preview mode
+      cors: true
+    },
+    
     // Dependency pre-bundling optimization
     optimizeDeps: {
       include: [
@@ -214,6 +258,18 @@ export default defineConfig(({ mode }) => {
         'axios',
         'uuid'
       ]
-    }
+    },
+    
+    // Environment variables configuration
+     define: {
+      // Ensure environment variables are available
+      'process.env.NODE_ENV': JSON.stringify(mode === 'production' ? 'production' : 'development')
+    },
+    
+    // Base path configuration (useful for subdirectory deployments)
+    base: '/',
+    
+    // Public directory
+    publicDir: 'public'
   }
 })
