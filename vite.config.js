@@ -262,8 +262,8 @@ export default defineConfig(({ mode }) => {
     
     // Environment variables configuration
      define: {
-      // Ensure environment variables are available
-      'process.env.NODE_ENV': JSON.stringify(mode === 'production' ? 'production' : 'development')
+       // Ensure environment variables are available
+       'process.env.NODE_ENV': JSON.stringify(mode === 'production' ? 'production' : 'development')
     },
     
     // Base path configuration (useful for subdirectory deployments)
