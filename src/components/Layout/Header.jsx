@@ -36,6 +36,12 @@ const Header = () => {
               <Link to="/tools/email-generator" className="text-gray-600 hover:text-indigo-600 mx-3">
                 Email Generator
               </Link>
+              <Link to="/tools/email-series" className="text-gray-600 hover:text-indigo-600 mx-3">
+                Email Series
+              </Link>
+              <Link to="/tools/video2promo" className="text-gray-600 hover:text-indigo-600 mx-3">
+                Video Email Generator
+              </Link>
               <Link to="/analytics" className="text-gray-600 hover:text-indigo-600 mx-3">
                 Analytics
               </Link>

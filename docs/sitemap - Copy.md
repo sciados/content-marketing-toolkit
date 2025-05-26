@@ -85,38 +85,6 @@
 | `src/components/EmailGenerator/EmailAnalyticsPanel.jsx` | ✅ | Panel for email analytics |
 | `src/components/EmailGenerator/SupabaseEmailDisplay.jsx` | ✅ | Component for displaying emails from Supabase |
 
-## Video2Promo System Components
-
-| File | Status | Description |
-|------|--------|-------------|
-| `src/components/Video2Promo/VideoUrlForm.jsx` | ✅ | **NEW** - YouTube URL input form |
-| `src/components/Video2Promo/TranscriptDisplay.jsx` | ✅ | **NEW** - Shows transcript & extracted benefits |
-| `src/components/Video2Promo/KeywordManager.jsx` | ✅ | **NEW** - Marketing keywords input component |
-| `src/components/Video2Promo/UTMBuilder.jsx` | ✅ | **NEW** - Affiliate link UTM builder |
-| `src/components/Video2Promo/AssetGenerator.jsx` | ✅ | **NEW** - Generate content panel |
-| `src/components/Video2Promo/GeneratedAssets.jsx` | ✅ | **NEW** - Display generated content |
-| `src/components/Video2Promo/ToneSelector.jsx` | ✅ | **NEW** - Tone control component |
-| `src/components/Video2Promo/index.js` | ✅ | **NEW** - Component exports |
-
-## Video2Promo Services Layer
-
-| File | Status | Description |
-|------|--------|-------------|
-| `src/services/video2promo/transcriptService.js` | ✅ | **NEW** - YouTube transcript fetching |
-| `src/services/video2promo/whisperService.js` | ✅ | **NEW** - Fallback speech-to-text |
-| `src/services/video2promo/nlpService.js` | ✅ | **NEW** - Benefit extraction from transcript |
-| `src/services/video2promo/assetGenerationService.js` | ✅ | **NEW** - Content generation service |
-| `src/services/video2promo/utmService.js` | ✅ | **NEW** - UTM parameter handling |
-| `src/services/video2promo/index.js` | ✅ | **NEW** - Service exports |
-
-## Video2Promo Hooks
-
-| File | Status | Description |
-|------|--------|-------------|
-| `src/hooks/useVideo2Promo.js` | ✅ | **NEW** - Main hook for Video2Promo functionality |
-| `src/hooks/useTranscript.js` | ✅ | **NEW** - Transcript fetching and processing |
-| `src/hooks/useAssetGeneration.js` | ✅ | **NEW** - Asset generation management |
-
 ## Supabase Services Layer
 
 | File | Status | Description |
@@ -144,7 +112,6 @@
 |------|--------|-------------|
 | `src/pages/Dashboard.jsx` | ✅ | Main dashboard with tools overview |
 | `src/pages/SalesPageEmailGenerator.jsx` | ✅ | Container for email generator component |
-| `src/pages/Video2Promo.jsx` | ✅ | **NEW** - Video-to-marketing campaign generator |
 | `src/pages/Profile.jsx` | ✅ | User profile page |
 | `src/pages/Subscription.jsx` | ✅ | **ENHANCED** - Complete subscription management |
 
@@ -217,7 +184,6 @@
 | File | Status | Description |
 |------|--------|-------------|
 | `supabase/migrations/006_token_pool.sql` | 🔄 | **PLANNED** - Global token pool management |
-| `supabase/migrations/007_video2promo.sql` | ✅ | **NEW** - Video2Promo tables and functions |
 
 ## Database Schema
 - ✅ **User profiles and authentication** - Applied via Supabase SQL Editor
@@ -225,7 +191,6 @@
 - ✅ **Usage tracking system** - Applied via Supabase SQL Editor
 - ✅ **Email storage and series** - Applied via Supabase SQL Editor
 - ✅ **Database functions** - Applied via Supabase SQL Editor
-- ✅ **Video projects and assets** - Video2Promo tables (NEW)
 
 ## Documentation & Guides
 
@@ -250,22 +215,19 @@
 - **Usage Tracking**: Real-time limits and analytics
 - **Database**: All tables, functions, and migrations
 - **Deployment**: Working on Vercel with environment variables
-- **Video2Promo Core**: Complete video-to-marketing platform (NEW)
 
 ### 🔄 **Enhanced/In Progress**
 - **AI Integration**: Tier-based Claude model selection
 - **Token Tracking**: Accurate usage and cost calculation
 - **Subscription UI**: Rich usage displays and history
 - **Export Features**: Enhanced metadata and tier information
-- **Video2Promo Advanced**: A/B testing and scheduling integrations
 
 ### ❌ **Planned Features**
 - **Global Token Pool**: Application-wide token budget management
 - **Advanced Analytics**: Usage patterns and insights
-- **Video2Promo Premium**: Scheduling integrations & advanced A/B testing
 - **Additional Content Tools**: Blog posts, newsletters, social media
+- **A/B Testing**: Email performance optimization
 - **Template Library**: Custom email templates by tier
-- **Performance Optimization**: Caching and background processing
 
 ## Architecture Strengths
 
@@ -281,28 +243,17 @@
 - **Quality differentiation** by subscription tier
 - **Future-ready** for Claude 4 integration
 
-### **3. Video2Promo System (IMPLEMENTED)**
-- **YouTube transcript extraction** with Whisper fallback
-- **AI-powered benefit analysis** using tier-based Claude models  
-- **Multi-format content generation** (email series, blog posts, newsletters)
-- **UTM parameter management** for affiliate tracking
-- **Tone customization** and A/B variant generation
-- **Complete UI/UX workflow** from video input to generated assets
-- **Usage tracking integration** with existing token system
-- **Tier-based feature gating** and project limits
-
-### **4. Robust Database Design**
+### **3. Robust Database Design**
 - **Row-level security** policies
 - **Efficient indexing** for performance
 - **Atomic operations** with proper transactions
 - **Comprehensive tracking** for analytics
 
-### **5. Excellent Economics**
+### **4. Excellent Economics**
 - **98%+ profit margins** on Pro and Gold tiers
 - **Negligible AI costs** compared to subscription revenue
 - **Room for generous limits** and feature expansion
 - **Sustainable free tier** as loss leader
-- **Video2Promo economics**: ~1,500-4,500 tokens per project fits comfortably within existing limits
 
 ## Required Environment Variables
 
@@ -327,15 +278,6 @@ VITE_SIMPLE_PROXY_URL=https://your-proxy-url/simple-proxy
 VITE_CLAUDE_PROXY_URL=https://your-proxy-url/claudeProxy
 VITE_CLAUDE_API_KEY=your-api-key
 VITE_CLAUDE_MODEL=claude-3-haiku-20240307
-
-# Video2Promo Configuration (NEW)
-VITE_YOUTUBE_API_KEY=your-youtube-api-key
-VITE_WHISPER_API_URL=https://api.openai.com/v1/audio/transcriptions
-VITE_OPENAI_API_KEY=your-openai-key
-
-# Optional Integrations
-VITE_MAILCHIMP_API_KEY=your-mailchimp-key
-VITE_SENDGRID_API_KEY=your-sendgrid-key
 ```
 
 ## Current System Capabilities
@@ -343,49 +285,19 @@ VITE_SENDGRID_API_KEY=your-sendgrid-key
 ### **For Free Users (2,000 tokens/month)**
 - Basic email generation with Claude Haiku
 - 10 emails, 2 series, 25 saved emails
-- **1 Video2Promo project/month** (NEW)
 - Template-based features
 - Cost: ~$0.0015/user/month
 
 ### **For Pro Users (50,000 tokens/month)**
 - High-quality generation with Claude 3.5 Sonnet
 - 200 emails, 30 series, 500 saved emails
-- **15+ Video2Promo projects/month** with UTM builder (NEW)
 - Advanced personalization and features
 - Cost: ~$0.45/user/month (98.4% margin)
 
 ### **For Gold Users (200,000 tokens/month)**
 - Premium AI with advanced capabilities
 - 1,000 emails, 150 series, 2,000 saved emails
-- **40+ Video2Promo projects/month** with A/B variants (NEW)
 - Sophisticated content and priority processing
 - Cost: ~$1.80/user/month (98.2% margin)
 
-This system provides a **world-class content marketing toolkit** with **sustainable economics** and **room for significant growth and feature expansion**! 
-
-## 🚀 **Video2Promo Implementation Status**
-
-### **✅ COMPLETED (Ready for Testing)**
-- **Complete UI Components**: All 8 Video2Promo components implemented
-- **Full Service Layer**: YouTube transcript, NLP analysis, asset generation  
-- **Custom Hooks**: Main functionality, transcript handling, asset generation
-- **Database Integration**: Tables, RLS policies, usage tracking
-- **Tier-Based Features**: Different limits and capabilities per subscription
-- **Token Management**: Accurate usage tracking and cost calculation
-- **Main Page**: Responsive UI with project management
-- **Route Integration**: Added to existing navigation system
-
-### **🔧 NEXT STEPS FOR DEPLOYMENT**
-1. **Install Dependencies**: `npm install youtube-transcript`
-2. **Database Setup**: Apply Video2Promo schema to Supabase
-3. **Environment Variables**: Add YouTube API and OpenAI keys
-4. **Navigation Update**: Add Video2Promo to sidebar/header menus
-5. **Testing**: Test with YouTube videos that have captions
-
-### **💎 KEY DIFFERENTIATORS ACHIEVED**
-- **Unique Market Position**: Only tool that transforms YouTube videos into complete marketing campaigns
-- **Seamless Integration**: Uses existing authentication, billing, and AI infrastructure
-- **Scalable Architecture**: Ready for thousands of users with current token limits
-- **Premium Economics**: High-margin SaaS with room for feature expansion
-
-The Video2Promo system is now **architecturally complete** and ready for production deployment! 🎯
+This system provides a **world-class email marketing tool** with **sustainable economics** and **room for significant growth and feature expansion**! 🚀

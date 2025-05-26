@@ -3,6 +3,7 @@ import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { preloadEmailComponents } from '../utils/emailPreloaderUtils';
 import { trackLazyLoading, useRenderTime } from '../utils/performanceUtils';
+// import { Video2Promo } from '../pages/Video2Promo';
 
 // Check if we're in development mode
 const isDevelopment = import.meta.env.DEV;
@@ -80,6 +81,14 @@ const Profile = lazy(() => {
 const SalesPageEmailGenerator = lazy(() => {
   const tracker = trackLazyLoading('SalesPageEmailGenerator');
   return import('../pages/SalesPageEmailGenerator').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
+const Video2Promo = lazy(() => {
+  const tracker = trackLazyLoading('Video2Promo');
+  return import('../pages/Video2Promo').then(module => {
     if (tracker) tracker();
     return module;
   });
@@ -293,7 +302,7 @@ const AppRoutes = () => {
           } 
         />
         
-        {/* NEW: Analytics Route */}
+        {/* Analytics Route */}
         <Route 
           path="/analytics" 
           element={
@@ -303,9 +312,9 @@ const AppRoutes = () => {
           } 
         />
         
-        {/* Email Generator Routes with Smart Preloading */}
+        {/* Email Generator Routes */}
         <Route 
-          path="/email-generator" 
+          path="/tools/email-generator" 
           element={
             <LazyRoute 
               pageName="Email Generator"
@@ -316,15 +325,13 @@ const AppRoutes = () => {
             </LazyRoute>
           } 
         />
+
+        {/* FIXED: Video2Promo Routes */}
         <Route 
-          path="/tools/email-generator" 
+          path="/tools/video2promo" 
           element={
-            <LazyRoute 
-              pageName="Email Generator"
-              preloadOnHover={true}
-              preloadFunction={preloadEmailComponents}
-            >
-              <SalesPageEmailGenerator />
+            <LazyRoute pageName="Video2Promo">
+              <Video2Promo />
             </LazyRoute>
           } 
         />
@@ -363,7 +370,7 @@ const AppRoutes = () => {
           } 
         />
         
-        {/* Future Features - Blog Post Creator */}
+        {/* Future Features */}
         <Route 
           path="/blog-creator" 
           element={
@@ -373,7 +380,6 @@ const AppRoutes = () => {
           } 
         />
         
-        {/* Future Features - Newsletter Creator */}
         <Route 
           path="/newsletter-creator" 
           element={
@@ -383,6 +389,21 @@ const AppRoutes = () => {
           } 
         />
       </Route>
+      
+      {/* Alternative Video2Promo Route Names - OUTSIDE MainLayout */}
+      <Route 
+        path="/video-to-email" 
+        element={<Navigate to="/tools/video2promo" replace />}
+      />
+      <Route 
+        path="/tools/video-to-email" 
+        element={<Navigate to="/tools/video2promo" replace />}
+      />
+      <Route 
+        path="/video2promo" 
+        element={<Navigate to="/tools/video2promo" replace />}
+      />
+      
 
       <Route 
         path="/subscription" 
