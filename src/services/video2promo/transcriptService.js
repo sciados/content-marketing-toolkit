@@ -145,15 +145,25 @@ class TranscriptService {
         console.log('🚀 Using serverless function for:', videoId);
       }
 
-      // Get serverless function URL
-      const serverlessUrl = import.meta.env.VITE_TRANSCRIPT_API_URL || 
-                           `${window.location.origin}/api/transcript`;
+      // FIXED: Better serverless URL detection
+      let serverlessUrl;
+      
+      // Check if we're on Vercel production
+      if (typeof window !== 'undefined' && window.location.hostname.includes('vercel.app')) {
+        serverlessUrl = `${window.location.origin}/api/transcript`;
+      } else if (import.meta.env.VITE_TRANSCRIPT_API_URL) {
+        serverlessUrl = import.meta.env.VITE_TRANSCRIPT_API_URL;
+      } else {
+        serverlessUrl = `${window.location.origin}/api/transcript`;
+      }
+      
+      const fullUrl = `${serverlessUrl}?videoId=${videoId}`;
       
       if (this.enableLogging) {
-        console.log('Serverless URL:', serverlessUrl);
+        console.log('🔗 Serverless URL:', fullUrl);
       }
 
-      const response = await fetch(`${serverlessUrl}?videoId=${videoId}`, {
+      const response = await fetch(fullUrl, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -161,41 +171,37 @@ class TranscriptService {
         }
       });
       
-      if (!response.ok) {
-        let errorMessage = `HTTP ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-        } catch {
-          errorMessage = `${errorMessage} ${response.statusText}`;
-        }
-        throw new Error(errorMessage);
+      const responseText = await response.text();
+      
+      if (this.enableLogging) {
+        console.log('📡 Serverless response status:', response.status);
+        console.log('📡 Serverless response preview:', responseText.substring(0, 200));
       }
       
-      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(`Serverless API returned ${response.status}: ${responseText}`);
+      }
+      
+      const data = JSON.parse(responseText);
       
       if (!data.success) {
-        throw new Error(data.error || 'Serverless function returned unsuccessful response');
+        throw new Error(data.error || 'Serverless function failed');
       }
       
       if (!data.transcript || !Array.isArray(data.transcript)) {
-        throw new Error('Invalid transcript format returned from serverless function');
+        throw new Error('Invalid transcript format from serverless function');
       }
       
-      if (this.enableLogging) {
-        console.log('✅ Serverless success:', {
-          method: data.metadata?.method,
-          segments: data.metadata?.stats?.segments,
-          wordCount: data.metadata?.stats?.wordCount,
-          duration: data.metadata?.stats?.estimatedDuration
-        });
-      }
+      console.log('✅ Serverless transcript success!', {
+        segments: data.transcript.length,
+        method: data.metadata?.method
+      });
       
       return data.transcript;
       
     } catch (error) {
-      console.error('Serverless function failed:', error);
-      throw new Error(`Serverless transcript fetch failed: ${error.message}`);
+      console.error('❌ Serverless function failed:', error.message);
+      throw error;
     }
   }
 
@@ -261,7 +267,7 @@ class TranscriptService {
   }
 
   /**
-   * Method 2: Third-party transcript services
+   * Method 2: Third-party transcript services - ENHANCED
    * @param {string} videoId - YouTube video ID
    * @returns {Promise<Array>} - Transcript items
    */
@@ -271,7 +277,27 @@ class TranscriptService {
         console.log('🌐 Trying third-party transcript services for:', videoId);
       }
 
-      // Option A: Try RapidAPI if key is available
+      // Option A: Try Deno service (working alternative)
+      try {
+        console.log('🦕 Trying Deno transcript service...');
+        const response = await fetch(`https://youtube-transcript-api.deno.dev/transcript/${videoId}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data && Array.isArray(data) && data.length > 0) {
+            console.log('✅ Got transcript from Deno service');
+            return data.map(item => ({
+              text: item.text,
+              offset: Math.round(item.offset || 0),
+              duration: Math.round(item.duration || 3000)
+            }));
+          }
+        }
+      } catch (denoError) {
+        console.log('Deno service failed:', denoError.message);
+      }
+
+      // Option B: Try RapidAPI if key is available
       if (import.meta.env.VITE_RAPIDAPI_KEY) {
         try {
           const rapidApiUrl = `https://youtube-transcript1.p.rapidapi.com/transcript`;
@@ -304,7 +330,7 @@ class TranscriptService {
         }
       }
 
-      // Option B: Custom API endpoint if available
+      // Option C: Custom API endpoint if available
       if (import.meta.env.VITE_CUSTOM_TRANSCRIPT_API) {
         try {
           const customApiUrl = `${import.meta.env.VITE_CUSTOM_TRANSCRIPT_API}/transcript/${videoId}`;
