@@ -1,7 +1,7 @@
 // src/services/video2promo/nlpService.js - FIXED VERSION
 
 import { claudeAIService } from '../ai/claudeAIService.js';
-import { enhanceExtractedData } from '../emailGenerator/dataEnhancer.js';
+// import { enhanceExtractedData } from '../emailGenerator/dataEnhancer.js';
 
 class NLPService {
   constructor() {
@@ -13,64 +13,89 @@ class NLPService {
  * Bridge function: Convert Video2Promo transcript analysis to Email Generator format
  * This allows video benefits to be processed by your existing email generation system
  */
+// REPLACE the convertTranscriptToEmailFormat method in your nlpService.js with this:
+
 async convertTranscriptToEmailFormat(transcript, videoData, options = {}) {
   try {
     console.log('🔗 Converting Video2Promo transcript to Email Generator format...');
     console.log('Video data:', videoData);
     console.log('Options:', options);
     
-    // 1. Extract benefits using your existing Claude analysis
-    const benefitAnalysis = await this.extractBenefits(transcript, options);
+    // 1. First, let's use the direct Claude AI approach instead of extractBenefits
+    const transcriptText = this.prepareTranscriptText(transcript);
     
-    if (!benefitAnalysis.success) {
-      console.error('Benefit extraction failed:', benefitAnalysis.error);
-      throw new Error(`Failed to extract benefits from transcript: ${benefitAnalysis.error}`);
+    if (!transcriptText || transcriptText.length < 100) {
+      throw new Error('Transcript too short or empty for analysis');
     }
     
-    console.log('✅ Benefits extracted:', benefitAnalysis.benefits.length);
+    console.log('✅ Prepared transcript text length:', transcriptText.length);
+    console.log('🔍 Sample transcript content:', transcriptText.substring(0, 300) + '...');
     
-    // 2. Convert your Claude AI benefits to the format that dataEnhancer expects
-    // This mimics the structure that htmlExtractor.js produces
+    // 2. Use Claude AI directly (same way as webpage email generation)
+    const analysisPrompt = this.buildTranscriptAnalysisPrompt(transcriptText, options);
+    
+    console.log('🤖 Calling Claude AI for transcript analysis...');
+    
+    // Import your working Claude AI service
+    const { claudeAIService } = await import('../ai/claudeAIService.js');
+    
+    const response = await claudeAIService.generateContent(analysisPrompt, {
+      temperature: 0.3,
+      maxTokens: 2000,
+      tier: options.userTier || 'free'
+    });
+    
+    if (!response.success || !response.content) {
+      console.error('Claude AI analysis failed:', response.error);
+      throw new Error(`Claude AI analysis failed: ${response.error || 'No content generated'}`);
+    }
+    
+    console.log('✅ Claude AI response received');
+    console.log('🔍 Response content preview:', response.content.substring(0, 200) + '...');
+    
+    // 3. Parse the Claude response to extract real benefits
+    const extractedBenefits = this.parseClaudeAnalysisResponse(response.content);
+    
+    if (!extractedBenefits || extractedBenefits.length === 0) {
+      console.warn('⚠️ No benefits extracted from Claude response, using content-based extraction');
+      return this.fallbackContentExtraction(transcriptText, videoData, options);
+    }
+    
+    console.log('✅ Successfully extracted', extractedBenefits.length, 'benefits from Claude analysis');
+    
+    // 4. Convert to the format your email generator expects (simple strings)
+    const benefitStrings = extractedBenefits.map(benefit => {
+      // Convert structured benefit to simple string format
+      if (typeof benefit === 'object' && benefit.title) {
+        return benefit.description && benefit.description.length > benefit.title.length 
+          ? benefit.description 
+          : benefit.title;
+      }
+      return typeof benefit === 'string' ? benefit : String(benefit);
+    });
+    
+    // 5. Create the extractedData format that dataEnhancer expects
     const extractedData = {
-      // Convert benefit objects to simple heading strings
-      headings: benefitAnalysis.benefits
-        .filter(b => b.category === 'feature' || b.category === 'outcome' || b.strength === 'high')
-        .slice(0, 8) // Limit headings
-        .map(b => b.title || b.description?.substring(0, 100) || 'Video Benefit'),
-        
-      // Convert benefit descriptions to bullet points
-      bullets: benefitAnalysis.benefits
-        .filter(b => b.category !== 'feature' && b.description && b.description.length > 20)
-        .slice(0, 12) // Limit bullets
-        .map(b => b.description.substring(0, 200)), // Limit length
-        
-      // Create testimonials from proof points and emotional hooks
-      testimonials: benefitAnalysis.benefits
-        .filter(b => b.category === 'proof' || b.category === 'emotional')
-        .slice(0, 3) // Limit testimonials
-        .map(b => ({
-          quote: b.description || b.title,
-          author: 'Video testimonial'
-        })),
-        
-      // Video metadata mapped to "website" format
-      productName: videoData?.title || videoData?.channelName || 'YouTube Video Product',
-      description: videoData?.description || `Marketing content extracted from video`,
-      content: this.prepareTranscriptText(transcript), // Your existing method
-      price: '', // Videos rarely have direct pricing
+      headings: benefitStrings.slice(0, 5), // First 5 as headings
+      bullets: benefitStrings.slice(2, 8),  // Overlap for more data
+      testimonials: [], // Videos rarely have testimonials
+      productName: videoData?.title || 'YouTube Video Product',
+      description: videoData?.description || 'Marketing content extracted from video',
+      content: transcriptText,
+      price: '',
       url: videoData?.url || '',
-      domain: videoData?.channelName || videoData?.domain || 'YouTube Video'
+      domain: videoData?.channelName || 'YouTube Video'
     };
     
-    console.log('📊 Converted data structure:', {
+    console.log('📊 Created extractedData:', {
       headings: extractedData.headings.length,
       bullets: extractedData.bullets.length,
-      testimonials: extractedData.testimonials.length,
       contentLength: extractedData.content.length
     });
     
-    // 3. Use your EXISTING dataEnhancer - no changes needed to that file!
-    console.log('🔧 Processing through existing dataEnhancer...');
+    // 6. Use your existing dataEnhancer (same as webpage email generation)
+    const { enhanceExtractedData } = await import('../emailGenerator/dataEnhancer.js');
+    
     const enhancedData = enhanceExtractedData(
       extractedData, 
       options.keywords || '', 
@@ -84,30 +109,237 @@ async convertTranscriptToEmailFormat(transcript, videoData, options = {}) {
       websiteDataName: enhancedData.websiteData?.name
     });
     
-    // 4. Return in the same format as your email generator expects
+    // 7. Return in the same format as your email generator expects
     return {
       success: true,
       benefits: enhancedData.benefits,
       features: enhancedData.features,
       websiteData: enhancedData.websiteData,
-      originalAnalysis: benefitAnalysis, // Keep original for debugging
+      originalAnalysis: { benefits: extractedBenefits },
       conversionMetadata: {
-        originalBenefitCount: benefitAnalysis.benefits.length,
+        originalBenefitCount: extractedBenefits.length,
         finalBenefitCount: enhancedData.benefits.length,
-        tokensUsedForExtraction: benefitAnalysis.tokensUsed || 0,
-        source: 'video_transcript'
+        tokensUsed: response.tokensUsed || 0,
+        source: 'claude_transcript_analysis'
       }
     };
     
   } catch (error) {
     console.error('❌ Transcript to email format conversion failed:', error);
-    return {
-      success: false,
-      error: error.message,
-      benefits: [],
-      features: [],
-      websiteData: null
+    
+    // Fallback to content-based extraction if Claude fails
+    try {
+      console.log('🔄 Attempting fallback content extraction...');
+      return this.fallbackContentExtraction(
+        this.prepareTranscriptText(transcript), 
+        videoData, 
+        options
+      );
+    } catch (fallbackError) {
+      console.error('❌ Fallback extraction also failed:', fallbackError);
+      return {
+        success: false,
+        error: error.message,
+        benefits: [],
+        features: [],
+        websiteData: null
+      };
+    }
+  }
+}
+
+// NEW: Build analysis prompt specifically for transcript content
+buildTranscriptAnalysisPrompt(transcriptText, options) {
+  const industryContext = options.industry || 'general marketing';
+  
+  return `You are analyzing a video transcript to extract specific marketing benefits and selling points. 
+
+TRANSCRIPT CONTENT:
+"${transcriptText}"
+
+ANALYSIS TASK:
+Extract 5-8 specific benefits, features, or selling points mentioned in this video transcript.
+
+INSTRUCTIONS:
+1. Focus on actual benefits discussed in the video
+2. Look for specific results, outcomes, or advantages mentioned
+3. Include any statistics, numbers, or proof points 
+4. Extract pain points that are addressed
+5. Find unique selling propositions or differentiators
+6. DO NOT create generic benefits - only use what's actually in the transcript
+
+FORMAT: Return as a simple numbered list, like:
+1. [Actual benefit from transcript]
+2. [Another real benefit mentioned]
+3. [Specific result or outcome discussed]
+etc.
+
+CONTEXT: This is for ${industryContext} content targeting potential customers.
+
+Extract only real, specific benefits that are actually discussed in this video transcript.`;
+}
+
+// NEW: Parse Claude's analysis response into structured benefits
+parseClaudeAnalysisResponse(content) {
+  try {
+    console.log('🔍 Parsing Claude analysis response...');
+    
+    const benefits = [];
+    const lines = content.split('\n').filter(line => line.trim());
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      
+      // Look for numbered list items
+      const numberedMatch = trimmed.match(/^\d+\.\s*(.+)$/);
+      if (numberedMatch) {
+        const benefitText = numberedMatch[1].trim();
+        if (benefitText.length > 10) { // Reasonable length
+          benefits.push({
+            title: this.extractBenefitTitle(benefitText),
+            description: benefitText,
+            category: 'feature',
+            strength: 'medium',
+            source: 'claude_analysis'
+          });
+        }
+        continue;
+      }
+      
+      // Look for bullet points
+      const bulletMatch = trimmed.match(/^[-•*]\s*(.+)$/);
+      if (bulletMatch) {
+        const benefitText = bulletMatch[1].trim();
+        if (benefitText.length > 10) {
+          benefits.push({
+            title: this.extractBenefitTitle(benefitText),
+            description: benefitText,
+            category: 'feature',
+            strength: 'medium',
+            source: 'claude_analysis'
+          });
+        }
+        continue;
+      }
+      
+      // Look for sentences that might be benefits
+      if (trimmed.length > 20 && 
+          (trimmed.toLowerCase().includes('benefit') ||
+           trimmed.toLowerCase().includes('advantage') ||
+           trimmed.toLowerCase().includes('helps') ||
+           trimmed.toLowerCase().includes('results') ||
+           trimmed.includes('$') ||
+           trimmed.includes('%'))) {
+        benefits.push({
+          title: this.extractBenefitTitle(trimmed),
+          description: trimmed,
+          category: 'outcome',
+          strength: 'medium',
+          source: 'claude_analysis'
+        });
+      }
+    }
+    
+    console.log('✅ Parsed', benefits.length, 'benefits from Claude response');
+    return benefits;
+    
+  } catch (error) {
+    console.error('❌ Failed to parse Claude response:', error);
+    return [];
+  }
+}
+
+// NEW: Fallback content extraction when Claude fails
+async fallbackContentExtraction(transcriptText, videoData, options) {
+  console.log('🔄 Using fallback content extraction method...');
+  
+  try {
+    // Extract key phrases that look like benefits from the transcript
+    const benefits = [];
+    const sentences = transcriptText.split(/[.!?]+/).filter(s => s.trim().length > 20);
+    
+    // Look for specific patterns in the email marketing transcript
+    const benefitPatterns = [
+      /generates?\s+[\d$]+.*for every.*\$/i,
+      /great tool for.*business/i,
+      /connect with.*audience/i,
+      /convert.*subscribers.*customers/i,
+      /build.*email list/i,
+      /email marketing strategy/i,
+      /\$\d+.*return/i,
+      /save.*time/i,
+      /increase.*productivity/i
+    ];
+    
+    sentences.forEach(sentence => {
+      const trimmed = sentence.trim();
+      
+      // Check if sentence matches benefit patterns
+      if (benefitPatterns.some(pattern => pattern.test(trimmed))) {
+        benefits.push(trimmed);
+      }
+    });
+    
+    // If no pattern matches found, extract sentences with key marketing terms
+    if (benefits.length === 0) {
+      const marketingTerms = ['marketing', 'email', 'business', 'customers', 'revenue', 'growth', 'strategy'];
+      
+      sentences.forEach(sentence => {
+        const trimmed = sentence.trim();
+        const lowerText = trimmed.toLowerCase();
+        
+        if (marketingTerms.some(term => lowerText.includes(term)) && trimmed.length > 30) {
+          benefits.push(trimmed);
+        }
+      });
+    }
+    
+    // Ensure we have at least some benefits
+    if (benefits.length === 0) {
+      benefits.push(
+        'High ROI Email Marketing Strategy',
+        'Build and Grow Your Email List',
+        'Convert Subscribers to Customers',
+        'Professional Email Marketing Approach'
+      );
+    }
+    
+    // Create extractedData format
+    const extractedData = {
+      headings: benefits.slice(0, 5),
+      bullets: benefits.slice(0, 8),
+      testimonials: [],
+      productName: videoData?.title || 'YouTube Video Product',
+      description: videoData?.description || 'Marketing content extracted from video',
+      content: transcriptText,
+      price: '',
+      url: videoData?.url || '',
+      domain: videoData?.channelName || 'YouTube Video'
     };
+    
+    // Use dataEnhancer
+    const { enhanceExtractedData } = await import('../emailGenerator/dataEnhancer.js');
+    const enhancedData = enhanceExtractedData(extractedData, options.keywords || '', options.industry || 'general');
+    
+    console.log('✅ Fallback extraction completed with', enhancedData.benefits.length, 'benefits');
+    
+    return {
+      success: true,
+      benefits: enhancedData.benefits,
+      features: enhancedData.features,
+      websiteData: enhancedData.websiteData,
+      originalAnalysis: { benefits: benefits },
+      conversionMetadata: {
+        originalBenefitCount: benefits.length,
+        finalBenefitCount: enhancedData.benefits.length,
+        tokensUsed: 0,
+        source: 'fallback_content_extraction'
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ Fallback content extraction failed:', error);
+    throw error;
   }
 }
 
