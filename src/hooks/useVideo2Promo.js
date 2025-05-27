@@ -1,443 +1,332 @@
-// src/hooks/useVideo2Promo.js - FIXED: Real database integration
-import { useState, useCallback, useEffect } from 'react';
+// src/hooks/useVideo2Promo.js - FIXED IMPORT
+
+import { useState, useCallback } from 'react';
 import { useSupabaseAuth } from './useSupabaseAuth';
-import { useProfile } from './useProfile';
+// mport { useProfile } from './useProfile';
 import { useUsageTracking } from './useUsageTracking';
 import { transcriptService } from '../services/video2promo/transcriptService';
 import { nlpService } from '../services/video2promo/nlpService';
 import { assetGenerationService } from '../services/video2promo/assetGenerationService';
-import { supabase } from '../services/supabase/supabaseClient';
+// import { supabase } from '../services/supabase/supabaseClient';
 
-export function useVideo2Promo() {
-  const [project, setProject] = useState(null);
-  const [projects, setProjects] = useState([]);
-  const [assets, setAssets] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  
+export const useVideo2Promo = () => {
   const { user } = useSupabaseAuth();
-  const { profileStats, refreshProfileStats } = useProfile();
-  const { trackAITokenUsage, getCurrentUsage } = useUsageTracking();
+  const { checkUsageLimit, updateUsage } = useUsageTracking();
+  
+  const [state, setState] = useState({
+    currentStep: 'input', // input, processing, transcript, benefits, generation, complete
+    videoUrl: '',
+    transcript: null,
+    benefits: [],
+    keywords: [],
+    utmParams: {},
+    generatedAssets: {},
+    loading: false,
+    error: null,
+    processingStage: ''
+  });
 
-  /**
-   * Load user's Video2Promo projects from database
-   */
-  const loadProjects = useCallback(async () => {
-    if (!user) {
-      console.log('No user, skipping project load');
-      setProjects([]);
-      return;
-    }
-
+  // Step 2: Extract benefits from transcript
+  const extractBenefits = useCallback(async (transcriptData = null) => {
     try {
-      console.log('Loading Video2Promo projects for user:', user.id);
+      const transcript = transcriptData || state.transcript;
       
-      const { data, error } = await supabase
-        .from('video_projects')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      if (!transcript || transcript.length === 0) {
+        throw new Error('No transcript data available for benefit extraction');
+      }
 
-      if (error) throw error;
+      setState(prev => ({
+        ...prev,
+        loading: true,
+        error: null,
+        processingStage: 'Analyzing transcript for benefits...'
+      }));
 
-      console.log('Loaded projects:', data);
-      setProjects(data || []);
-    } catch (err) {
-      console.error('Error loading Video2Promo projects:', err);
-      setError(err.message);
-      setProjects([]);
-    }
-  }, [user]);
+      console.log('Starting benefit extraction with transcript:', transcript.length, 'segments');
 
-  /**
-   * Check if user can create projects based on tier limits
-   */
-  const checkCanCreateProject = useCallback(async () => {
-    if (!profileStats) {
-      return { allowed: false, message: 'Profile loading...' };
-    }
-
-    const tierLimits = {
-      free: { projects: 5 },
-      pro: { projects: 50 },
-      gold: { projects: 200 }
-    };
-
-    const userTier = profileStats.subscriptionTier || 'free';
-    const limit = tierLimits[userTier]?.projects || 5;
-    const current = projects.length;
-
-    return {
-      allowed: current < limit,
-      current,
-      limit,
-      remaining: Math.max(0, limit - current),
-      message: current >= limit ? `You've reached your ${userTier} plan limit of ${limit} projects` : ''
-    };
-  }, [profileStats, projects.length]);
-
-  /**
-   * Get remaining tokens from real usage tracking
-   */
-  const getRemainingTokens = useCallback(async () => {
-    if (!profileStats) {
-      console.log('No profile stats, returning default tokens');
-      return 2000;
-    }
-
-    try {
-      // Get current month's usage
-      const usage = await getCurrentUsage();
-      const tokensUsed = usage.ai_tokens_used || 0;
-
-      // Get tier limits
-      const tierLimits = {
-        free: 2000,
-        pro: 50000,
-        gold: 200000
-      };
-
-      const userTier = profileStats.subscriptionTier || 'free';
-      const totalLimit = tierLimits[userTier] || 2000;
-      const remaining = Math.max(0, totalLimit - tokensUsed);
-
-      console.log(`Token calculation for ${userTier}:`, {
-        totalLimit,
-        tokensUsed,
-        remaining
+      // Extract benefits using NLP service
+      const benefitsResult = await nlpService.extractBenefits(transcript, {
+        userTier: user?.subscription_tier || 'free',
+        industry: 'general',
+        audience: 'potential customers'
       });
 
-      return remaining;
-    } catch (err) {
-      console.error('Error getting remaining tokens:', err);
-      // Fallback to tier default
-      const tierLimits = {
-        free: 2000,
-        pro: 50000,
-        gold: 200000
-      };
-      return tierLimits[profileStats.subscriptionTier || 'free'] || 2000;
-    }
-  }, [profileStats, getCurrentUsage]);
+      console.log('Benefits extraction result:', benefitsResult);
 
-  /**
-   * Create a new Video2Promo project - REAL DATABASE
-   */
-  const createProject = useCallback(async (formData) => {
-    if (!user) {
-      throw new Error('User must be authenticated');
-    }
-
-    // Check project limits
-    const canCreate = await checkCanCreateProject();
-    if (!canCreate.allowed) {
-      throw new Error(canCreate.message);
-    }
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      console.log('Creating Video2Promo project with data:', formData);
-
-      // 1. Validate YouTube URL
-      if (!transcriptService.isValidYouTubeUrl(formData.youtube_url)) {
-        throw new Error('Please enter a valid YouTube URL');
+      if (!benefitsResult.success) {
+        throw new Error('Failed to extract benefits: ' + (benefitsResult.error || 'Unknown error'));
       }
 
-      // 2. Get transcript
-      const transcriptData = await transcriptService.getTranscript(formData.youtube_url);
-      console.log('Transcript received:', transcriptData);
-      
-      // 3. Extract benefits using AI (this will use tokens)
-      const benefits = await nlpService.extractBenefits(
-        transcriptData.transcript, 
-        formData.keywords || [],
-        profileStats?.subscriptionTier || 'free'
-      );
-      console.log('Benefits extracted:', benefits);
-
-      // 4. Track AI token usage for benefit extraction
-      if (benefits.tokens_used) {
-        await trackAITokenUsage(benefits.tokens_used);
-        await refreshProfileStats(); // Refresh to show updated token usage
+      if (!benefitsResult.benefits || benefitsResult.benefits.length === 0) {
+        throw new Error('No benefits found in video content. Please try with a different video that discusses specific features or advantages.');
       }
 
-      // 5. Create project in database
-      const projectData = {
-        user_id: user.id,
-        youtube_url: formData.youtube_url,
-        video_id: transcriptData.videoId,
-        video_title: transcriptData.metadata?.title || `Video ${transcriptData.videoId}`,
-        video_duration: transcriptData.duration || 0,
-        transcript: transcriptData.transcript,
-        benefits: benefits.benefits || benefits, // Handle different response formats
-        keywords: formData.keywords || [],
-        affiliate_link: formData.affiliate_link || '',
-        utm_params: formData.utm_params || {},
-        tone: formData.tone || 'friendly',
-        status: 'ready',
-        tokens_used: benefits.tokens_used || 0
+      setState(prev => ({
+        ...prev,
+        benefits: benefitsResult.benefits,
+        currentStep: 'benefits',
+        loading: false,
+        processingStage: ''
+      }));
+
+      return {
+        success: true,
+        benefits: benefitsResult.benefits
       };
 
-      const { data: newProject, error: insertError } = await supabase
-        .from('video_projects')
-        .insert([projectData])
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      console.log('✅ Project created successfully:', newProject);
-
-      // Update state
-      setProject(newProject);
-      setProjects(prev => [newProject, ...prev]);
+    } catch (error) {
+      console.error('Benefit extraction failed:', error);
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error.message,
+        processingStage: '',
+        // Show fallback benefits with error message
+        benefits: [{
+          id: 'error_1',
+          title: 'Benefit Extraction Failed',
+          description: `Error: ${error.message}. Please try again or use a video with clearer content about specific benefits or features.`,
+          category: 'error',
+          strength: 'low',
+          source: 'error'
+        }]
+      }));
       
-      return newProject;
-
-    } catch (err) {
-      console.error('❌ Error creating Video2Promo project:', err);
-      setError(err.message);
-      throw err;
-    } finally {
-      setIsLoading(false);
+      return {
+        success: false,
+        error: error.message
+      };
     }
-  }, [user, profileStats, checkCanCreateProject, trackAITokenUsage, refreshProfileStats]);
+  }, [state.transcript, user?.subscription_tier]);
 
-  /**
-   * Generate marketing assets - REAL TOKEN TRACKING
-   */
-  const generateAssets = useCallback(async (generationParams) => {
-    if (!project || !user) {
-      throw new Error('Project and user required for asset generation');
-    }
-
-    const { benefitIndices, assetTypes, generateVariants = false } = generationParams;
-
-    if (!benefitIndices?.length || !assetTypes?.length) {
-      throw new Error('Please select benefits and asset types');
-    }
-
-    // Check remaining tokens
-    const remainingTokens = await getRemainingTokens();
-    const estimatedTokensNeeded = benefitIndices.length * assetTypes.length * 1500; // Rough estimate
-
-    if (remainingTokens < estimatedTokensNeeded) {
-      throw new Error(`Not enough tokens remaining. Need ~${estimatedTokensNeeded}, have ${remainingTokens}`);
-    }
-
-    setIsLoading(true);
-    setError(null);
-
+  // Step 1: Process video URL and extract transcript
+  const processVideo = useCallback(async (videoUrl) => {
     try {
-      console.log('🚀 Generating assets:', { benefitIndices, assetTypes });
-      const generatedAssets = [];
-      let totalTokensUsed = 0;
+      setState(prev => ({
+        ...prev,
+        loading: true,
+        error: null,
+        processingStage: 'Validating video URL...',
+        videoUrl
+      }));
 
-      // Generate assets for each selected benefit
-      for (const benefitIndex of benefitIndices) {
-        const benefit = project.benefits[benefitIndex];
-        if (!benefit) continue;
+      // Validate URL
+      if (!videoUrl || !videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be')) {
+        throw new Error('Please provide a valid YouTube URL');
+      }
 
-        // Generate each requested asset type
-        for (const assetType of assetTypes) {
-          const assetParams = {
-            benefit: { ...benefit, index: benefitIndex },
-            keywords: project.keywords || [],
-            affiliateLink: project.affiliate_link || '',
-            tone: project.tone || 'friendly',
-            userTier: profileStats?.subscriptionTier || 'free',
-            generateVariants
+      // Check usage limits
+      const canProceed = await checkUsageLimit('video2promo_projects');
+      if (!canProceed.allowed) {
+        throw new Error(`Usage limit reached: ${canProceed.message}`);
+      }
+
+      setState(prev => ({
+        ...prev,
+        processingStage: 'Extracting video transcript...'
+      }));
+
+      // Extract transcript
+      const transcriptResult = await transcriptService.getTranscript(videoUrl);
+      
+      if (!transcriptResult.success) {
+        throw new Error('Failed to extract transcript: ' + (transcriptResult.error || 'Unknown error'));
+      }
+
+      console.log('Transcript extracted successfully:', transcriptResult);
+
+      setState(prev => ({
+        ...prev,
+        transcript: transcriptResult.transcript,
+        currentStep: 'transcript',
+        processingStage: 'Transcript extracted successfully'
+      }));
+
+      // Automatically proceed to benefit extraction
+      setTimeout(() => {
+        extractBenefits(transcriptResult.transcript);
+      }, 1000);
+
+      return {
+        success: true,
+        transcript: transcriptResult.transcript
+      };
+
+    } catch (error) {
+      console.error('Video processing failed:', error);
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error.message,
+        processingStage: ''
+      }));
+      
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }, [checkUsageLimit, extractBenefits]);
+
+  // Step 3: Update keywords and UTM parameters
+  const updateKeywords = useCallback((keywords) => {
+    setState(prev => ({
+      ...prev,
+      keywords
+    }));
+  }, []);
+
+  const updateUTMParams = useCallback((utmParams) => {
+    setState(prev => ({
+      ...prev,
+      utmParams
+    }));
+  }, []);
+
+  // Step 4: Generate marketing assets
+  const generateAssets = useCallback(async (assetTypes = ['email_series']) => {
+    try {
+      if (!state.benefits || state.benefits.length === 0) {
+        throw new Error('No benefits available for asset generation');
+      }
+
+      setState(prev => ({
+        ...prev,
+        loading: true,
+        error: null,
+        processingStage: 'Generating marketing assets...',
+        currentStep: 'generation'
+      }));
+
+      // Check token usage for generation
+      const estimatedTokens = assetTypes.length * 1500; // Estimate tokens per asset
+      const canGenerate = await checkUsageLimit('tokens', estimatedTokens);
+      if (!canGenerate.allowed) {
+        throw new Error(`Insufficient tokens: ${canGenerate.message}`);
+      }
+
+      const generationData = {
+        benefits: state.benefits,
+        keywords: state.keywords,
+        utmParams: state.utmParams,
+        videoUrl: state.videoUrl,
+        transcript: state.transcript
+      };
+
+      const assets = {};
+
+      for (const assetType of assetTypes) {
+        setState(prev => ({
+          ...prev,
+          processingStage: `Generating ${assetType.replace('_', ' ')}...`
+        }));
+
+        const result = await assetGenerationService.generateAsset(
+          assetType,
+          generationData,
+          {
+            userTier: user?.subscription_tier || 'free',
+            includeUTM: state.utmParams && Object.keys(state.utmParams).length > 0
+          }
+        );
+
+        if (result.success) {
+          assets[assetType] = result.content;
+          
+          // Update usage tracking
+          await updateUsage('tokens', result.tokensUsed || 0);
+        } else {
+          console.error(`Failed to generate ${assetType}:`, result.error);
+          assets[assetType] = {
+            error: result.error,
+            fallback: true
           };
-
-          let assetResult;
-          switch (assetType) {
-            case 'email_series':
-              assetResult = await assetGenerationService.generateEmailSeries(assetParams);
-              break;
-            case 'blog_post':
-              assetResult = await assetGenerationService.generateBlogPost(assetParams);
-              break;
-            case 'newsletter':
-              assetResult = await assetGenerationService.generateNewsletter(assetParams);
-              break;
-            default:
-              console.warn(`Unknown asset type: ${assetType}`);
-              continue;
-          }
-
-          if (assetResult) {
-            // Track tokens used
-            const tokensUsed = assetResult.total_tokens || 0;
-            totalTokensUsed += tokensUsed;
-
-            // Save asset to database
-            const assetData = {
-              project_id: project.id,
-              user_id: user.id,
-              asset_type: assetType,
-              benefit_index: benefitIndex,
-              title: `${assetType.replace('_', ' ')} for ${benefit.title}`,
-              content: assetResult.content,
-              metadata: {
-                benefit: benefit,
-                generation_params: assetParams,
-                ai_model: assetResult.model_used
-              },
-              tokens_used: tokensUsed,
-              generation_cost: tokensUsed * 0.000001 // Rough cost estimate
-            };
-
-            const { data: savedAsset, error: saveError } = await supabase
-              .from('video_assets')
-              .insert([assetData])
-              .select()
-              .single();
-
-            if (saveError) {
-              console.error('Error saving asset:', saveError);
-              // Continue with other assets even if one fails to save
-            } else {
-              generatedAssets.push(savedAsset);
-            }
-          }
         }
       }
 
-      // Track total AI token usage
-      if (totalTokensUsed > 0) {
-        await trackAITokenUsage(totalTokensUsed);
-        await refreshProfileStats(); // Refresh to show updated usage
-      }
+      // Update project usage
+      await updateUsage('video2promo_projects', 1);
 
-      // Update project with total tokens used
-      const { error: updateError } = await supabase
-        .from('video_projects')
-        .update({ 
-          tokens_used: (project.tokens_used || 0) + totalTokensUsed,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', project.id);
+      setState(prev => ({
+        ...prev,
+        generatedAssets: assets,
+        currentStep: 'complete',
+        loading: false,
+        processingStage: ''
+      }));
 
-      if (updateError) {
-        console.error('Error updating project tokens:', updateError);
-      }
+      return {
+        success: true,
+        assets
+      };
 
-      // Update assets state
-      setAssets(prev => [...prev, ...generatedAssets]);
-      console.log('✅ Generated assets successfully:', generatedAssets);
-
-      return generatedAssets;
-
-    } catch (err) {
-      console.error('❌ Error generating assets:', err);
-      setError(err.message);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [project, user, profileStats, getRemainingTokens, trackAITokenUsage, refreshProfileStats]);
-
-  /**
-   * Load assets for a project from database
-   */
-  const loadProjectAssets = useCallback(async (projectId) => {
-    if (!projectId || !user) return;
-
-    try {
-      console.log('Loading assets for project:', projectId);
+    } catch (error) {
+      console.error('Asset generation failed:', error);
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error.message,
+        processingStage: ''
+      }));
       
-      const { data, error } = await supabase
-        .from('video_assets')
-        .select('*')
-        .eq('project_id', projectId)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      console.log('Loaded assets:', data);
-      setAssets(data || []);
-    } catch (err) {
-      console.error('Error loading project assets:', err);
-      setAssets([]);
+      return {
+        success: false,
+        error: error.message
+      };
     }
-  }, [user]);
+  }, [
+    state.benefits, 
+    state.keywords, 
+    state.utmParams, 
+    state.videoUrl, 
+    state.transcript, 
+    user?.subscription_tier, 
+    checkUsageLimit, 
+    updateUsage
+  ]);
 
-  /**
-   * Delete a project and its assets
-   */
-  const deleteProject = useCallback(async (projectId) => {
-    if (!projectId || !user) return;
-
-    try {
-      // Delete assets first (foreign key constraint)
-      const { error: assetsError } = await supabase
-        .from('video_assets')
-        .delete()
-        .eq('project_id', projectId)
-        .eq('user_id', user.id);
-
-      if (assetsError) throw assetsError;
-
-      // Delete project
-      const { error: projectError } = await supabase
-        .from('video_projects')
-        .delete()
-        .eq('id', projectId)
-        .eq('user_id', user.id);
-
-      if (projectError) throw projectError;
-
-      // Update state
-      setProjects(prev => prev.filter(p => p.id !== projectId));
-      if (project?.id === projectId) {
-        setProject(null);
-        setAssets([]);
-      }
-
-      console.log('✅ Project deleted successfully');
-    } catch (err) {
-      console.error('❌ Error deleting project:', err);
-      throw err;
-    }
-  }, [user, project]);
-
-  // Load projects on mount
-  useEffect(() => {
-    if (user) {
-      loadProjects();
-    }
-  }, [user, loadProjects]);
-
-  // Load assets when project changes
-  useEffect(() => {
-    if (project?.id) {
-      loadProjectAssets(project.id);
-    } else {
-      setAssets([]);
-    }
-  }, [project?.id, loadProjectAssets]);
+  // Reset to start over
+  const reset = useCallback(() => {
+    setState({
+      currentStep: 'input',
+      videoUrl: '',
+      transcript: null,
+      benefits: [],
+      keywords: [],
+      utmParams: {},
+      generatedAssets: {},
+      loading: false,
+      error: null,
+      processingStage: ''
+    });
+  }, []);
 
   return {
     // State
-    project,
-    projects,
-    assets,
-    isLoading,
-    error,
+    ...state,
     
     // Actions
-    createProject,
+    processVideo,
+    extractBenefits,
+    updateKeywords,  
+    updateUTMParams,
     generateAssets,
-    loadProjects,
-    loadProjectAssets,
-    deleteProject,
-    setProject,
+    reset,
     
-    // Utilities
-    checkCanCreateProject,
-    getRemainingTokens
+    // Computed values
+    canProceedToNextStep: !state.loading && !state.error,
+    hasTranscript: state.transcript && state.transcript.length > 0,
+    hasBenefits: state.benefits && state.benefits.length > 0 && !state.benefits[0]?.category === 'error',
+    isProcessing: state.loading,
+    
+    // Debug info
+    debug: {
+      transcriptLength: state.transcript?.length || 0,
+      benefitsCount: state.benefits?.length || 0,
+      processingStage: state.processingStage,
+      userTier: user?.subscription_tier || 'free'
+    }
   };
-}
+};
+
+export default useVideo2Promo;

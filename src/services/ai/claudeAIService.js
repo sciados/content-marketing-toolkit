@@ -1,9 +1,10 @@
-// src/services/ai/claudeAIService.js - FIXED for 5th Grade Reading Level
+// src/services/ai/claudeAIService.js - Updated with Video2Promo support
+
 import axios from 'axios';
 
 /**
  * Service for interacting with Claude AI API with tier-based model selection
- * Updated for 5th grade reading level affiliate marketing emails
+ * Updated for Video2Promo benefit extraction and email generation
  */
 class ClaudeAIService {
   constructor() {
@@ -39,7 +40,7 @@ class ClaudeAIService {
     
     // Log configuration if logging is enabled
     if (this.enableLogging) {
-      console.log('Claude AI Service Configuration:');
+      console.log('🤖 Claude AI Service Configuration:');
       console.log('API URL:', this.apiUrl);
       console.log('API Key:', this.apiKey ? 'Set (begins with ' + this.apiKey.substring(0, 10) + '...)' : 'Not set');
       console.log('Default Model:', this.defaultModel);
@@ -55,12 +56,12 @@ class ClaudeAIService {
     
     // Log if the proxy URL is not set
     if (!this.apiUrl) {
-      console.warn('Claude AI proxy URL not set. Email generation may fail.');
+      console.warn('⚠️ Claude AI proxy URL not set. Email generation may fail.');
     }
     
     // Log if the API key is not set
     if (!this.apiKey) {
-      console.warn('Claude API key not set. Email generation may fail.');
+      console.warn('⚠️ Claude API key not set. Email generation may fail.');
     }
   }
 
@@ -71,11 +72,161 @@ class ClaudeAIService {
     const config = this.tierModels[userTier] || this.tierModels.free;
     
     if (this.enableLogging) {
-      console.log(`🤖 Selected ${config.displayName} for ${userTier} tier user`);
+      console.log(`🎯 Selected ${config.displayName} for ${userTier} tier user`);
       console.log('Model features:', config.features);
     }
     
     return config;
+  }
+
+  /**
+   * NEW: Generate content using Claude AI (for Video2Promo benefit extraction)
+   */
+  async generateContent(prompt, options = {}) {
+    try {
+      const {
+        temperature = 0.7,
+        maxTokens = 4000,
+        tier = 'free'
+      } = options;
+
+      // Get model configuration for tier
+      const modelConfig = this.getModelForTier(tier);
+      const selectedModel = modelConfig.model;
+
+      if (this.enableLogging) {
+        console.log('🤖 Claude AI Debug Information:');
+        console.log('- Prompt length:', prompt.length);
+        console.log('- User tier:', tier);
+        console.log('- Selected model:', selectedModel);
+        console.log('- Max tokens:', maxTokens);
+        console.log('- Temperature:', temperature);
+        console.log('- First 200 chars of prompt:', prompt.substring(0, 200) + '...');
+        
+        // Check if prompt contains actual transcript data
+        const hasTranscriptData = prompt.includes('TRANSCRIPT TO ANALYZE:') && 
+                                 prompt.length > 1000 && 
+                                 !prompt.includes('template') && 
+                                 !prompt.includes('example');
+        
+        console.log('- Contains real transcript data:', hasTranscriptData);
+        
+        if (!hasTranscriptData) {
+          console.warn('⚠️ Warning: Prompt appears to lack real transcript data');
+        }
+      }
+
+      // Make the API call using existing method
+      const response = await this.makeDirectClaudeRequest({
+        prompt: prompt,
+        model: selectedModel,
+        maxTokens: maxTokens,
+        temperature: temperature
+      });
+
+      if (this.enableLogging) {
+        console.log('✅ Claude Response received, length:', response.content?.[0]?.text?.length || 0);
+        
+        if (response.content?.[0]?.text) {
+          const responseText = response.content[0].text;
+          console.log('🔍 Response analysis:');
+          console.log('- Contains JSON:', responseText.includes('{') && responseText.includes('}'));
+          console.log('- Contains "benefits":', responseText.toLowerCase().includes('benefits'));
+          console.log('- Contains "template":', responseText.toLowerCase().includes('template'));
+          console.log('- First 200 chars:', responseText.substring(0, 200));
+        }
+      }
+
+      if (response.content && response.content[0] && response.content[0].text) {
+        const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
+        
+        return {
+          success: true,
+          content: response.content[0].text,
+          tokensUsed: tokensUsed,
+          model: selectedModel,
+          usage: response.usage
+        };
+      } else {
+        throw new Error('Invalid response format from Claude API');
+      }
+      
+    } catch (error) {
+      console.error('❌ Claude AI Service Error:', error);
+      return {
+        success: false,
+        error: error.message,
+        content: null
+      };
+    }
+  }
+
+  /**
+   * NEW: Make direct API request to Claude (for Video2Promo)
+   */
+  async makeDirectClaudeRequest(params) {
+    const { prompt, model, maxTokens, temperature = 0.7 } = params;
+
+    try {
+      // Try with your existing proxy first
+      const response = await this.client.post(this.apiUrl, {
+        model: model,
+        max_tokens: maxTokens,
+        temperature: temperature,
+        messages: [{
+          role: 'user',
+          content: prompt
+        }],
+        apiKey: this.apiKey
+      });
+
+      if (this.enableLogging) {
+        console.log('✅ Direct Claude API request successful:', {
+          status: response.status,
+          model: model
+        });
+      }
+
+      return response.data;
+
+    } catch (axiosError) {
+      if (this.enableLogging) {
+        console.warn('❌ Direct Claude request failed:', axiosError.message);
+      }
+
+      // Fallback to fetch
+      const fetchResponse = await fetch(this.apiUrl, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: model,
+          max_tokens: maxTokens,
+          temperature: temperature,
+          messages: [{
+            role: 'user',
+            content: prompt
+          }],
+          apiKey: this.apiKey
+        }),
+        mode: 'cors'
+      });
+
+      if (!fetchResponse.ok) {
+        const errorText = await fetchResponse.text();
+        console.error('❌ Claude API Error:', errorText);
+        throw new Error(`Claude API error: ${fetchResponse.status} - ${errorText}`);
+      }
+
+      const data = await fetchResponse.json();
+      
+      if (this.enableLogging) {
+        console.log('✅ Fetch Claude API request successful');
+      }
+
+      return data;
+    }
   }
 
   /**
@@ -477,7 +628,7 @@ Subject: [your subject line]
    * Handle and format errors
    */
   handleError(error) {
-    let errorMessage = 'Failed to generate email with AI. ';
+    let errorMessage = 'Failed to generate content with AI. ';
     
     if (error.message.includes('API key')) {
       errorMessage += 'API key issue: ' + error.message;
@@ -634,4 +785,8 @@ Subject: [your subject line]
   }
 }
 
-export default new ClaudeAIService();
+// Export a single instance and the class for Video2Promo compatibility
+const claudeAIService = new ClaudeAIService();
+
+export { claudeAIService };
+export default claudeAIService;
