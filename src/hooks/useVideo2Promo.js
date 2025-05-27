@@ -1,13 +1,13 @@
-// src/hooks/useVideo2Promo.js - UPDATED to use unified system
+// src/hooks/useVideo2Promo.js - FIXED VERSION
 
 import { useState, useCallback } from 'react';
-import { useSupabaseAuth } from './useSupabaseAuth';
+import useSupabase from './useSupabase';
 import { useUsageTracking } from './useUsageTracking';
 import { transcriptService } from '../services/video2promo/transcriptService';
-import { extractBenefitsFromTranscript } from '../services/common/unifiedBenefitExtractor';
+import { nlpService } from '../services/video2promo/nlpService'; // USE YOUR EXISTING NLP SERVICE
 
 export const useVideo2Promo = () => {
-  const { user } = useSupabaseAuth();
+  const { user } = useSupabase();
   const { checkUsageLimit, updateUsage } = useUsageTracking();
   
   const [state, setState] = useState({
@@ -28,82 +28,120 @@ export const useVideo2Promo = () => {
     processingStage: ''
   });
 
-  // Extract benefits using the unified system
+  // Extract benefits using your existing nlpService with bridge function
   const extractBenefits = useCallback(async (transcriptData = null) => {
-  try {
-    const transcript = transcriptData || state.transcript;
-    
-    if (!transcript || transcript.length === 0) {
-      throw new Error('No transcript data available for benefit extraction');
+    try {
+      const transcript = transcriptData || state.transcript;
+      
+      if (!transcript || transcript.length === 0) {
+        throw new Error('No transcript data available for benefit extraction');
+      }
+
+      setState(prev => ({
+        ...prev,
+        loading: true,
+        error: null,
+        processingStage: 'Analyzing transcript for benefits...'
+      }));
+
+      // 🔍 DEBUG: Log the transcript data
+      console.log('🔍 DEBUG - Raw transcript data:', transcript);
+      console.log('🔍 DEBUG - Transcript type:', typeof transcript);
+      console.log('🔍 DEBUG - Is array:', Array.isArray(transcript));
+      console.log('🔍 DEBUG - Length:', transcript?.length);
+      
+      if (Array.isArray(transcript) && transcript.length > 0) {
+        console.log('🔍 DEBUG - First segment:', transcript[0]);
+        console.log('🔍 DEBUG - Sample text:', transcript.slice(0, 3).map(t => t.text || t));
+      }
+
+      console.log('🎥 Extracting benefits from transcript using nlpService bridge...');
+
+      // 🔍 DEBUG: Log the extraction call
+      console.log('🔍 DEBUG - Calling nlpService.convertTranscriptToEmailFormat with:', {
+        transcriptLength: transcript.length,
+        videoId: state.videoUrl.split('v=')[1]?.substring(0, 8),
+        userTier: user?.subscription_tier || 'free'
+      });
+
+      // Use your existing nlpService with the bridge function
+      const extractionResults = await nlpService.convertTranscriptToEmailFormat(
+        transcript, 
+        {
+          title: `Video ${state.videoUrl.split('v=')[1]?.substring(0, 8) || 'Content'}`,
+          url: state.videoUrl,
+          channelName: 'YouTube Video',
+          description: 'Marketing content extracted from YouTube video'
+        },
+        {
+          keywords: state.keywords.join(', '),
+          industry: 'general',
+          userTier: user?.subscription_tier || 'free',
+          user: user
+        }
+      );
+
+      // 🔍 DEBUG: Log the extraction results
+      console.log('🔍 DEBUG - Extraction results:', extractionResults);
+      console.log('🔍 DEBUG - Success:', extractionResults.success);
+      console.log('🔍 DEBUG - Benefits found:', extractionResults.benefits?.length);
+      console.log('🔍 DEBUG - Features found:', extractionResults.features?.length);
+      console.log('🔍 DEBUG - Website data:', extractionResults.websiteData);
+
+      if (!extractionResults.success) {
+        throw new Error(`Benefit extraction failed: ${extractionResults.error}`);
+      }
+
+      // Update state with the extracted data
+      setState(prev => ({
+        ...prev,
+        extractedBenefits: extractionResults.benefits || [],
+        extractedFeatures: extractionResults.features || [],
+        websiteData: extractionResults.websiteData,
+        selectedBenefits: new Array(extractionResults.benefits?.length || 0).fill(true), // All selected by default
+        currentStep: 'benefits',
+        loading: false,
+        processingStage: ''
+      }));
+
+      return {
+        success: true,
+        extractedBenefits: extractionResults.benefits || [],
+        extractedFeatures: extractionResults.features || [],
+        websiteData: extractionResults.websiteData
+      };
+
+    } catch (error) {
+      console.error('❌ Benefit extraction failed:', error);
+      
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error.message,
+        processingStage: '',
+        // Set fallback benefits so user can see what went wrong
+        extractedBenefits: [
+          {
+            id: 'error_1',
+            title: 'Benefit Extraction Failed',
+            description: `Error: ${error.message}. Please try again or check if the video contains clear product benefits.`,
+            category: 'error',
+            strength: 'low',
+            source: 'error'
+          }
+        ],
+        selectedBenefits: [false]
+      }));
+      
+      return {
+        success: false,
+        error: error.message,
+        extractedBenefits: [],
+        extractedFeatures: [],
+        websiteData: null
+      };
     }
-
-    setState(prev => ({
-      ...prev,
-      loading: true,
-      error: null,
-      processingStage: 'Analyzing transcript for benefits...'
-    }));
-
-    // 🔍 DEBUG: Log the transcript data
-    console.log('🔍 DEBUG - Raw transcript data:', transcript);
-    console.log('🔍 DEBUG - Transcript type:', typeof transcript);
-    console.log('🔍 DEBUG - Is array:', Array.isArray(transcript));
-    console.log('🔍 DEBUG - Length:', transcript?.length);
-    
-    if (Array.isArray(transcript) && transcript.length > 0) {
-      console.log('🔍 DEBUG - First segment:', transcript[0]);
-      console.log('🔍 DEBUG - Sample text:', transcript.slice(0, 3).map(t => t.text || t));
-    }
-
-    console.log('🎥 Extracting benefits from transcript using unified system...');
-
-    // 🔍 DEBUG: Log the extraction call
-    console.log('🔍 DEBUG - Calling extractBenefitsFromTranscript with:', {
-      transcriptLength: transcript.length,
-      videoId: state.videoUrl.split('v=')[1]?.substring(0, 8),
-      userTier: user?.subscription_tier || 'free'
-    });
-
-    // Use the unified benefit extractor
-    const extractionResults = await extractBenefitsFromTranscript(transcript, {
-      sourceUrl: state.videoUrl,
-      keywords: state.keywords.join(', '),
-      industry: 'general',
-      userTier: user?.subscription_tier || 'free',
-      productName: `Video ${state.videoUrl.split('v=')[1]?.substring(0, 8) || 'Content'}`,
-      description: 'Marketing content extracted from YouTube video'
-    });
-
-    // 🔍 DEBUG: Log the extraction results
-    console.log('🔍 DEBUG - Extraction results:', extractionResults);
-    console.log('🔍 DEBUG - Benefits found:', extractionResults.extractedBenefits?.length);
-    console.log('🔍 DEBUG - Features found:', extractionResults.extractedFeatures?.length);
-    console.log('🔍 DEBUG - Website data:', extractionResults.websiteData);
-
-    // Rest of your existing code...
-    setState(prev => ({
-      ...prev,
-      extractedBenefits: extractionResults.extractedBenefits,
-      extractedFeatures: extractionResults.extractedFeatures,
-      websiteData: extractionResults.websiteData,
-      selectedBenefits: new Array(extractionResults.extractedBenefits.length).fill(false),
-      currentStep: 'benefits',
-      loading: false,
-      processingStage: ''
-    }));
-
-    return {
-      success: true,
-      extractedBenefits: extractionResults.extractedBenefits,
-      extractedFeatures: extractionResults.extractedFeatures,
-      websiteData: extractionResults.websiteData
-    };
-
-  } catch (error) {
-    console.error('❌ Benefit extraction failed:', error);
-    // Your existing error handling...
-  }
-}, [state.transcript, state.videoUrl, state.keywords, user?.subscription_tier]);
+  }, [state.transcript, state.videoUrl, state.keywords, user]);
 
   // Process video URL and extract transcript
   const processVideo = useCallback(async (videoUrl) => {
@@ -142,13 +180,9 @@ export const useVideo2Promo = () => {
         ...prev,
         transcript: transcriptResult.transcript,
         currentStep: 'transcript',
-        processingStage: 'Transcript extracted successfully'
+        processingStage: 'Transcript extracted successfully',
+        loading: false
       }));
-
-      // Automatically proceed to benefit extraction
-      setTimeout(() => {
-        extractBenefits(transcriptResult.transcript);
-      }, 1000);
 
       return {
         success: true,
@@ -169,7 +203,7 @@ export const useVideo2Promo = () => {
         error: error.message
       };
     }
-  }, [checkUsageLimit, extractBenefits]);
+  }, [checkUsageLimit]);
 
   // Toggle benefit selection (same as email generator)
   const toggleBenefit = useCallback((index) => {
