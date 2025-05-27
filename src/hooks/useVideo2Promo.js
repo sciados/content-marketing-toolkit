@@ -30,79 +30,80 @@ export const useVideo2Promo = () => {
 
   // Extract benefits using the unified system
   const extractBenefits = useCallback(async (transcriptData = null) => {
-    try {
-      const transcript = transcriptData || state.transcript;
-      
-      if (!transcript || transcript.length === 0) {
-        throw new Error('No transcript data available for benefit extraction');
-      }
-
-      setState(prev => ({
-        ...prev,
-        loading: true,
-        error: null,
-        processingStage: 'Analyzing transcript for benefits...'
-      }));
-
-      console.log('🎥 Extracting benefits from transcript using unified system...');
-
-      // Use the unified benefit extractor (same as website scanner)
-      const extractionResults = await extractBenefitsFromTranscript(transcript, {
-        sourceUrl: state.videoUrl,
-        keywords: state.keywords.join(', '),
-        industry: 'general',
-        userTier: user?.subscription_tier || 'free',
-        productName: `Video ${state.videoUrl.split('v=')[1]?.substring(0, 8) || 'Content'}`,
-        description: 'Marketing content extracted from YouTube video'
-      });
-
-      // The results are already in the exact format your ScanResultsPanel expects!
-      setState(prev => ({
-        ...prev,
-        extractedBenefits: extractionResults.extractedBenefits,
-        extractedFeatures: extractionResults.extractedFeatures,
-        websiteData: extractionResults.websiteData,
-        selectedBenefits: new Array(extractionResults.extractedBenefits.length).fill(false),
-        currentStep: 'benefits',
-        loading: false,
-        processingStage: ''
-      }));
-
-      return {
-        success: true,
-        extractedBenefits: extractionResults.extractedBenefits,
-        extractedFeatures: extractionResults.extractedFeatures,
-        websiteData: extractionResults.websiteData
-      };
-
-    } catch (error) {
-      console.error('❌ Benefit extraction failed:', error);
-      setState(prev => ({
-        ...prev,
-        loading: false,
-        error: error.message,
-        processingStage: '',
-        extractedBenefits: [
-          'Benefit extraction failed - please try again',
-          'Video may not have clear marketing content',
-          'Consider trying a different video'
-        ],
-        extractedFeatures: ['No features extracted'],
-        websiteData: {
-          name: 'Video Analysis Failed',
-          description: error.message,
-          source: 'transcript',
-          url: state.videoUrl
-        },
-        selectedBenefits: [false, false, false]
-      }));
-      
-      return {
-        success: false,
-        error: error.message
-      };
+  try {
+    const transcript = transcriptData || state.transcript;
+    
+    if (!transcript || transcript.length === 0) {
+      throw new Error('No transcript data available for benefit extraction');
     }
-  }, [state.transcript, state.videoUrl, state.keywords, user?.subscription_tier]);
+
+    setState(prev => ({
+      ...prev,
+      loading: true,
+      error: null,
+      processingStage: 'Analyzing transcript for benefits...'
+    }));
+
+    // 🔍 DEBUG: Log the transcript data
+    console.log('🔍 DEBUG - Raw transcript data:', transcript);
+    console.log('🔍 DEBUG - Transcript type:', typeof transcript);
+    console.log('🔍 DEBUG - Is array:', Array.isArray(transcript));
+    console.log('🔍 DEBUG - Length:', transcript?.length);
+    
+    if (Array.isArray(transcript) && transcript.length > 0) {
+      console.log('🔍 DEBUG - First segment:', transcript[0]);
+      console.log('🔍 DEBUG - Sample text:', transcript.slice(0, 3).map(t => t.text || t));
+    }
+
+    console.log('🎥 Extracting benefits from transcript using unified system...');
+
+    // 🔍 DEBUG: Log the extraction call
+    console.log('🔍 DEBUG - Calling extractBenefitsFromTranscript with:', {
+      transcriptLength: transcript.length,
+      videoId: state.videoUrl.split('v=')[1]?.substring(0, 8),
+      userTier: user?.subscription_tier || 'free'
+    });
+
+    // Use the unified benefit extractor
+    const extractionResults = await extractBenefitsFromTranscript(transcript, {
+      sourceUrl: state.videoUrl,
+      keywords: state.keywords.join(', '),
+      industry: 'general',
+      userTier: user?.subscription_tier || 'free',
+      productName: `Video ${state.videoUrl.split('v=')[1]?.substring(0, 8) || 'Content'}`,
+      description: 'Marketing content extracted from YouTube video'
+    });
+
+    // 🔍 DEBUG: Log the extraction results
+    console.log('🔍 DEBUG - Extraction results:', extractionResults);
+    console.log('🔍 DEBUG - Benefits found:', extractionResults.extractedBenefits?.length);
+    console.log('🔍 DEBUG - Features found:', extractionResults.extractedFeatures?.length);
+    console.log('🔍 DEBUG - Website data:', extractionResults.websiteData);
+
+    // Rest of your existing code...
+    setState(prev => ({
+      ...prev,
+      extractedBenefits: extractionResults.extractedBenefits,
+      extractedFeatures: extractionResults.extractedFeatures,
+      websiteData: extractionResults.websiteData,
+      selectedBenefits: new Array(extractionResults.extractedBenefits.length).fill(false),
+      currentStep: 'benefits',
+      loading: false,
+      processingStage: ''
+    }));
+
+    return {
+      success: true,
+      extractedBenefits: extractionResults.extractedBenefits,
+      extractedFeatures: extractionResults.extractedFeatures,
+      websiteData: extractionResults.websiteData
+    };
+
+  } catch (error) {
+    console.error('❌ Benefit extraction failed:', error);
+    // Your existing error handling...
+  }
+}, [state.transcript, state.videoUrl, state.keywords, user?.subscription_tier]);
 
   // Process video URL and extract transcript
   const processVideo = useCallback(async (videoUrl) => {
