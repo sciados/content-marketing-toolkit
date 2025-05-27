@@ -1,334 +1,401 @@
-// src/services/video2promo/transcriptService.js - CLEAN VERSION (No Firebase)
+// src/services/video2promo/transcriptService.js - SUPABASE ONLY VERSION
 
 class TranscriptService {
   constructor() {
-    // Working public CORS proxies (no Firebase)
-    this.corsProxies = [
-      'https://api.allorigins.win/get?url=',
-      'https://api.codetabs.com/v1/proxy?quest=',
-      'https://cors-anywhere.herokuapp.com/'
-    ];
-
+    // Use your existing serverless API endpoint (no Firebase)
+    this.serverlessEndpoint = import.meta.env.VITE_TRANSCRIPT_API_URL || 'https://content-marketing-toolkit-8w8d.vercel.app/api/transcript';
     this.youtubeApiKey = import.meta.env.VITE_YOUTUBE_API_KEY;
+    
+    console.log('🎥 Transcript Service initialized (Supabase-only)');
+    console.log('📡 Serverless endpoint:', this.serverlessEndpoint);
+    console.log('🔑 YouTube API key:', this.youtubeApiKey ? 'Available' : 'Missing');
   }
 
-  // Extract video ID from various YouTube URL formats
-  extractVideoId(url) {
-    const patterns = [
-      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-      /youtube\.com\/watch\?.*v=([^&\n?#]+)/,
-      /youtu\.be\/([^&\n?#]+)/
+  /**
+   * Main method to get transcript for a YouTube video
+   */
+  async getTranscript(videoUrl) {
+    try {
+      const videoId = this.extractVideoId(videoUrl);
+      if (!videoId) {
+        throw new Error('Invalid YouTube URL. Please provide a valid YouTube video link.');
+      }
+
+      console.log('🎬 Extracting transcript for video:', videoId);
+      
+      // Method 1: Try your serverless API first (most reliable)
+      try {
+        console.log('📡 Trying serverless API...');
+        const serverlessResult = await this.fetchTranscriptViaServerless(videoId);
+        if (serverlessResult.success) {
+          console.log('✅ Serverless API successful!');
+          return serverlessResult;
+        }
+      } catch (serverlessError) {
+        console.warn('⚠️ Serverless API failed:', serverlessError.message);
+      }
+
+      // Method 2: Try YouTube Data API (if available)
+      if (this.youtubeApiKey) {
+        try {
+          console.log('📺 Trying YouTube Data API...');
+          const youtubeResult = await this.fetchTranscriptViaYouTubeAPI(videoId);
+          if (youtubeResult.success) {
+            console.log('✅ YouTube Data API successful!');
+            return youtubeResult;
+          }
+        } catch (youtubeError) {
+          console.warn('⚠️ YouTube Data API failed:', youtubeError.message);
+        }
+      }
+
+      // Method 3: Try direct transcript URLs (no proxy needed)
+      try {
+        console.log('🔗 Trying direct transcript access...');
+        const directResult = await this.fetchTranscriptDirectly(videoId);
+        if (directResult.success) {
+          console.log('✅ Direct transcript access successful!');
+          return directResult;
+        }
+      } catch (directError) {
+        console.warn('⚠️ Direct transcript access failed:', directError.message);
+      }
+
+      // Method 4: Try alternative transcript APIs
+      try {
+        console.log('🌐 Trying alternative transcript services...');
+        const altResult = await this.fetchTranscriptViaAlternatives(videoId);
+        if (altResult.success) {
+          console.log('✅ Alternative service successful!');
+          return altResult;
+        }
+      } catch (altError) {
+        console.warn('⚠️ Alternative services failed:', altError.message);
+      }
+
+      // All methods failed
+      throw new Error('Unable to fetch transcript. This video may not have captions enabled or may be restricted.');
+
+    } catch (error) {
+      console.error('❌ Transcript extraction failed:', error);
+      return {
+        success: false,
+        error: error.message,
+        transcript: null
+      };
+    }
+  }
+
+  /**
+   * Method 1: Use your existing serverless API
+   */
+  async fetchTranscriptViaServerless(videoId) {
+    try {
+      const response = await fetch(this.serverlessEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          videoId: videoId,
+          method: 'transcript'
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Serverless API error: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.transcript && Array.isArray(data.transcript) && data.transcript.length > 0) {
+        return {
+          success: true,
+          transcript: data.transcript,
+          source: 'serverless_api'
+        };
+      } else {
+        throw new Error('No transcript data returned from serverless API');
+      }
+
+    } catch (error) {
+      console.error('Serverless transcript fetch failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Method 2: Use YouTube Data API for captions
+   */
+  async fetchTranscriptViaYouTubeAPI(videoId) {
+    try {
+      // First, get caption tracks
+      const captionsResponse = await fetch(
+        `https://www.googleapis.com/youtube/v3/captions?part=snippet&videoId=${videoId}&key=${this.youtubeApiKey}`
+      );
+
+      if (!captionsResponse.ok) {
+        throw new Error(`YouTube API error: ${captionsResponse.status}`);
+      }
+
+      const captionsData = await captionsResponse.json();
+      
+      if (!captionsData.items || captionsData.items.length === 0) {
+        throw new Error('No captions available for this video');
+      }
+
+      // Find English captions
+      const englishCaption = captionsData.items.find(item => 
+        item.snippet.language === 'en' || item.snippet.language === 'en-US'
+      ) || captionsData.items[0];
+
+      // Download the caption
+      const captionResponse = await fetch(
+        `https://www.googleapis.com/youtube/v3/captions/${englishCaption.id}?key=${this.youtubeApiKey}`,
+        {
+          headers: {
+            'Accept': 'application/json'
+          }
+        }
+      );
+
+      if (!captionResponse.ok) {
+        throw new Error(`Caption download error: ${captionResponse.status}`);
+      }
+
+      const captionText = await captionResponse.text();
+      
+      // Parse caption text into segments
+      const transcript = this.parseCaptionText(captionText);
+
+      return {
+        success: true,
+        transcript: transcript,
+        source: 'youtube_data_api'
+      };
+
+    } catch (error) {
+      console.error('YouTube Data API transcript fetch failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Method 3: Try direct transcript access (no proxy)
+   */
+  async fetchTranscriptDirectly(videoId) {
+    const transcriptUrls = [
+      `http://video.google.com/timedtext?lang=en&v=${videoId}&kind=asr`,
+      `http://video.google.com/timedtext?v=${videoId}&lang=en&fmt=srv3`,
+      `https://www.youtube.com/api/timedtext?lang=en&v=${videoId}`,
     ];
 
-    for (const pattern of patterns) {
-      const match = url.match(pattern);
-      if (match) return match[1];
-    }
-    
-    throw new Error('Invalid YouTube URL format');
-  }
-
-  // Method 1: YouTube Data API v3 (requires API key)
-  async getOfficialTranscript(videoId) {
-    if (!this.youtubeApiKey) {
-      console.warn('YouTube API key not available - skipping official method');
-      return null;
-    }
-
-    try {
-      // Get video details to check if captions exist
-      const videoUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${this.youtubeApiKey}`;
-      const videoResponse = await fetch(videoUrl);
-      
-      if (!videoResponse.ok) {
-        throw new Error(`YouTube API error: ${videoResponse.status}`);
-      }
-
-      const videoData = await videoResponse.json();
-      if (!videoData.items || videoData.items.length === 0) {
-        throw new Error('Video not found');
-      }
-
-      console.log('✅ Video found via YouTube API:', videoData.items[0].snippet.title);
-      
-      // For now, return null as we can't download captions without OAuth
-      // This method confirms the video exists
-      return null;
-    } catch (error) {
-      console.error('YouTube API method failed:', error);
-      return null;
-    }
-  }
-
-  // Method 2: Extract from YouTube page HTML using CORS proxies
-  async getTranscriptFromPage(videoId) {
-    const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    
-    for (const proxy of this.corsProxies) {
+    for (const url of transcriptUrls) {
       try {
-        console.log(`🔍 Trying proxy: ${proxy.substring(0, 30)}...`);
+        console.log('🔗 Trying direct URL:', url);
         
-        let proxyUrl;
-        if (proxy.includes('allorigins.win')) {
-          proxyUrl = `${proxy}${encodeURIComponent(watchUrl)}`;
-        } else {
-          proxyUrl = `${proxy}${encodeURIComponent(watchUrl)}`;
-        }
-
-        const response = await fetch(proxyUrl, {
+        // Try direct fetch (might work from Vercel edge functions)
+        const response = await fetch(url, {
+          method: 'GET',
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-          },
-          timeout: 10000
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          }
         });
 
-        if (!response.ok) {
-          console.warn(`Proxy ${proxy} returned ${response.status}`);
-          continue;
+        if (response.ok) {
+          const xmlText = await response.text();
+          const transcript = this.parseTranscriptXML(xmlText);
+          
+          if (transcript && transcript.length > 0) {
+            return {
+              success: true,
+              transcript: transcript,
+              source: 'direct_access'
+            };
+          }
         }
-
-        let html;
-        if (proxy.includes('allorigins.win')) {
-          const data = await response.json();
-          html = data.contents;
-        } else {
-          html = await response.text();
-        }
-
-        if (!html || html.length < 1000) {
-          console.warn(`Proxy ${proxy} returned insufficient data`);
-          continue;
-        }
-
-        // Extract transcript from page HTML
-        const transcript = this.extractTranscriptFromHTML(html, videoId);
-        if (transcript && transcript.length > 0) {
-          console.log(`✅ Transcript extracted via ${proxy}`);
-          return transcript;
-        }
-
       } catch (error) {
-        console.warn(`Proxy ${proxy} failed:`, error.message);
+        console.warn(`Direct access failed for ${url}:`, error.message);
         continue;
       }
     }
 
+    throw new Error('All direct transcript URLs failed');
+  }
+
+  /**
+   * Method 4: Try alternative transcript services
+   */
+  async fetchTranscriptViaAlternatives(videoId) {
+    const alternatives = [
+      {
+        name: 'YouTube Transcript API',
+        url: `https://youtubetranscript.com/?server_vid2=${videoId}`,
+        parser: 'json'
+      },
+      {
+        name: 'Transcript Fetcher',
+        url: `https://api.scrapfly.io/scrape?url=https://www.youtube.com/watch?v=${videoId}&render_js=true&extract=%7B%22transcript%22%3A%22%23transcript%22%7D`,
+        parser: 'scrapfly'
+      }
+    ];
+
+    for (const alt of alternatives) {
+      try {
+        console.log(`🌐 Trying ${alt.name}...`);
+        
+        const response = await fetch(alt.url, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (compatible; TranscriptBot/1.0)'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          let transcript;
+
+          if (alt.parser === 'json' && data.transcript) {
+            transcript = Array.isArray(data.transcript) ? data.transcript : [data.transcript];
+          } else if (alt.parser === 'scrapfly' && data.result && data.result.transcript) {
+            transcript = this.parseTranscriptText(data.result.transcript);
+          }
+
+          if (transcript && transcript.length > 0) {
+            return {
+              success: true,
+              transcript: transcript,
+              source: alt.name
+            };
+          }
+        }
+      } catch (error) {
+        console.warn(`${alt.name} failed:`, error.message);
+        continue;
+      }
+    }
+
+    throw new Error('All alternative transcript services failed');
+  }
+
+  /**
+   * Extract video ID from YouTube URL
+   */
+  extractVideoId(url) {
+    const patterns = [
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([^&\n?#]+)/,
+      /(?:https?:\/\/)?(?:www\.)?youtu\.be\/([^&\n?#]+)/,
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([^&\n?#]+)/,
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/v\/([^&\n?#]+)/
+    ];
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match) {
+        return match[1];
+      }
+    }
     return null;
   }
 
-  // Method 3: Generate mock transcript for testing
-  generateMockTranscript(videoId) {
-    console.log('⚠️ Generating mock transcript for testing purposes', videoId ? `for video ${videoId}` : '');
-    
-    const mockSegments = [
-      { text: "Welcome to this amazing product demonstration", start: 0, duration: 3 },
-      { text: "This tool will save you hours of work every single day", start: 3, duration: 4 },
-      { text: "It's 50% faster than any competitor on the market", start: 7, duration: 3 },
-      { text: "Users report incredible results within the first week", start: 10, duration: 4 },
-      { text: "The interface is so simple, anyone can use it", start: 14, duration: 3 },
-      { text: "You'll see a 300% increase in your productivity", start: 17, duration: 4 },
-      { text: "No technical skills required - just point and click", start: 21, duration: 3 },
-      { text: "Get started today with our risk-free trial", start: 24, duration: 3 },
-      { text: "Join thousands of satisfied customers worldwide", start: 27, duration: 4 },
-      { text: "Don't wait - this special offer won't last long", start: 31, duration: 3 }
+  /**
+   * Parse XML transcript format
+   */
+  parseTranscriptXML(xmlText) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xmlText, 'text/xml');
+      const textElements = doc.querySelectorAll('text');
+      
+      const transcript = [];
+      textElements.forEach((element, index) => {
+        const text = element.textContent?.trim();
+        const start = parseFloat(element.getAttribute('start') || '0');
+        const duration = parseFloat(element.getAttribute('dur') || '3');
+        
+        if (text && text.length > 0) {
+          transcript.push({
+            text: text,
+            start: start,
+            duration: duration,
+            index: index
+          });
+        }
+      });
+
+      return transcript;
+    } catch (error) {
+      console.error('XML parsing failed:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Parse caption text format
+   */
+  parseCaptionText(captionText) {
+    try {
+      // Handle different caption formats
+      if (captionText.includes('<?xml')) {
+        return this.parseTranscriptXML(captionText);
+      }
+
+      // Handle JSON format
+      if (captionText.startsWith('{') || captionText.startsWith('[')) {
+        const data = JSON.parse(captionText);
+        return Array.isArray(data) ? data : [data];
+      }
+
+      // Handle plain text format
+      return this.parseTranscriptText(captionText);
+    } catch (error) {
+      console.error('Caption text parsing failed:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Parse plain text transcript
+   */
+  parseTranscriptText(text) {
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    return sentences.map((sentence, index) => ({
+      text: sentence.trim(),
+      start: index * 3, // Estimate timing
+      duration: 3,
+      index: index
+    }));
+  }
+
+  /**
+   * Test method to check if transcript service is working
+   */
+  async testTranscriptService() {
+    const testVideos = [
+      'dQw4w9WgXcQ', // Rick Roll (usually has captions)
+      'jNQXAC9IVRw', // Another test video
+      'M7lc1UVf-VE'  // Another test video
     ];
 
-    return mockSegments;
-  }
-
-  // Extract transcript from YouTube page HTML
-  extractTranscriptFromHTML(html, videoId) {
-    try {
-      // Look for various patterns in YouTube's HTML that contain transcript data
-      const patterns = [
-        // Pattern 1: captionTracks in playerResponse
-        /"captionTracks":\s*\[(.*?)\]/,
-        // Pattern 2: captions in ytInitialPlayerResponse
-        /"captions":\s*{[^}]*"playerCaptionsTracklistRenderer":\s*{[^}]*"captionTracks":\s*\[(.*?)\]/,
-        // Pattern 3: Direct transcript data
-        /"transcriptRenderer":\s*{.*?"content":\s*\[(.*?)\]/
-      ];
-
-      for (const pattern of patterns) {
-        const match = html.match(pattern);
-        if (match) {
-          try {
-            // Try to parse the matched JSON
-            const captionData = JSON.parse(`[${match[1]}]`);
-            if (captionData && captionData.length > 0) {
-              console.log('Found caption data in HTML');
-              return this.processCaptionData(captionData);
-            }
-          } catch (parseError) {
-            console.warn('Failed to parse caption data:', parseError);
-            continue;
-          }
-        }
-      }
-
-      // If no transcript found in HTML, check if it's a valid video page
-      if (html.includes(videoId) && html.includes('youtube')) {
-        console.log('✅ Valid YouTube page detected but no transcript found');
-        console.log('💡 Video may not have auto-generated captions');
-        
-        // Return mock data for testing
-        return this.generateMockTranscript(videoId);
-      }
-
-      return null;
-    } catch (error) {
-      console.error('HTML parsing failed:', error);
-      return null;
-    }
-  }
-
-  // Process caption data extracted from HTML
-  processCaptionData(captionTracks) {
-    try {
-      // Find English caption track
-      const englishTrack = captionTracks.find(track => 
-        track.languageCode === 'en' || 
-        track.languageCode === 'en-US' ||
-        track.name?.simpleText?.includes('English')
-      );
-
-      if (!englishTrack || !englishTrack.baseUrl) {
-        console.warn('No English caption track found');
-        return null;
-      }
-
-      console.log('Found English caption track:', englishTrack.name?.simpleText);
-      
-      // Note: We can't directly fetch the baseUrl due to CORS
-      // For now, return mock data based on track existence
-      return this.generateMockTranscript('detected');
-      
-    } catch (error) {
-      console.error('Caption data processing failed:', error);
-      return null;
-    }
-  }
-
-  // Main method - tries all approaches
-  async getTranscript(youtubeUrl) {
-    try {
-      const videoId = this.extractVideoId(youtubeUrl);
-      console.log('🎥 Extracting transcript for video ID:', videoId);
-
-      const methods = [
-        // Method 1: Official YouTube API (if key available)
-        () => this.getOfficialTranscript(videoId),
-        // Method 2: Extract from page HTML
-        () => this.getTranscriptFromPage(videoId),
-        // Method 3: Mock data for testing
-        () => Promise.resolve(this.generateMockTranscript(videoId))
-      ];
-
-      for (const [index, method] of methods.entries()) {
-        try {
-          console.log(`Trying method ${index + 1}...`);
-          const result = await method();
-          
-          if (result && result.length > 0) {
-            console.log(`✅ Transcript extracted using method ${index + 1}:`, result.length, 'segments');
-            
-            return {
-              success: true,
-              transcript: result,
-              videoId: videoId,
-              method: `method_${index + 1}`,
-              wordCount: this.countWords(result),
-              duration: this.calculateDuration(result),
-              metadata: {
-                title: `Video ${videoId}`,
-                extractedAt: new Date().toISOString(),
-                source: index === 2 ? 'mock_data' : 'extraction'
-              }
-            };
-          }
-        } catch (error) {
-          console.warn(`Method ${index + 1} failed:`, error.message);
-          continue;
-        }
-      }
-
-      // If all methods fail, return error
-      throw new Error('All transcript extraction methods failed. Video may not have captions available.');
-
-    } catch (error) {
-      console.error('Transcript extraction failed:', error);
-      return {
-        success: false,
-        error: error.message,
-        videoId: null,
-        transcript: []
-      };
-    }
-  }
-
-  // Helper: Count words in transcript
-  countWords(transcript) {
-    if (!Array.isArray(transcript)) return 0;
+    console.log('🧪 Testing transcript service...');
     
-    return transcript.reduce((count, segment) => {
-      if (segment.text) {
-        return count + segment.text.split(/\s+/).length;
-      }
-      return count;
-    }, 0);
-  }
-
-  // Helper: Calculate total duration
-  calculateDuration(transcript) {
-    if (!Array.isArray(transcript)) return 0;
-    
-    const lastSegment = transcript[transcript.length - 1];
-    if (lastSegment && typeof lastSegment.start === 'number') {
-      return lastSegment.start + (lastSegment.duration || 3);
-    }
-    
-    return transcript.length * 3; // Estimate 3 seconds per segment
-  }
-
-  // Helper: Check if YouTube URL is valid
-  isValidYouTubeUrl(url) {
-    try {
-      this.extractVideoId(url);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  // Helper: Get basic metadata (for testing)
-  async getBasicMetadata(videoId) {
-    try {
-      if (this.youtubeApiKey) {
-        const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${this.youtubeApiKey}`;
-        const response = await fetch(url);
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.items && data.items.length > 0) {
-            return {
-              title: data.items[0].snippet.title,
-              channelTitle: data.items[0].snippet.channelTitle,
-              publishedAt: data.items[0].snippet.publishedAt
-            };
-          }
+    for (const videoId of testVideos) {
+      try {
+        const result = await this.getTranscript(`https://www.youtube.com/watch?v=${videoId}`);
+        if (result.success) {
+          console.log(`✅ Test successful for video ${videoId}:`, result.source);
+          return { success: true, videoId: videoId, source: result.source };
         }
+      } catch (error) {
+        console.warn(`❌ Test failed for video ${videoId}:`, error.message);
       }
-
-      return {
-        title: `Video ${videoId}`,
-        channelTitle: 'Unknown Channel',
-        publishedAt: new Date().toISOString()
-      };
-    } catch (error) {
-      console.error('Metadata fetch failed:', error);
-      return null;
     }
+
+    return { success: false, error: 'All test videos failed' };
   }
 }
 
+// Export singleton instance
 export const transcriptService = new TranscriptService();
