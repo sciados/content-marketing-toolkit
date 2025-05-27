@@ -1,15 +1,13 @@
-// src/services/ai/claudeAIService.js - Updated with Video2Promo support
-
-import axios from 'axios';
+// src/services/ai/claudeAIService.js - Updated for Supabase-only architecture
 
 /**
  * Service for interacting with Claude AI API with tier-based model selection
- * Updated for Video2Promo benefit extraction and email generation
+ * Updated for Supabase-only architecture (no Firebase)
  */
 class ClaudeAIService {
   constructor() {
-    // Use the Firebase Cloud Function URL from environment variables
-    this.apiUrl = import.meta.env.VITE_CLAUDE_PROXY_URL;
+    // Use direct Anthropic API endpoint or Supabase Edge Function (no Firebase)
+    this.apiUrl = import.meta.env.VITE_CLAUDE_API_ENDPOINT || 'https://api.anthropic.com/v1/messages';
     this.apiKey = import.meta.env.VITE_CLAUDE_API_KEY;
     this.defaultModel = import.meta.env.VITE_CLAUDE_MODEL || 'claude-3-haiku-20240307';
     
@@ -40,24 +38,15 @@ class ClaudeAIService {
     
     // Log configuration if logging is enabled
     if (this.enableLogging) {
-      console.log('🤖 Claude AI Service Configuration:');
+      console.log('🤖 Claude AI Service Configuration (Supabase-only):');
       console.log('API URL:', this.apiUrl);
       console.log('API Key:', this.apiKey ? 'Set (begins with ' + this.apiKey.substring(0, 10) + '...)' : 'Not set');
       console.log('Default Model:', this.defaultModel);
       console.log('Available Tier Models:', Object.keys(this.tierModels));
     }
     
-    this.client = axios.create({
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      withCredentials: false
-    });
-    
-    // Log if the proxy URL is not set
-    if (!this.apiUrl) {
-      console.warn('⚠️ Claude AI proxy URL not set. Email generation may fail.');
-    }
+    // Remove axios dependency - use fetch only
+    // this.client = axios.create({ ... });
     
     // Log if the API key is not set
     if (!this.apiKey) {
@@ -80,7 +69,7 @@ class ClaudeAIService {
   }
 
   /**
-   * NEW: Generate content using Claude AI (for Video2Promo benefit extraction)
+   * Generate content using Claude AI (for Video2Promo benefit extraction)
    */
   async generateContent(prompt, options = {}) {
     try {
@@ -104,7 +93,7 @@ class ClaudeAIService {
         console.log('- First 200 chars of prompt:', prompt.substring(0, 200) + '...');
         
         // Check if prompt contains actual transcript data
-        const hasTranscriptData = prompt.includes('TRANSCRIPT TO ANALYZE:') && 
+        const hasTranscriptData = prompt.includes('TRANSCRIPT CONTENT:') && 
                                  prompt.length > 1000 && 
                                  !prompt.includes('template') && 
                                  !prompt.includes('example');
@@ -116,7 +105,7 @@ class ClaudeAIService {
         }
       }
 
-      // Make the API call using existing method
+      // Make the API call using direct method (no proxy)
       const response = await this.makeDirectClaudeRequest({
         prompt: prompt,
         model: selectedModel,
@@ -162,43 +151,21 @@ class ClaudeAIService {
   }
 
   /**
-   * NEW: Make direct API request to Claude (for Video2Promo)
+   * Make direct API request to Claude (Supabase-only version)
    */
   async makeDirectClaudeRequest(params) {
     const { prompt, model, maxTokens, temperature = 0.7 } = params;
 
     try {
-      // Try with your existing proxy first
-      const response = await this.client.post(this.apiUrl, {
-        model: model,
-        max_tokens: maxTokens,
-        temperature: temperature,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }],
-        apiKey: this.apiKey
-      });
-
-      if (this.enableLogging) {
-        console.log('✅ Direct Claude API request successful:', {
-          status: response.status,
-          model: model
-        });
-      }
-
-      return response.data;
-
-    } catch (axiosError) {
-      if (this.enableLogging) {
-        console.warn('❌ Direct Claude request failed:', axiosError.message);
-      }
-
-      // Fallback to fetch
-      const fetchResponse = await fetch(this.apiUrl, {
+      console.log('🤖 Making direct Claude API request (Supabase-only)...');
+      
+      // Method 1: Try direct Anthropic API call
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json'
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
           model: model,
@@ -207,25 +174,60 @@ class ClaudeAIService {
           messages: [{
             role: 'user',
             content: prompt
-          }],
-          apiKey: this.apiKey
-        }),
-        mode: 'cors'
+          }]
+        })
       });
 
-      if (!fetchResponse.ok) {
-        const errorText = await fetchResponse.text();
+      if (!response.ok) {
+        const errorText = await response.text();
         console.error('❌ Claude API Error:', errorText);
-        throw new Error(`Claude API error: ${fetchResponse.status} - ${errorText}`);
+        throw new Error(`Claude API error: ${response.status} - ${errorText}`);
       }
 
-      const data = await fetchResponse.json();
+      const data = await response.json();
       
       if (this.enableLogging) {
-        console.log('✅ Fetch Claude API request successful');
+        console.log('✅ Direct Claude API request successful');
       }
 
       return data;
+
+    } catch (error) {
+      console.error('❌ Direct Claude request failed:', error);
+      
+      // If direct API fails, try with a simple proxy approach
+      try {
+        console.log('🔧 Trying alternative proxy approach...');
+        
+        // Use a simple proxy that adds CORS headers
+        const proxyResponse = await fetch(`https://cors-anywhere.herokuapp.com/https://api.anthropic.com/v1/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': this.apiKey,
+            'anthropic-version': '2023-06-01',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify({
+            model: model,
+            max_tokens: maxTokens,
+            temperature: temperature,
+            messages: [{
+              role: 'user',
+              content: prompt
+            }]
+          })
+        });
+
+        if (proxyResponse.ok) {
+          console.log('✅ Proxy request successful');
+          return await proxyResponse.json();
+        }
+      } catch (proxyError) {
+        console.error('❌ Proxy request also failed:', proxyError);
+      }
+      
+      throw error;
     }
   }
 
@@ -327,7 +329,7 @@ INCLUDE CTA: ${includeCta ? 'Yes' : 'No'}`;
         });
       }
 
-      // Make the API call
+      // Make the API call using direct method
       const result = await this.makeClaudeRequest({
         userMessage,
         systemPrompt,
@@ -533,56 +535,45 @@ Subject: [your subject line]
   }
 
   /**
-   * Make the actual Claude API request with fallback
+   * Make the actual Claude API request (direct to Anthropic)
    */
   async makeClaudeRequest({ userMessage, systemPrompt, model, maxTokens, affiliateLink }) {
     try {
-      // First try with Axios
-      const response = await this.client.post(this.apiUrl, {
-        prompt: userMessage,
-        systemPrompt: systemPrompt,
-        model: model,
-        maxTokens: maxTokens,
-        apiKey: this.apiKey
-      });
+      console.log('🤖 Making Claude API request...');
       
-      if (this.enableLogging) {
-        console.log('✅ Axios request successful:', {
-          status: response.status,
-          model: model
-        });
-      }
+      // Combine system prompt and user message
+      const fullPrompt = `${systemPrompt}\n\n${userMessage}`;
       
-      let emailContent = this.extractContentFromResponse(response.data);
-      return this.parseEmailContent(emailContent, affiliateLink);
-      
-    } catch (axiosError) {
-      if (this.enableLogging) {
-        console.warn('Axios request failed, trying fetch:', axiosError.message);
-      }
-      
-      // Fallback to fetch
-      const fetchResponse = await fetch(this.apiUrl, {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01'
+        },
         body: JSON.stringify({
-          prompt: userMessage,
-          systemPrompt: systemPrompt,
           model: model,
-          maxTokens: maxTokens,
-          apiKey: this.apiKey
-        }),
-        mode: 'cors'
+          max_tokens: maxTokens,
+          temperature: 0.7,
+          messages: [{
+            role: 'user',
+            content: fullPrompt
+          }]
+        })
       });
       
-      if (!fetchResponse.ok) {
-        const errorText = await fetchResponse.text();
-        throw new Error(`Fetch API request failed with status: ${fetchResponse.status}. ${errorText}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Claude API request failed with status: ${response.status}. ${errorText}`);
       }
       
-      const data = await fetchResponse.json();
+      const data = await response.json();
       let emailContent = this.extractContentFromResponse(data);
       return this.parseEmailContent(emailContent, affiliateLink);
+      
+    } catch (error) {
+      console.error('❌ Claude API request failed:', error);
+      throw error;
     }
   }
 
@@ -746,23 +737,27 @@ Subject: [your subject line]
    * Check if the Claude AI service is available
    */
   async isAvailable() {
-    if (!this.apiUrl || !this.apiKey) {
+    if (!this.apiKey) {
       console.warn('Claude AI service not properly configured');
       return false;
     }
     
     try {
-      const response = await fetch(this.apiUrl, {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01'
+        },
         body: JSON.stringify({
-          prompt: "Hello",
-          systemPrompt: "Reply with 'OK' only.",
           model: this.defaultModel,
-          maxTokens: 10,
-          apiKey: this.apiKey
-        }),
-        mode: 'cors'
+          max_tokens: 10,
+          messages: [{
+            role: 'user',
+            content: 'Hello'
+          }]
+        })
       });
       
       const isOk = response.ok;
@@ -785,7 +780,7 @@ Subject: [your subject line]
   }
 }
 
-// Export a single instance and the class for Video2Promo compatibility
+// Export a single instance and the class for Video2Promo compatibility  
 const claudeAIService = new ClaudeAIService();
 
 export { claudeAIService };
