@@ -1,11 +1,115 @@
 // src/services/video2promo/nlpService.js - FIXED VERSION
 
 import { claudeAIService } from '../ai/claudeAIService.js';
+import { enhanceExtractedData } from '../emailGenerator/dataEnhancer.js';
 
 class NLPService {
   constructor() {
     this.maxTranscriptLength = 8000; // Limit for API calls
   }
+
+  // NEW METHOD: Bridge Video2Promo transcript data to Email Generator format
+  /**
+ * Bridge function: Convert Video2Promo transcript analysis to Email Generator format
+ * This allows video benefits to be processed by your existing email generation system
+ */
+async convertTranscriptToEmailFormat(transcript, videoData, options = {}) {
+  try {
+    console.log('🔗 Converting Video2Promo transcript to Email Generator format...');
+    console.log('Video data:', videoData);
+    console.log('Options:', options);
+    
+    // 1. Extract benefits using your existing Claude analysis
+    const benefitAnalysis = await this.extractBenefits(transcript, options);
+    
+    if (!benefitAnalysis.success) {
+      console.error('Benefit extraction failed:', benefitAnalysis.error);
+      throw new Error(`Failed to extract benefits from transcript: ${benefitAnalysis.error}`);
+    }
+    
+    console.log('✅ Benefits extracted:', benefitAnalysis.benefits.length);
+    
+    // 2. Convert your Claude AI benefits to the format that dataEnhancer expects
+    // This mimics the structure that htmlExtractor.js produces
+    const extractedData = {
+      // Convert benefit objects to simple heading strings
+      headings: benefitAnalysis.benefits
+        .filter(b => b.category === 'feature' || b.category === 'outcome' || b.strength === 'high')
+        .slice(0, 8) // Limit headings
+        .map(b => b.title || b.description?.substring(0, 100) || 'Video Benefit'),
+        
+      // Convert benefit descriptions to bullet points
+      bullets: benefitAnalysis.benefits
+        .filter(b => b.category !== 'feature' && b.description && b.description.length > 20)
+        .slice(0, 12) // Limit bullets
+        .map(b => b.description.substring(0, 200)), // Limit length
+        
+      // Create testimonials from proof points and emotional hooks
+      testimonials: benefitAnalysis.benefits
+        .filter(b => b.category === 'proof' || b.category === 'emotional')
+        .slice(0, 3) // Limit testimonials
+        .map(b => ({
+          quote: b.description || b.title,
+          author: 'Video testimonial'
+        })),
+        
+      // Video metadata mapped to "website" format
+      productName: videoData?.title || videoData?.channelName || 'YouTube Video Product',
+      description: videoData?.description || `Marketing content extracted from video`,
+      content: this.prepareTranscriptText(transcript), // Your existing method
+      price: '', // Videos rarely have direct pricing
+      url: videoData?.url || '',
+      domain: videoData?.channelName || videoData?.domain || 'YouTube Video'
+    };
+    
+    console.log('📊 Converted data structure:', {
+      headings: extractedData.headings.length,
+      bullets: extractedData.bullets.length,
+      testimonials: extractedData.testimonials.length,
+      contentLength: extractedData.content.length
+    });
+    
+    // 3. Use your EXISTING dataEnhancer - no changes needed to that file!
+    console.log('🔧 Processing through existing dataEnhancer...');
+    const enhancedData = enhanceExtractedData(
+      extractedData, 
+      options.keywords || '', 
+      options.industry || 'general'
+    );
+    
+    console.log('✅ Data enhanced successfully!');
+    console.log('📈 Final results:', {
+      benefits: enhancedData.benefits.length,
+      features: enhancedData.features.length,
+      websiteDataName: enhancedData.websiteData?.name
+    });
+    
+    // 4. Return in the same format as your email generator expects
+    return {
+      success: true,
+      benefits: enhancedData.benefits,
+      features: enhancedData.features,
+      websiteData: enhancedData.websiteData,
+      originalAnalysis: benefitAnalysis, // Keep original for debugging
+      conversionMetadata: {
+        originalBenefitCount: benefitAnalysis.benefits.length,
+        finalBenefitCount: enhancedData.benefits.length,
+        tokensUsedForExtraction: benefitAnalysis.tokensUsed || 0,
+        source: 'video_transcript'
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ Transcript to email format conversion failed:', error);
+    return {
+      success: false,
+      error: error.message,
+      benefits: [],
+      features: [],
+      websiteData: null
+    };
+  }
+}
 
   // Main method to extract benefits from transcript
   async extractBenefits(transcript, options = {}) {
