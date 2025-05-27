@@ -13,6 +13,29 @@ import MainLayout from '../components/Layout/MainLayout';
 import AuthLayout from '../components/Layout/AuthLayout';
 import Loader from '../components/Common/Loader';
 
+const ALLOWED_ORIGIN =
+  import.meta.env.DEV
+    ? 'https://content-marketing-toolkit-8w8d.vercel.app'
+    : '*';
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Credentials': 'true',
+    },
+  });
+}
+
+export async function GET() {
+  return Response.json({ ok: true }, {
+    headers: { 'Access-Control-Allow-Origin': ALLOWED_ORIGIN },
+  });
+}
+
 const AdminUsers = lazy(() => {
   const tracker = trackLazyLoading('AdminUsers');
   return import('../pages/Admin/AdminUsers').then(module => {
