@@ -1,13 +1,13 @@
-// src/hooks/useVideo2Promo.js - FIXED VERSION
+// src/hooks/useVideo2Promo.js - UPDATED FOR PYTHON BACKEND
 
 import { useState, useCallback } from 'react';
 import useSupabase from './useSupabase';
 import { useUsageTracking } from './useUsageTracking';
-import { transcriptService } from '../services/video2promo/transcriptService';
-import { nlpService } from '../services/video2promo/nlpService'; // USE YOUR EXISTING NLP SERVICE
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 export const useVideo2Promo = () => {
-  const { user } = useSupabase();
+  const { user, session } = useSupabase();
   const { checkUsageLimit, updateUsage } = useUsageTracking();
   
   const [state, setState] = useState({
@@ -28,15 +28,68 @@ export const useVideo2Promo = () => {
     processingStage: ''
   });
 
-  // Extract benefits using your existing nlpService with bridge function
-  const extractBenefits = useCallback(async (transcriptData = null) => {
+  // Extract transcript using Python backend
+  const extractTranscript = useCallback(async (videoUrl, method = 'auto') => {
     try {
-      const transcript = transcriptData || state.transcript;
+      setState(prev => ({
+        ...prev,
+        loading: true,
+        error: null,
+        processingStage: 'Extracting video transcript...'
+      }));
+
+      console.log('🎥 Extracting transcript from:', videoUrl);
       
-      if (!transcript || transcript.length === 0) {
-        throw new Error('No transcript data available for benefit extraction');
+      const response = await fetch(`${API_BASE}/api/video2promo/extract-transcript`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ videoUrl, method })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to extract transcript');
       }
 
+      const data = await response.json();
+      console.log('✅ Transcript extracted successfully:', data);
+      
+      setState(prev => ({
+        ...prev,
+        transcript: data.transcript,
+        currentStep: 'transcript',
+        processingStage: 'Transcript extracted successfully',
+        loading: false
+      }));
+
+      return {
+        success: true,
+        transcript: data.transcript,
+        extractionMethod: data.extractionMethod,
+        wordCount: data.wordCount
+      };
+    } catch (error) {
+      console.error('❌ Transcript extraction failed:', error);
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error.message,
+        processingStage: ''
+      }));
+      
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }, [session]);
+
+  // Analyze transcript using Python backend
+  const analyzeTranscript = useCallback(async (transcript, keywords = [], tone = 'professional') => {
+    try {
       setState(prev => ({
         ...prev,
         loading: true,
@@ -44,61 +97,41 @@ export const useVideo2Promo = () => {
         processingStage: 'Analyzing transcript for benefits...'
       }));
 
-      // 🔍 DEBUG: Log the transcript data
-      console.log('🔍 DEBUG - Raw transcript data:', transcript);
-      console.log('🔍 DEBUG - Transcript type:', typeof transcript);
-      console.log('🔍 DEBUG - Is array:', Array.isArray(transcript));
-      console.log('🔍 DEBUG - Length:', transcript?.length);
+      console.log('🔍 Analyzing transcript with Python backend...');
       
-      if (Array.isArray(transcript) && transcript.length > 0) {
-        console.log('🔍 DEBUG - First segment:', transcript[0]);
-        console.log('🔍 DEBUG - Sample text:', transcript.slice(0, 3).map(t => t.text || t));
-      }
-
-      console.log('🎥 Extracting benefits from transcript using nlpService bridge...');
-
-      // 🔍 DEBUG: Log the extraction call
-      console.log('🔍 DEBUG - Calling nlpService.convertTranscriptToEmailFormat with:', {
-        transcriptLength: transcript.length,
-        videoId: state.videoUrl.split('v=')[1]?.substring(0, 8),
-        userTier: user?.subscription_tier || 'free'
+      const response = await fetch(`${API_BASE}/api/video2promo/analyze-benefits`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ transcript, keywords, tone })
       });
 
-      // Use your existing nlpService with the bridge function
-      const extractionResults = await nlpService.convertTranscriptToEmailFormat(
-        transcript, 
-        {
-          title: `Video ${state.videoUrl.split('v=')[1]?.substring(0, 8) || 'Content'}`,
-          url: state.videoUrl,
-          channelName: 'YouTube Video',
-          description: 'Marketing content extracted from YouTube video'
-        },
-        {
-          keywords: state.keywords.join(', '),
-          industry: 'general',
-          userTier: user?.subscription_tier || 'free',
-          user: user
-        }
-      );
-
-      // 🔍 DEBUG: Log the extraction results
-      console.log('🔍 DEBUG - Extraction results:', extractionResults);
-      console.log('🔍 DEBUG - Success:', extractionResults.success);
-      console.log('🔍 DEBUG - Benefits found:', extractionResults.benefits?.length);
-      console.log('🔍 DEBUG - Features found:', extractionResults.features?.length);
-      console.log('🔍 DEBUG - Website data:', extractionResults.websiteData);
-
-      if (!extractionResults.success) {
-        throw new Error(`Benefit extraction failed: ${extractionResults.error}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to analyze transcript');
       }
 
-      // Update state with the extracted data
+      const data = await response.json();
+      console.log('✅ Analysis completed:', data);
+      
+      // Transform backend response to match your frontend format
+      const benefits = data.analysis.key_benefits || [];
+      const features = data.analysis.features || [];
+      
       setState(prev => ({
         ...prev,
-        extractedBenefits: extractionResults.benefits || [],
-        extractedFeatures: extractionResults.features || [],
-        websiteData: extractionResults.websiteData,
-        selectedBenefits: new Array(extractionResults.benefits?.length || 0).fill(true), // All selected by default
+        extractedBenefits: benefits,
+        extractedFeatures: features,
+        selectedBenefits: new Array(benefits.length).fill(true), // All selected by default
+        websiteData: {
+          title: `Video Analysis - ${tone} tone`,
+          description: data.analysis.main_value_proposition || 'Video content analysis',
+          targetAudience: data.analysis.target_audience || 'General audience',
+          painPoints: data.analysis.pain_points_addressed || [],
+          emotionalTriggers: data.analysis.emotional_triggers || []
+        },
         currentStep: 'benefits',
         loading: false,
         processingStage: ''
@@ -106,14 +139,12 @@ export const useVideo2Promo = () => {
 
       return {
         success: true,
-        extractedBenefits: extractionResults.benefits || [],
-        extractedFeatures: extractionResults.features || [],
-        websiteData: extractionResults.websiteData
+        analysis: data.analysis,
+        extractedBenefits: benefits,
+        extractedFeatures: features
       };
-
     } catch (error) {
-      console.error('❌ Benefit extraction failed:', error);
-      
+      console.error('❌ Analysis failed:', error);
       setState(prev => ({
         ...prev,
         loading: false,
@@ -121,29 +152,110 @@ export const useVideo2Promo = () => {
         processingStage: '',
         // Set fallback benefits so user can see what went wrong
         extractedBenefits: [
-          {
-            id: 'error_1',
-            title: 'Benefit Extraction Failed',
-            description: `Error: ${error.message}. Please try again or check if the video contains clear product benefits.`,
-            category: 'error',
-            strength: 'low',
-            source: 'error'
-          }
+          `Analysis failed: ${error.message}`,
+          'Please try again with a different video',
+          'Ensure the video has clear audio and content'
         ],
-        selectedBenefits: [false]
+        selectedBenefits: [false, false, false]
       }));
       
       return {
         success: false,
-        error: error.message,
-        extractedBenefits: [],
-        extractedFeatures: [],
-        websiteData: null
+        error: error.message
       };
     }
-  }, [state.transcript, state.videoUrl, state.keywords, user]);
+  }, [session]);
 
-  // Process video URL and extract transcript
+  // Extract benefits (bridge function for compatibility)
+  const extractBenefits = useCallback(async (transcriptData = null) => {
+    const transcript = transcriptData || state.transcript;
+    
+    if (!transcript || transcript.length === 0) {
+      throw new Error('No transcript data available for benefit extraction');
+    }
+
+    return await analyzeTranscript(transcript, state.keywords, 'professional');
+  }, [state.transcript, state.keywords, analyzeTranscript]);
+
+  // Generate assets using Python backend
+  const generateAssets = useCallback(async (assetTypes = ['email_series'], tone = 'professional') => {
+    try {
+      const selectedCount = state.selectedBenefits.filter(Boolean).length;
+      if (selectedCount === 0) {
+        throw new Error('Please select at least one benefit to generate content');
+      }
+
+      setState(prev => ({
+        ...prev,
+        loading: true,
+        error: null,
+        processingStage: `Generating ${assetTypes.join(', ')}...`,
+        currentStep: 'generation'
+      }));
+
+      // Create analysis object from current state
+      const analysis = {
+        key_benefits: state.extractedBenefits.filter((_, index) => state.selectedBenefits[index]),
+        features: state.extractedFeatures,
+        main_value_proposition: state.websiteData?.description || 'Video content marketing',
+        target_audience: state.websiteData?.targetAudience || 'General audience'
+      };
+
+      console.log('🚀 Generating assets with Python backend...');
+      
+      const response = await fetch(`${API_BASE}/api/video2promo/generate-assets`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`
+        },
+        body: JSON.stringify({ 
+          analysis, 
+          assetTypes, 
+          tone, 
+          utmParams: state.utmParams 
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate assets');
+      }
+
+      const data = await response.json();
+      console.log('✅ Assets generated successfully:', data);
+
+      await updateUsage('video2promo_projects', 1);
+
+      setState(prev => ({
+        ...prev,
+        generatedAssets: data.assets,
+        currentStep: 'complete',
+        loading: false,
+        processingStage: ''
+      }));
+
+      return {
+        success: true,
+        assets: data.assets
+      };
+    } catch (error) {
+      console.error('❌ Asset generation failed:', error);
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error.message,
+        processingStage: ''
+      }));
+      
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }, [state.selectedBenefits, state.extractedBenefits, state.extractedFeatures, state.websiteData, state.utmParams, session, updateUsage]);
+
+  // Process video URL (updated to use backend)
   const processVideo = useCallback(async (videoUrl) => {
     try {
       setState(prev => ({
@@ -163,32 +275,14 @@ export const useVideo2Promo = () => {
         throw new Error(`Usage limit reached: ${canProceed.message}`);
       }
 
-      setState(prev => ({
-        ...prev,
-        processingStage: 'Extracting video transcript...'
-      }));
-
-      const transcriptResult = await transcriptService.getTranscript(videoUrl);
+      // Extract transcript using backend
+      const transcriptResult = await extractTranscript(videoUrl);
       
       if (!transcriptResult.success) {
-        throw new Error('Failed to extract transcript: ' + (transcriptResult.error || 'Unknown error'));
+        throw new Error('Failed to extract transcript: ' + transcriptResult.error);
       }
 
-      console.log('✅ Transcript extracted successfully:', transcriptResult);
-
-      setState(prev => ({
-        ...prev,
-        transcript: transcriptResult.transcript,
-        currentStep: 'transcript',
-        processingStage: 'Transcript extracted successfully',
-        loading: false
-      }));
-
-      return {
-        success: true,
-        transcript: transcriptResult.transcript
-      };
-
+      return transcriptResult;
     } catch (error) {
       console.error('❌ Video processing failed:', error);
       setState(prev => ({
@@ -203,7 +297,53 @@ export const useVideo2Promo = () => {
         error: error.message
       };
     }
-  }, [checkUsageLimit]);
+  }, [checkUsageLimit, extractTranscript]);
+
+  // Process complete video workflow
+  const processCompleteVideo = useCallback(async (videoUrl, keywords = [], tone = 'professional', assetTypes = ['email_series']) => {
+    try {
+      // Update keywords in state
+      setState(prev => ({ ...prev, keywords }));
+      
+      // Step 1: Extract transcript
+      const transcriptResult = await processVideo(videoUrl);
+      if (!transcriptResult.success) {
+        throw new Error(transcriptResult.error);
+      }
+      
+      // Step 2: Analyze transcript
+      const analysisResult = await analyzeTranscript(transcriptResult.transcript, keywords, tone);
+      if (!analysisResult.success) {
+        throw new Error(analysisResult.error);
+      }
+      
+      // Step 3: Generate assets
+      const assetsResult = await generateAssets(assetTypes, tone);
+      if (!assetsResult.success) {
+        throw new Error(assetsResult.error);
+      }
+      
+      return {
+        success: true,
+        transcript: transcriptResult.transcript,
+        analysis: analysisResult.analysis,
+        assets: assetsResult.assets
+      };
+    } catch (error) {
+      console.error('❌ Complete video processing failed:', error);
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: error.message,
+        processingStage: ''
+      }));
+      
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }, [processVideo, analyzeTranscript, generateAssets]);
 
   // Toggle benefit selection (same as email generator)
   const toggleBenefit = useCallback((index) => {
@@ -231,85 +371,6 @@ export const useVideo2Promo = () => {
     }));
   }, []);
 
-  // Generate marketing assets (placeholder for now)
-  const generateAssets = useCallback(async (assetTypes = ['email_series']) => {
-    try {
-      const selectedCount = state.selectedBenefits.filter(Boolean).length;
-      if (selectedCount === 0) {
-        throw new Error('Please select at least one benefit to generate emails');
-      }
-
-      setState(prev => ({
-        ...prev,
-        loading: true,
-        error: null,
-        processingStage: `Generating ${assetTypes.join(', ')}...`,
-        currentStep: 'generation'
-      }));
-
-      // Create assets based on requested types
-      const assets = {};
-      
-      for (const assetType of assetTypes) {
-        if (assetType === 'email_series') {
-          assets.email_series = {
-            emails: state.extractedBenefits
-              .filter((benefit, index) => state.selectedBenefits[index])
-              .map((benefit, index) => ({
-                subject: `Discover: ${benefit}`,
-                body: `Here's how this amazing benefit can transform your results: ${benefit}`,
-                benefit: benefit,
-                number: index + 1
-              }))
-          };
-        } else if (assetType === 'blog_post') {
-          assets.blog_post = {
-            title: `Amazing Benefits You Need to Know`,
-            content: state.extractedBenefits
-              .filter((benefit, index) => state.selectedBenefits[index])
-              .map(benefit => `• ${benefit}`)
-              .join('\n')
-          };
-        } else if (assetType === 'social_media') {
-          assets.social_media = {
-            posts: state.extractedBenefits
-              .filter((benefit, index) => state.selectedBenefits[index])
-              .map(benefit => `🔥 ${benefit} #marketing #success`)
-          };
-        }
-      }
-
-      await updateUsage('video2promo_projects', 1);
-
-      setState(prev => ({
-        ...prev,
-        generatedAssets: assets,
-        currentStep: 'complete',
-        loading: false,
-        processingStage: ''
-      }));
-
-      return {
-        success: true,
-        assets
-      };
-
-    } catch (error) {
-      console.error('❌ Asset generation failed:', error);
-      setState(prev => ({
-        ...prev,
-        loading: false,
-        error: error.message,
-        processingStage: ''
-      }));
-      
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }, [state.selectedBenefits, state.extractedBenefits, updateUsage]);
-
   // Reset to start over
   const reset = useCallback(() => {
     setState({
@@ -335,11 +396,14 @@ export const useVideo2Promo = () => {
     
     // Actions
     processVideo,
-    extractBenefits,
-    toggleBenefit, // NEW: Same as email generator
+    extractTranscript,        // NEW: Direct transcript extraction
+    analyzeTranscript,        // NEW: Direct transcript analysis
+    extractBenefits,          // UPDATED: Bridge function for compatibility
+    toggleBenefit,            // Same as email generator
     updateKeywords,  
     updateUTMParams,
-    generateAssets,
+    generateAssets,           // UPDATED: Uses backend
+    processCompleteVideo,     // NEW: Complete workflow
     reset,
     
     // Computed values
@@ -354,7 +418,8 @@ export const useVideo2Promo = () => {
       benefitsCount: state.extractedBenefits?.length || 0,
       selectedCount: state.selectedBenefits?.filter(Boolean).length || 0,
       processingStage: state.processingStage,
-      userTier: user?.subscription_tier || 'free'
+      userTier: user?.subscription_tier || 'free',
+      backendUrl: API_BASE
     }
   };
 };
