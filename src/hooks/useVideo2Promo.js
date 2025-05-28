@@ -257,14 +257,19 @@ export const useVideo2Promo = () => {
 
   // Process video URL (updated to use backend)
   const processVideo = useCallback(async (videoUrl) => {
-    try {
-      setState(prev => ({
-        ...prev,
-        loading: true,
-        error: null,
-        processingStage: 'Validating video URL...',
-        videoUrl
-      }));
+  try {
+    // Add this validation
+    if (!videoUrl || typeof videoUrl !== 'string') {
+      throw new Error('Please provide a valid YouTube URL');
+    }
+
+    setState(prev => ({
+      ...prev,
+      loading: true,
+      error: null,
+      processingStage: 'Validating video URL...',
+      videoUrl: videoUrl  // Make sure we store the string value
+    }));
 
       if (!videoUrl || !videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be')) {
         throw new Error('Please provide a valid YouTube URL');
