@@ -1,10 +1,11 @@
-// src/context/SupabaseProvider.jsx
+// src/context/SupabaseProvider.jsx - FIXED with session support
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase/supabaseClient';
 import SupabaseContext from './SupabaseContext';
 
 const SupabaseProvider = ({ children }) => {
   const [user, setUser] = useState(null);
+  const [session, setSession] = useState(null); // ADD: Store session
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -26,15 +27,19 @@ const SupabaseProvider = ({ children }) => {
         
         if (data.session) {
           setUser(data.session.user);
+          setSession(data.session); // STORE the session
           console.log("User found:", data.session.user.email);
+          console.log("Session token:", data.session.access_token ? 'Present' : 'Missing');
         } else {
           console.log("No active session found");
           setUser(null);
+          setSession(null); // Clear session
         }
       } catch (err) {
         console.error("Error checking session:", err);
         setError(err);
         setUser(null);
+        setSession(null); // Clear session on error
       } finally {
         setLoading(false);
       }
@@ -49,8 +54,11 @@ const SupabaseProvider = ({ children }) => {
         
         if (session?.user) {
           setUser(session.user);
+          setSession(session); // STORE the session
+          console.log("Session updated - token:", session.access_token ? 'Present' : 'Missing');
         } else {
           setUser(null);
+          setSession(null); // Clear session
         }
       }
     );
@@ -79,6 +87,7 @@ const SupabaseProvider = ({ children }) => {
       
       console.log("Login successful:", data.user?.email);
       setUser(data.user);
+      setSession(data.session); // STORE the session
       
       return { data, error: null };
     } catch (error) {
@@ -108,6 +117,7 @@ const SupabaseProvider = ({ children }) => {
       
       if (data.user && data.session) {
         setUser(data.user);
+        setSession(data.session); // STORE the session
       }
       
       return { data, error: null };
@@ -133,6 +143,7 @@ const SupabaseProvider = ({ children }) => {
       
       console.log("Logout successful");
       setUser(null);
+      setSession(null); // Clear session
       
       // Force redirect to login
       window.location.href = '/auth/login';
@@ -143,6 +154,7 @@ const SupabaseProvider = ({ children }) => {
       
       // Even on error, force logout state and redirect
       setUser(null);
+      setSession(null); // Clear session
       window.location.href = '/auth/login';
       return { error };
     } finally {
@@ -196,20 +208,23 @@ const SupabaseProvider = ({ children }) => {
 
   console.log("SupabaseProvider state:", { 
     userExists: !!user, 
+    sessionExists: !!session,
+    hasAccessToken: !!(session?.access_token),
     loading
   });
 
-  // Provide BOTH naming conventions but without unnecessary try/catch
+  // Provide BOTH naming conventions and include session
   const value = {
     user,
+    session, // ADD: Expose session
     loading,
     error,
     login,
-    signIn: login,  // Alias for login - no extra try/catch
+    signIn: login,  // Alias for login
     signup,
-    signUp: signup,  // Alias for signup - no extra try/catch
+    signUp: signup,  // Alias for signup
     logout,
-    signOut: logout, // Alias for logout - no extra try/catch
+    signOut: logout, // Alias for logout
     resetPassword,
     updatePassword,
     supabase
