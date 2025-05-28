@@ -28,64 +28,75 @@ export const useVideo2Promo = () => {
     processingStage: ''
   });
 
-  // Extract transcript using Python backend
-  const extractTranscript = useCallback(async (videoUrl, method = 'auto') => {
-    try {
-      setState(prev => ({
-        ...prev,
-        loading: true,
-        error: null,
-        processingStage: 'Extracting video transcript...'
-      }));
+  // Extract transcript using Python backend - FIXED VERSION
+const extractTranscript = useCallback(async (videoUrl, method = 'auto') => {
+  try {
+    setState(prev => ({
+      ...prev,
+      loading: true,
+      error: null,
+      processingStage: 'Extracting video transcript...'
+    }));
 
-      console.log('🎥 Extracting transcript from:', videoUrl);
-      
-      const response = await fetch(`${API_BASE}/api/video2promo/extract-transcript`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
-        },
-        body: JSON.stringify({ videoUrl, method })
-      });
+    console.log('🎥 Extracting transcript from:', videoUrl);
+    
+    // Make sure we're sending the correct field name that the backend expects
+    const requestBody = {
+      videoUrl: videoUrl.trim(), // Backend expects 'videoUrl', not 'youtube_url'
+      method: method
+    };
+    
+    console.log('📤 Sending request to backend:', requestBody);
+    
+    const response = await fetch(`${API_BASE}/api/video2promo/extract-transcript`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session?.access_token}`
+      },
+      body: JSON.stringify(requestBody)
+    });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to extract transcript');
-      }
+    console.log('📥 Backend response status:', response.status);
 
-      const data = await response.json();
-      console.log('✅ Transcript extracted successfully:', data);
-      
-      setState(prev => ({
-        ...prev,
-        transcript: data.transcript,
-        currentStep: 'transcript',
-        processingStage: 'Transcript extracted successfully',
-        loading: false
-      }));
-
-      return {
-        success: true,
-        transcript: data.transcript,
-        extractionMethod: data.extractionMethod,
-        wordCount: data.wordCount
-      };
-    } catch (error) {
-      console.error('❌ Transcript extraction failed:', error);
-      setState(prev => ({
-        ...prev,
-        loading: false,
-        error: error.message,
-        processingStage: ''
-      }));
-      
-      return {
-        success: false,
-        error: error.message
-      };
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('❌ Backend error response:', errorData);
+      throw new Error(errorData.error || `Backend error: ${response.status}`);
     }
-  }, [session]);
+
+    const data = await response.json();
+    console.log('✅ Transcript extracted successfully:', data);
+    
+    setState(prev => ({
+      ...prev,
+      transcript: data.transcript,
+      currentStep: 'transcript',
+      processingStage: 'Transcript extracted successfully',
+      loading: false
+    }));
+
+    return {
+      success: true,
+      transcript: data.transcript,
+      extractionMethod: data.extractionMethod,
+      wordCount: data.wordCount
+    };
+  } catch (error) {
+    console.error('❌ Transcript extraction failed:', error);
+    setState(prev => ({
+      ...prev,
+      loading: false,
+      error: error.message,
+      processingStage: ''
+    }));
+    
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}, [session]);
 
   // Analyze transcript using Python backend
   const analyzeTranscript = useCallback(async (transcript, keywords = [], tone = 'professional') => {
@@ -255,11 +266,20 @@ export const useVideo2Promo = () => {
     }
   }, [state.selectedBenefits, state.extractedBenefits, state.extractedFeatures, state.websiteData, state.utmParams, session, updateUsage]);
 
-  // Process video URL (updated to use backend)
-  const processVideo = useCallback(async (videoUrl) => {
+  // Process video URL (updated to use backend) - FIXED VERSION
+const processVideo = useCallback(async (videoUrl, additionalData = {}) => {
   try {
-    // Add this validation
+    console.log('🎥 processVideo called with:', { videoUrl, additionalData });
+    
+    // Add this validation - make sure videoUrl is a string
     if (!videoUrl || typeof videoUrl !== 'string') {
+      console.error('❌ Invalid videoUrl:', videoUrl);
+      throw new Error('Please provide a valid YouTube URL');
+    }
+
+    // Validate URL format
+    if (!videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be')) {
+      console.error('❌ Invalid YouTube URL format:', videoUrl);
       throw new Error('Please provide a valid YouTube URL');
     }
 
@@ -268,41 +288,41 @@ export const useVideo2Promo = () => {
       loading: true,
       error: null,
       processingStage: 'Validating video URL...',
-      videoUrl: videoUrl  // Make sure we store the string value
+      videoUrl: videoUrl.trim(), // Store cleaned URL
+      // Store additional form data
+      keywords: additionalData.keywords || [],
+      utmParams: additionalData.utm_params || {}
     }));
 
-      if (!videoUrl || !videoUrl.includes('youtube.com') && !videoUrl.includes('youtu.be')) {
-        throw new Error('Please provide a valid YouTube URL');
-      }
-
-      const canProceed = await checkUsageLimit('video2promo_projects');
-      if (!canProceed.allowed) {
-        throw new Error(`Usage limit reached: ${canProceed.message}`);
-      }
-
-      // Extract transcript using backend
-      const transcriptResult = await extractTranscript(videoUrl);
-      
-      if (!transcriptResult.success) {
-        throw new Error('Failed to extract transcript: ' + transcriptResult.error);
-      }
-
-      return transcriptResult;
-    } catch (error) {
-      console.error('❌ Video processing failed:', error);
-      setState(prev => ({
-        ...prev,
-        loading: false,
-        error: error.message,
-        processingStage: ''
-      }));
-      
-      return {
-        success: false,
-        error: error.message
-      };
+    const canProceed = await checkUsageLimit('video2promo_projects');
+    if (!canProceed.allowed) {
+      throw new Error(`Usage limit reached: ${canProceed.message}`);
     }
-  }, [checkUsageLimit, extractTranscript]);
+
+    // Extract transcript using backend
+    const transcriptResult = await extractTranscript(videoUrl.trim());
+    
+    if (!transcriptResult.success) {
+      throw new Error('Failed to extract transcript: ' + transcriptResult.error);
+    }
+
+    return transcriptResult;
+  } catch (error) {
+    console.error('❌ Video processing failed:', error);
+    setState(prev => ({
+      ...prev,
+      loading: false,
+      error: error.message,
+      processingStage: ''
+    }));
+    
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}, [checkUsageLimit, extractTranscript]);
+  
 
   // Process complete video workflow
   const processCompleteVideo = useCallback(async (videoUrl, keywords = [], tone = 'professional', assetTypes = ['email_series']) => {

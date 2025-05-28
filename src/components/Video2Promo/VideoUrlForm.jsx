@@ -47,7 +47,20 @@ export function VideoUrlForm({ onSubmit, loading, disabled }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validateForm()) {
-      onSubmit(formData);
+      console.log('🔍 DEBUG - formData:', formData);
+      console.log('🔍 DEBUG - youtube_url value:', formData.youtube_url);
+      
+      // Pass the correct URL property - it's youtube_url, not url/videoUrl/youtubeUrl
+      const videoUrl = formData.youtube_url;
+      console.log('🔍 DEBUG - extracted URL:', videoUrl);
+      
+      // Also pass the additional form data for backend processing
+      onSubmit(videoUrl, {
+        keywords: formData.keywords,
+        affiliate_link: formData.affiliate_link,
+        utm_params: formData.utm_params,
+        tone: formData.tone
+      });
     }
   };
 
