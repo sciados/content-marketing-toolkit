@@ -28,9 +28,14 @@ export const useVideo2Promo = () => {
     processingStage: ''
   });
 
-  // Extract transcript using Python backend - FIXED VERSION
+// Extract transcript using Python backend - WITH AUTHENTICATION CHECK
 const extractTranscript = useCallback(async (videoUrl, method = 'auto') => {
   try {
+    // Check if user is authenticated
+    if (!session?.access_token) {
+      throw new Error('Please log in to use Video2Promo. Authentication is required for backend processing.');
+    }
+
     setState(prev => ({
       ...prev,
       loading: true,
@@ -39,10 +44,11 @@ const extractTranscript = useCallback(async (videoUrl, method = 'auto') => {
     }));
 
     console.log('🎥 Extracting transcript from:', videoUrl);
+    console.log('🔑 Using session token:', session.access_token ? 'Present' : 'Missing');
     
     // Make sure we're sending the correct field name that the backend expects
     const requestBody = {
-      videoUrl: videoUrl.trim(), // Backend expects 'videoUrl', not 'youtube_url'
+      videoUrl: videoUrl.trim(), // Backend expects 'videoUrl'
       method: method
     };
     
@@ -52,7 +58,7 @@ const extractTranscript = useCallback(async (videoUrl, method = 'auto') => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session?.access_token}`
+        'Authorization': `Bearer ${session.access_token}`
       },
       body: JSON.stringify(requestBody)
     });
@@ -62,7 +68,15 @@ const extractTranscript = useCallback(async (videoUrl, method = 'auto') => {
     if (!response.ok) {
       const errorData = await response.json();
       console.error('❌ Backend error response:', errorData);
-      throw new Error(errorData.error || `Backend error: ${response.status}`);
+      
+      // Handle specific authentication errors
+      if (response.status === 401) {
+        throw new Error('Authentication failed. Please log in again.');
+      } else if (response.status === 403) {
+        throw new Error('Access denied. Please check your subscription tier.');
+      } else {
+        throw new Error(errorData.error || `Backend error: ${response.status}`);
+      }
     }
 
     const data = await response.json();
