@@ -1,416 +1,357 @@
-// src/components/Video2Promo/DebugPanel.jsx - UPDATED VERSION
+// src/components/Video2Promo/DebugPanel.jsx - UPDATED FOR PYTHON BACKEND (No Card Dependencies)
 
-import React, { useState } from 'react';
-import { transcriptService } from '../../services/video2promo/transcriptService';
-import { nlpService } from '../../services/video2promo/nlpService';
+import React, { useState, useEffect } from 'react';
+import { Badge } from '../Common/Badge';
+import useSupabase from '../../hooks/useSupabase';
 
-export function DebugPanel() {
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
+export const DebugPanel = ({ isVisible = true }) => {
   const [testResults, setTestResults] = useState({});
-  const [testing, setTesting] = useState(false);
+  const [isRunningTests, setIsRunningTests] = useState(false);
+  const [backendStatus, setBackendStatus] = useState(null);
+  const { session, user } = useSupabase();
 
-  const runTests = async () => {
-    setTesting(true);
+  // Check backend connection on component mount
+  useEffect(() => {
+    checkBackendConnection();
+  }, []);
+
+  const checkBackendConnection = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/`);
+      const data = await response.json();
+      setBackendStatus({
+        connected: true,
+        services: data.services,
+        version: data.version,
+        environment: data.environment
+      });
+    } catch (error) {
+      setBackendStatus({
+        connected: false,
+        error: error.message
+      });
+    }
+  };
+
+  const runSystemTests = async () => {
+    setIsRunningTests(true);
     const results = {};
 
     try {
-      // Test 1: Environment variables
-      results.env = {
-        corsProxy: !!import.meta.env.VITE_CORS_PROXY_URL,
-        youtubeApi: !!import.meta.env.VITE_YOUTUBE_API_KEY,
-        claudeProxy: !!import.meta.env.VITE_CLAUDE_PROXY_URL,
-        claudeApiKey: !!import.meta.env.VITE_CLAUDE_API_KEY,
-        openaiKey: !!import.meta.env.VITE_OPENAI_API_KEY,
-        values: {
-          corsProxy: import.meta.env.VITE_CORS_PROXY_URL?.substring(0, 50) + '...',
-          youtubeApi: import.meta.env.VITE_YOUTUBE_API_KEY ? 'AIza...' : 'Not set',
-          claudeProxy: import.meta.env.VITE_CLAUDE_PROXY_URL?.substring(0, 50) + '...',
-          openaiKey: import.meta.env.VITE_OPENAI_API_KEY ? 'sk-...' : 'Not set'
-        }
-      };
-
-      // Test 2: URL validation
-      const testUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ'; // Rick Roll for testing
+      // Test 1: Backend Health Check
+      console.log('🧪 Testing backend connection...');
       try {
-        const videoId = transcriptService.extractVideoId(testUrl);
-        results.urlValidation = {
-          isValid: true,
-          videoId: videoId,
-          testUrl: testUrl
+        const healthResponse = await fetch(`${API_BASE}/`);
+        const healthData = await healthResponse.json();
+        results.backendHealth = {
+          status: 'success',
+          message: `Backend connected - ${healthData.version}`,
+          details: healthData
         };
       } catch (error) {
-        results.urlValidation = {
-          isValid: false,
-          error: error.message,
-          testUrl: testUrl
+        results.backendHealth = {
+          status: 'error', 
+          message: `Backend connection failed: ${error.message}`
         };
       }
 
-      // Test 3: Transcript service basic functionality
-      results.transcriptService = {
-        status: 'available',
-        methods: {
-          extractVideoId: typeof transcriptService.extractVideoId === 'function',
-          getTranscript: typeof transcriptService.getTranscript === 'function',
-          getOfficialTranscript: typeof transcriptService.getOfficialTranscript === 'function'
+      // Test 2: Authentication
+      console.log('🧪 Testing authentication...');
+      results.authentication = {
+        status: session ? 'success' : 'warning',
+        message: session ? `Authenticated as ${user?.email}` : 'No active session',
+        details: { hasSession: !!session, userId: user?.id }
+      };
+
+      // Test 3: Environment Variables
+      console.log('🧪 Testing environment variables...');
+      results.environment = {
+        status: API_BASE ? 'success' : 'error',
+        message: API_BASE ? `API Base: ${API_BASE}` : 'API_BASE not configured',
+        details: {
+          apiBase: API_BASE,
+          supabaseUrl: import.meta.env.VITE_SUPABASE_URL ? '✓ Set' : '✗ Missing',
+          supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY ? '✓ Set' : '✗ Missing'
         }
       };
 
-      // Test 4: NLP service basic functionality
-      results.nlpService = {
-        status: 'available',
-        methods: {
-          extractBenefits: typeof nlpService.extractBenefits === 'function',
-          prepareTranscriptText: typeof nlpService.prepareTranscriptText === 'function',
-          analyzeWithClaude: typeof nlpService.analyzeWithClaude === 'function'
+      // Test 4: Video2Promo API (only if authenticated)
+      if (session) {
+        console.log('🧪 Testing Video2Promo API...');
+        try {
+          // Test with a sample YouTube URL
+          const testUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+          const transcriptResponse = await fetch(`${API_BASE}/api/video2promo/extract-transcript`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify({ videoUrl: testUrl, method: 'auto' })
+          });
+
+          if (transcriptResponse.ok) {
+            results.video2promoAPI = {
+              status: 'success',
+              message: 'Video2Promo API accessible'
+            };
+          } else {
+            const errorData = await transcriptResponse.json();
+            results.video2promoAPI = {
+              status: 'warning',
+              message: `API responded with ${transcriptResponse.status}: ${errorData.error || 'Unknown error'}`
+            };
+          }
+        } catch (error) {
+          results.video2promoAPI = {
+            status: 'error',
+            message: `Video2Promo API test failed: ${error.message}`
+          };
         }
-      };
-
-      // Test 5: Sample benefit extraction with dummy data
-      try {
-        const sampleTranscript = [
-          { text: "This amazing product will save you 10 hours per week", start: 0 },
-          { text: "It's 50% faster than the competition and costs less", start: 30 },
-          { text: "Users report 300% increase in productivity", start: 60 },
-          { text: "Simple to use, no technical skills required", start: 90 }
-        ];
-
-        console.log('🧪 Testing benefit extraction with sample data...');
-        const benefitResult = await nlpService.extractBenefits(sampleTranscript, { 
-          userTier: 'pro' 
-        });
-
-        results.sampleBenefitExtraction = {
-          status: benefitResult.success ? 'success' : 'failed',
-          benefitsFound: benefitResult.benefits?.length || 0,
-          error: benefitResult.error,
-          sampleBenefit: benefitResult.benefits?.[0]
+      } else {
+        results.video2promoAPI = {
+          status: 'warning',
+          message: 'Skipped - No authentication'
         };
-      } catch (error) {
-        results.sampleBenefitExtraction = {
+      }
+
+      setTestResults(results);
+    } catch (error) {
+      console.error('System test error:', error);
+      setTestResults({
+        systemError: {
           status: 'error',
-          error: error.message
-        };
-      }
-
-      // Test 6: Ready status for real video test
-      results.realVideoTest = {
-        status: 'ready',
-        message: 'Click "Test Real Video" to test with actual YouTube video'
-      };
-
-    } catch (error) {
-      results.globalError = error.message;
+          message: `System test failed: ${error.message}`
+        }
+      });
+    } finally {
+      setIsRunningTests(false);
     }
-
-    setTestResults(results);
-    setTesting(false);
   };
 
-  const testRealVideo = async () => {
-    setTesting(true);
-    try {
-      const testUrl = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
-      console.log('🧪 Testing real video transcript fetch for:', testUrl);
-      
-      const result = await transcriptService.getTranscript(testUrl);
-      console.log('✅ Real video test result:', result);
-      
-      if (result.success && result.transcript) {
-        // Test benefit extraction on real transcript
-        console.log('🔍 Testing benefit extraction on real transcript...');
-        const benefitResult = await nlpService.extractBenefits(result.transcript, {
-          userTier: 'pro'
-        });
+  const testRickRollVideo = async () => {
+    console.log('🎵 Testing Rick Roll video...');
+    // This would trigger your Video2Promo workflow with a known video
+    window.dispatchEvent(new CustomEvent('test-video-url', {
+      detail: { url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' }
+    }));
+  };
 
-        setTestResults(prev => ({
-          ...prev,
-          realVideoTest: {
-            status: 'success',
-            videoId: result.videoId,
-            transcriptSegments: result.transcript.length,
-            method: result.method,
-            benefitExtraction: {
-              success: benefitResult.success,
-              benefitsFound: benefitResult.benefits?.length || 0,
-              error: benefitResult.error,
-              sampleBenefit: benefitResult.benefits?.[0]
-            }
-          }
-        }));
-      } else {
-        throw new Error(result.error || 'Failed to extract transcript');
-      }
-    } catch (error) {
-      console.error('❌ Real video test failed:', error);
-      setTestResults(prev => ({
-        ...prev,
-        realVideoTest: {
-          status: 'failed',
-          error: error.message,
-          suggestion: 'Check console for detailed error logs. Try with a video that has auto-generated captions.'
-        }
+  const testCustomVideo = async () => {
+    const url = prompt('Enter YouTube URL to test:');
+    if (url) {
+      console.log('🎬 Testing custom video:', url);
+      window.dispatchEvent(new CustomEvent('test-video-url', {
+        detail: { url }
       }));
     }
-    setTesting(false);
   };
 
-  const testSpecificVideo = async () => {
-    const customUrl = prompt('Enter YouTube URL to test:');
-    if (!customUrl) return;
-
-    setTesting(true);
-    try {
-      console.log('🧪 Testing custom video:', customUrl);
-      
-      const result = await transcriptService.getTranscript(customUrl);
-      console.log('✅ Custom video test result:', result);
-      
-      if (result.success && result.transcript) {
-        const benefitResult = await nlpService.extractBenefits(result.transcript, {
-          userTier: 'pro'
-        });
-
-        setTestResults(prev => ({
-          ...prev,
-          customVideoTest: {
-            status: 'success',
-            url: customUrl,
-            videoId: result.videoId,
-            transcriptSegments: result.transcript.length,
-            method: result.method,
-            benefitExtraction: {
-              success: benefitResult.success,
-              benefitsFound: benefitResult.benefits?.length || 0,
-              benefits: benefitResult.benefits
-            }
-          }
-        }));
-      } else {
-        throw new Error(result.error || 'Failed to extract transcript');
-      }
-    } catch (error) {
-      console.error('❌ Custom video test failed:', error);
-      setTestResults(prev => ({
-        ...prev,
-        customVideoTest: {
-          status: 'failed',
-          url: customUrl,
-          error: error.message
-        }
-      }));
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'success': return '✅';
+      case 'warning': return '⚠️';
+      case 'error': return '❌';
+      default: return '⚪';
     }
-    setTesting(false);
   };
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'success': return 'bg-green-100 text-green-800';
+      case 'warning': return 'bg-yellow-100 text-yellow-800';  
+      case 'error': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (!isVisible) return null;
 
   return (
-    <div className="bg-gray-50 border rounded-lg p-6 mt-4">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold">🔧 Video2Promo Debug Panel</h3>
-        <div className="text-xs text-gray-500">
-          {import.meta.env.DEV ? 'Development Mode' : 'Production Mode'}
+    <div className="w-full max-w-4xl mx-auto mb-6 border-2 border-blue-200 bg-blue-50 rounded-lg">
+      <div className="p-4 border-b border-blue-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-lg font-bold">
+            <span>🧪</span>
+            <span>Video2Promo Debug Panel</span>
+            <Badge className="bg-green-100 text-green-800 text-sm">
+              Python Backend v2.0
+            </Badge>
+          </div>
+          <Badge className="text-xs text-blue-600 bg-blue-100">
+            Development Mode
+          </Badge>
         </div>
       </div>
-      
-      <div className="space-y-2 mb-4">
-        <button
-          onClick={runTests}
-          disabled={testing}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-        >
-          {testing ? 'Running Tests...' : '🧪 Run System Tests'}
-        </button>
 
-        {Object.keys(testResults).length > 0 && (
-          <>
-            <button
-              onClick={testRealVideo}
-              disabled={testing}
-              className="ml-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-            >
-              {testing ? 'Testing...' : '🎥 Test Rick Roll Video'}
-            </button>
-
-            <button
-              onClick={testSpecificVideo}
-              disabled={testing}
-              className="ml-2 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
-            >
-              {testing ? 'Testing...' : '🎯 Test Custom Video'}
-            </button>
-          </>
-        )}
-      </div>
-
-      {Object.keys(testResults).length > 0 && (
-        <div className="space-y-4">
-          <h4 className="font-medium text-gray-800">📊 Test Results:</h4>
+      <div className="p-6 space-y-6">
+        {/* Action Buttons */}
+        <div className="flex gap-2 flex-wrap">
+          <button 
+            onClick={runSystemTests}
+            disabled={isRunningTests}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md disabled:opacity-50 flex items-center gap-2"
+          >
+            <span>⚡</span>
+            {isRunningTests ? 'Running Tests...' : 'Run System Tests'}
+          </button>
           
-          {/* Environment Variables */}
-          <div className="bg-white p-4 rounded border">
-            <h5 className="font-medium text-sm mb-2 flex items-center gap-2">
-              🔧 Environment Variables
-            </h5>
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div>CORS Proxy: {testResults.env?.corsProxy ? '✅' : '❌'}</div>
-              <div>YouTube API: {testResults.env?.youtubeApi ? '✅' : '❌'}</div>
-              <div>Claude Proxy: {testResults.env?.claudeProxy ? '✅' : '❌'}</div>
-              <div>Claude API Key: {testResults.env?.claudeApiKey ? '✅' : '❌'}</div>
-              <div>OpenAI Key: {testResults.env?.openaiKey ? '✅' : '❌'}</div>
-            </div>
-            {testResults.env?.values && (
-              <details className="mt-3">
-                <summary className="cursor-pointer text-blue-600 text-sm">🔍 Show Configuration</summary>
-                <pre className="text-xs mt-2 bg-gray-100 p-3 rounded overflow-auto">
-                  {JSON.stringify(testResults.env.values, null, 2)}
-                </pre>
-              </details>
-            )}
-          </div>
+          <button 
+            onClick={testRickRollVideo}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md flex items-center gap-2"
+          >
+            <span>🎵</span>
+            Test Rick Roll Video
+          </button>
+          
+          <button 
+            onClick={testCustomVideo}
+            className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md flex items-center gap-2"
+          >
+            <span>🎬</span>
+            Test Custom Video
+          </button>
+        </div>
 
-          {/* URL Validation */}
-          <div className="bg-white p-4 rounded border">
-            <h5 className="font-medium text-sm mb-2">🔗 URL Validation</h5>
-            <div className="text-sm space-y-1">
-              <div>Valid URL: {testResults.urlValidation?.isValid ? '✅' : '❌'}</div>
-              <div>Video ID: <code className="bg-gray-100 px-1 rounded">{testResults.urlValidation?.videoId || 'None'}</code></div>
-              {testResults.urlValidation?.error && (
-                <div className="text-red-600">Error: {testResults.urlValidation.error}</div>
+        {/* Backend Status */}
+        {backendStatus && (
+          <div className="border rounded-lg p-4 bg-white">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <span>⚡</span>
+              Backend Connection Status
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <span>{getStatusIcon(backendStatus.connected ? 'success' : 'error')}</span>
+                  <span className="font-medium">Connection:</span>
+                  <Badge className={getStatusColor(backendStatus.connected ? 'success' : 'error')}>
+                    {backendStatus.connected ? 'Connected' : 'Failed'}
+                  </Badge>
+                </div>
+                <div className="text-sm text-gray-600">
+                  <div>URL: <code className="bg-gray-100 px-1 rounded">{API_BASE}</code></div>
+                  {backendStatus.version && <div>Version: {backendStatus.version}</div>}
+                  {backendStatus.environment && <div>Env: {backendStatus.environment}</div>}
+                </div>
+              </div>
+              
+              {backendStatus.services && (
+                <div>
+                  <span className="font-medium mb-2 block">Backend Services:</span>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex items-center gap-1">
+                      <span>{getStatusIcon(backendStatus.services.supabase ? 'success' : 'error')}</span>
+                      Supabase: {backendStatus.services.supabase ? '✓' : '✗'}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span>{getStatusIcon(backendStatus.services.claude ? 'success' : 'error')}</span>
+                      Claude: {backendStatus.services.claude ? '✓' : '✗'}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span>{getStatusIcon(backendStatus.services.openai ? 'success' : 'error')}</span>
+                      OpenAI: {backendStatus.services.openai ? '✓' : '✗'}
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span>{getStatusIcon(backendStatus.services.youtube ? 'success' : 'error')}</span>
+                      YouTube: {backendStatus.services.youtube ? '✓' : '✗'}
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </div>
+        )}
 
-          {/* Service Status */}
-          <div className="bg-white p-4 rounded border">
-            <h5 className="font-medium text-sm mb-2">⚙️ Service Status</h5>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <div className="font-medium">Transcript Service:</div>
-                <div>Status: {testResults.transcriptService?.status === 'available' ? '✅ Available' : '❌ Unavailable'}</div>
-                <div className="text-xs text-gray-600 mt-1">
-                  Methods: {Object.values(testResults.transcriptService?.methods || {}).filter(Boolean).length}/3 available
-                </div>
-              </div>
-              <div>
-                <div className="font-medium">NLP Service:</div>
-                <div>Status: {testResults.nlpService?.status === 'available' ? '✅ Available' : '❌ Unavailable'}</div>
-                <div className="text-xs text-gray-600 mt-1">
-                  Methods: {Object.values(testResults.nlpService?.methods || {}).filter(Boolean).length}/3 available
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Sample Benefit Extraction */}
-          {testResults.sampleBenefitExtraction && (
-            <div className="bg-white p-4 rounded border">
-              <h5 className="font-medium text-sm mb-2">🧠 Sample Benefit Extraction</h5>
-              <div className="text-sm space-y-1">
-                <div>Status: {
-                  testResults.sampleBenefitExtraction.status === 'success' ? '✅ Success' :
-                  testResults.sampleBenefitExtraction.status === 'failed' ? '⚠️ Failed' : '❌ Error'
-                }</div>
-                <div>Benefits Found: {testResults.sampleBenefitExtraction.benefitsFound}</div>
-                {testResults.sampleBenefitExtraction.error && (
-                  <div className="text-red-600">Error: {testResults.sampleBenefitExtraction.error}</div>
-                )}
-                {testResults.sampleBenefitExtraction.sampleBenefit && (
-                  <details className="mt-2">
-                    <summary className="cursor-pointer text-blue-600">Show Sample Benefit</summary>
-                    <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                      <div><strong>Title:</strong> {testResults.sampleBenefitExtraction.sampleBenefit.title}</div>
-                      <div><strong>Description:</strong> {testResults.sampleBenefitExtraction.sampleBenefit.description}</div>
-                      <div><strong>Category:</strong> {testResults.sampleBenefitExtraction.sampleBenefit.category}</div>
+        {/* Test Results */}
+        {Object.keys(testResults).length > 0 && (
+          <div className="border rounded-lg p-4 bg-white">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <span>🧪</span>
+              Test Results
+            </h3>
+            <div className="space-y-3">
+              {Object.entries(testResults).map(([testName, result]) => (
+                <div key={testName} className="flex items-start gap-3 p-2 bg-gray-50 rounded">
+                  <span>{getStatusIcon(result.status)}</span>
+                  <div className="flex-1">
+                    <div className="font-medium capitalize">
+                      {testName.replace(/([A-Z])/g, ' $1').trim()}
                     </div>
-                  </details>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Real Video Test */}
-          {testResults.realVideoTest && testResults.realVideoTest.status !== 'ready' && (
-            <div className="bg-white p-4 rounded border">
-              <h5 className="font-medium text-sm mb-2">🎥 Real Video Test</h5>
-              <div className="text-sm space-y-1">
-                <div>Status: {
-                  testResults.realVideoTest.status === 'success' ? '✅ Success' :
-                  testResults.realVideoTest.status === 'failed' ? '❌ Failed' : '❓ Unknown'
-                }</div>
-                {testResults.realVideoTest.videoId && (
-                  <>
-                    <div>Video ID: <code className="bg-gray-100 px-1 rounded">{testResults.realVideoTest.videoId}</code></div>
-                    <div>Transcript Segments: {testResults.realVideoTest.transcriptSegments}</div>
-                    <div>Method Used: {testResults.realVideoTest.method}</div>
-                  </>
-                )}
-                {testResults.realVideoTest.benefitExtraction && (
-                  <div className="mt-2 p-2 bg-blue-50 rounded">
-                    <div className="font-medium text-blue-800">Benefit Extraction:</div>
-                    <div>Success: {testResults.realVideoTest.benefitExtraction.success ? '✅' : '❌'}</div>
-                    <div>Benefits Found: {testResults.realVideoTest.benefitExtraction.benefitsFound}</div>
-                    {testResults.realVideoTest.benefitExtraction.error && (
-                      <div className="text-red-600">Error: {testResults.realVideoTest.benefitExtraction.error}</div>
-                    )}
-                  </div>
-                )}
-                {testResults.realVideoTest.error && (
-                  <div className="text-red-600">Error: {testResults.realVideoTest.error}</div>
-                )}
-                {testResults.realVideoTest.suggestion && (
-                  <div className="text-orange-600">💡 {testResults.realVideoTest.suggestion}</div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Custom Video Test */}
-          {testResults.customVideoTest && (
-            <div className="bg-white p-4 rounded border">
-              <h5 className="font-medium text-sm mb-2">🎯 Custom Video Test</h5>
-              <div className="text-sm space-y-1">
-                <div>URL: <code className="bg-gray-100 px-1 rounded text-xs">{testResults.customVideoTest.url}</code></div>
-                <div>Status: {testResults.customVideoTest.status === 'success' ? '✅ Success' : '❌ Failed'}</div>
-                {testResults.customVideoTest.videoId && (
-                  <>
-                    <div>Video ID: <code className="bg-gray-100 px-1 rounded">{testResults.customVideoTest.videoId}</code></div>
-                    <div>Transcript Segments: {testResults.customVideoTest.transcriptSegments}</div>
-                    <div>Method Used: {testResults.customVideoTest.method}</div>
-                  </>
-                )}
-                {testResults.customVideoTest.benefitExtraction && (
-                  <div className="mt-2">
-                    <div>Benefits Found: {testResults.customVideoTest.benefitExtraction.benefitsFound}</div>
-                    {testResults.customVideoTest.benefitExtraction.benefits && testResults.customVideoTest.benefitExtraction.benefits.length > 0 && (
-                      <details className="mt-2">
-                        <summary className="cursor-pointer text-blue-600">Show Extracted Benefits</summary>
-                        <div className="mt-2 max-h-40 overflow-y-auto">
-                          {testResults.customVideoTest.benefitExtraction.benefits.slice(0, 3).map((benefit, idx) => (
-                            <div key={idx} className="p-2 bg-gray-50 rounded mb-2 text-xs">
-                              <div><strong>{benefit.title}</strong></div>
-                              <div className="text-gray-600">{benefit.description?.substring(0, 100)}...</div>
-                            </div>
-                          ))}
-                        </div>
+                    <div className="text-sm text-gray-600">{result.message}</div>
+                    {result.details && (
+                      <details className="text-xs text-gray-500 mt-1">
+                        <summary className="cursor-pointer">Details</summary>
+                        <pre className="mt-1 bg-gray-100 p-2 rounded text-xs overflow-auto">
+                          {JSON.stringify(result.details, null, 2)}
+                        </pre>
                       </details>
                     )}
                   </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Environment Info */}
+        <div className="border rounded-lg p-4 bg-white">
+          <h3 className="font-semibold mb-3">Environment Variables</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">Backend URL:</span>
+                {API_BASE ? (
+                  <Badge className="bg-green-100 text-green-800">✓ Set</Badge>
+                ) : (
+                  <Badge className="bg-red-100 text-red-800">✗ Missing</Badge>
                 )}
-                {testResults.customVideoTest.error && (
-                  <div className="text-red-600">Error: {testResults.customVideoTest.error}</div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">Supabase URL:</span>
+                {import.meta.env.VITE_SUPABASE_URL ? (
+                  <Badge className="bg-green-100 text-green-800">✓ Set</Badge>
+                ) : (
+                  <Badge className="bg-red-100 text-red-800">✗ Missing</Badge>
                 )}
               </div>
             </div>
-          )}
-
-          {/* Global Error */}
-          {testResults.globalError && (
-            <div className="bg-red-50 border border-red-200 p-4 rounded">
-              <h5 className="font-medium text-sm mb-2 text-red-800">💥 Global Error</h5>
-              <div className="text-sm text-red-700">{testResults.globalError}</div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="font-medium">Supabase Key:</span>
+                {import.meta.env.VITE_SUPABASE_ANON_KEY ? (
+                  <Badge className="bg-green-100 text-green-800">✓ Set</Badge>
+                ) : (
+                  <Badge className="bg-red-100 text-red-800">✗ Missing</Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">Auth Status:</span>
+                {session ? (
+                  <Badge className="bg-green-100 text-green-800">✓ Authenticated</Badge>
+                ) : (
+                  <Badge className="bg-yellow-100 text-yellow-800">! Not Authenticated</Badge>
+                )}
+              </div>
             </div>
-          )}
+          </div>
+          
+          <details className="mt-3">
+            <summary className="cursor-pointer text-blue-600 text-sm">Show Configuration</summary>
+            <pre className="mt-2 bg-gray-100 p-3 rounded text-xs overflow-auto">
+{`API Base: ${API_BASE}
+Supabase URL: ${import.meta.env.VITE_SUPABASE_URL}
+Environment: ${import.meta.env.VITE_APP_ENV}
+User ID: ${user?.id || 'Not authenticated'}
+Session: ${session ? 'Active' : 'None'}`}
+            </pre>
+          </details>
         </div>
-      )}
+      </div>
     </div>
   );
-}
+};
+
+export default DebugPanel;
