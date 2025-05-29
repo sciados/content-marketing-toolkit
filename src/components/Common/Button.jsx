@@ -19,116 +19,78 @@ const Button = ({
   isDisabled = false,
   loadingText,
   onClick,
+  className = '',
   ...props
 }) => {
-  const baseStyles = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontWeight: 'bold',
-    borderRadius: '4px',
-    cursor: isDisabled || isLoading ? 'not-allowed' : 'pointer',
-    transition: 'all 0.2s',
-    opacity: isDisabled ? 0.6 : 1,
+  // Base classes for all buttons
+  const baseClasses = "inline-flex items-center justify-center font-bold rounded transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2";
+
+  // Size classes
+  const sizeClasses = {
+    sm: 'px-3 py-1.5 text-sm',
+    md: 'px-4 py-2 text-base',
+    lg: 'px-6 py-3 text-lg'
   };
 
-  // Size styles
-  const sizeStyles = {
-    sm: { padding: '6px 12px', fontSize: '14px' },
-    md: { padding: '8px 16px', fontSize: '16px' },
-    lg: { padding: '12px 24px', fontSize: '18px' }
+  // Variant classes with proper Tailwind hover states
+  const variantClasses = {
+    primary: 'bg-blue-600 text-white border-transparent hover:bg-blue-700 focus:ring-blue-500',
+    secondary: 'bg-gray-600 text-white border-transparent hover:bg-gray-700 focus:ring-gray-500',
+    outline: 'bg-transparent text-blue-600 border border-blue-600 hover:bg-blue-50 focus:ring-blue-500',
+    link: 'bg-transparent text-blue-600 border-transparent p-0 hover:underline focus:ring-blue-500'
   };
 
-  // Variant styles
-  const variantStyles = {
-    primary: {
-      backgroundColor: '#3182CE',
-      color: 'white',
-      border: 'none',
-      '&:hover': {
-        backgroundColor: '#2B6CB0'
-      }
-    },
-    secondary: {
-      backgroundColor: '#718096',
-      color: 'white',
-      border: 'none',
-      '&:hover': {
-        backgroundColor: '#4A5568'
-      }
-    },
-    outline: {
-      backgroundColor: 'transparent',
-      color: '#3182CE',
-      border: '1px solid #3182CE',
-      '&:hover': {
-        backgroundColor: '#EBF8FF'
-      }
-    },
-    link: {
-      backgroundColor: 'transparent',
-      color: '#3182CE',
-      border: 'none',
-      padding: 0,
-      '&:hover': {
-        textDecoration: 'underline'
-      }
-    }
-  };
+  // Disabled/loading state classes
+  const disabledClasses = isDisabled || isLoading 
+    ? 'opacity-60 cursor-not-allowed pointer-events-none' 
+    : 'cursor-pointer';
 
-  // Combine styles
-  const buttonStyles = {
-    ...baseStyles,
-    ...sizeStyles[size],
-    ...variantStyles[variant],
-    ...(isDisabled || isLoading ? { pointerEvents: 'none' } : {})
-  };
-
-  // Apply hover styles on hover (only if not disabled/loading)
-  const [isHovered, setIsHovered] = React.useState(false);
-  
-  const combinedStyles = {
-    ...buttonStyles,
-    ...(isHovered && !isDisabled && !isLoading && variantStyles[variant]['&:hover'])
-  };
+  // Combine all classes
+  const buttonClasses = `
+    ${baseClasses}
+    ${sizeClasses[size]}
+    ${variantClasses[variant]}
+    ${disabledClasses}
+    ${className}
+  `.trim().replace(/\s+/g, ' ');
 
   return (
     <button
-      style={combinedStyles}
+      className={buttonClasses}
       disabled={isDisabled || isLoading}
       onClick={onClick}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
       {...props}
     >
       {isLoading ? (
         <>
-          <span 
-            style={{ 
-              display: 'inline-block', 
-              width: '14px', 
-              height: '14px', 
-              border: '2px solid currentColor', 
-              borderTopColor: 'transparent', 
-              borderRadius: '50%', 
-              marginRight: '8px',
-              animation: 'spin 1s linear infinite'
-            }}
-          />
+          <svg 
+            className="animate-spin -ml-1 mr-2 h-4 w-4 text-current" 
+            xmlns="http://www.w3.org/2000/svg" 
+            fill="none" 
+            viewBox="0 0 24 24"
+          >
+            <circle 
+              className="opacity-25" 
+              cx="12" 
+              cy="12" 
+              r="10" 
+              stroke="currentColor" 
+              strokeWidth="4"
+            />
+            <path 
+              className="opacity-75" 
+              fill="currentColor" 
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            />
+          </svg>
           {loadingText || children}
         </>
       ) : (
         children
       )}
-      <style jsx="true">{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </button>
   );
 };
 
-export {Button}
+export { Button };
 export default Button;
