@@ -1,6 +1,8 @@
-// src/hooks/useUsageTracking.js
+// src/hooks/useUsageTracking.js - FIXED with Video2Promo support
 import { useState, useCallback } from 'react';
 import { subscriptions } from '../services/supabase/subscriptions';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 /**
  * Custom hook for tracking and managing usage limits
@@ -92,15 +94,60 @@ export const useUsageTracking = () => {
   }, []);
 
   /**
+   * Track Video2Promo project usage
+   * @param {number} count - Number of projects created (default: 1)
+   */
+  const trackVideo2PromoProject = useCallback(async (count = 1) => {
+    setIsTracking(true);
+    setError(null);
+    
+    try {
+      // For Video2Promo, we can track it as series or create a new usage type
+      await subscriptions.updateUsage('series_created', count);
+      console.log(`Tracked ${count} Video2Promo project(s) created`);
+    } catch (err) {
+      console.error('Error tracking Video2Promo project:', err);
+      setError(err.message);
+      throw err;
+    } finally {
+      setIsTracking(false);
+    }
+  }, []);
+
+  /**
    * Check if user can perform an action based on usage limits
-   * @param {string} limitType - Type of limit to check ('emails', 'series', 'ai_tokens')
+   * @param {string} limitType - Type of limit to check ('emails', 'series', 'ai_tokens', 'video2promo_projects')
    * @returns {Promise<Object>} - { allowed: boolean, current: number, limit: number, remaining: number }
    */
   const checkUsageLimit = useCallback(async (limitType) => {
     try {
-      const result = await subscriptions.checkUsageLimit(limitType);
-      console.log(`Usage check for ${limitType}:`, result);
-      return result;
+      console.log(`🔍 Checking usage limit for: ${limitType}`);
+      
+      // Map Video2Promo projects to series limits for now
+      const mappedLimitType = limitType === 'video2promo_projects' ? 'series' : limitType;
+      
+      const result = await subscriptions.checkUsageLimit(mappedLimitType);
+      console.log(`Usage check for ${limitType} (mapped to ${mappedLimitType}):`, result);
+      
+      // Ensure we return the expected structure
+      if (!result || typeof result !== 'object') {
+        console.warn(`Invalid usage limit result for ${limitType}:`, result);
+        return {
+          allowed: false,
+          current_usage: 0,
+          limit_value: 0,
+          remaining: 0,
+          message: 'Invalid usage data'
+        };
+      }
+      
+      return {
+        allowed: result.allowed !== false, // Default to true if not explicitly false
+        current_usage: result.current_usage || 0,
+        limit_value: result.limit_value || 0,
+        remaining: result.remaining || 0,
+        message: result.message || 'Usage check completed'
+      };
     } catch (err) {
       console.error(`Error checking usage limit for ${limitType}:`, err);
       setError(err.message);
@@ -109,8 +156,67 @@ export const useUsageTracking = () => {
         allowed: false,
         current_usage: 0,
         limit_value: 0,
-        remaining: 0
+        remaining: 0,
+        message: `Error checking usage: ${err.message}`
       };
+    }
+  }, []);
+
+  /**
+   * Update usage using the backend API (for Video2Promo and other backend features)
+   * @param {string} usageType - Type of usage to update
+   * @param {number} amount - Amount to add (default: 1)
+   */
+  const updateUsage = useCallback(async (usageType, amount = 1) => {
+    setIsTracking(true);
+    setError(null);
+    
+    try {
+      console.log(`🔍 Updating usage via backend: ${usageType} +${amount}`);
+      
+      // Try to get session for backend API call
+      const session = JSON.parse(localStorage.getItem('supabase.auth.token'))?.currentSession;
+      
+      if (!session?.access_token) {
+        throw new Error('No valid session for backend API call');
+      }
+      
+      const response = await fetch(`${API_BASE}/api/usage/track`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          usage_type: usageType,
+          amount: amount
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Backend API error: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log(`✅ Backend usage update successful:`, result);
+      
+    } catch (err) {
+      console.error(`Error updating usage via backend for ${usageType}:`, err);
+      
+      // Fallback to Supabase method if backend fails
+      try {
+        console.log(`🔄 Falling back to Supabase for ${usageType}`);
+        const mappedType = usageType === 'video2promo_projects' ? 'series_created' : usageType;
+        await subscriptions.updateUsage(mappedType, amount);
+        console.log(`✅ Supabase fallback successful for ${usageType}`);
+      } catch (fallbackErr) {
+        console.error(`❌ Both backend and Supabase failed for ${usageType}:`, fallbackErr);
+        setError(fallbackErr.message);
+        throw fallbackErr;
+      }
+    } finally {
+      setIsTracking(false);
     }
   }, []);
 
@@ -180,12 +286,27 @@ export const useUsageTracking = () => {
     }
   }, [checkUsageLimit]);
 
+  /**
+   * Check if user can create Video2Promo projects
+   * @returns {Promise<boolean>} - Whether Video2Promo creation is allowed
+   */
+  const canCreateVideo2Promo = useCallback(async () => {
+    try {
+      const limit = await checkUsageLimit('video2promo_projects');
+      return limit.allowed && limit.remaining >= 1;
+    } catch (err) {
+      console.error('Error checking Video2Promo creation limit:', err);
+      return false;
+    }
+  }, [checkUsageLimit]);
+
   return {
     // Tracking functions
     trackEmailGeneration,
     trackEmailSaved,
     trackSeriesCreated,
     trackAITokenUsage,
+    trackVideo2PromoProject, // NEW
     
     // Limit checking functions
     checkUsageLimit,
@@ -193,6 +314,10 @@ export const useUsageTracking = () => {
     canGenerateEmails,
     canSaveEmails,
     canCreateSeries,
+    canCreateVideo2Promo, // NEW
+    
+    // Backend integration
+    updateUsage, // NEW - for backend API calls
     
     // State
     isTracking,

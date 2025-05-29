@@ -1,7 +1,7 @@
 // src/components/Video2Promo/VideoUrlForm.jsx
 import React, { useState } from 'react';
 import { Input } from '../Common/Input';
-import { Button } from '../Common/Button';
+import Button from '../Common/Button';
 import { KeywordManager } from './KeywordManager';
 import { UTMBuilder } from './UTMBuilder';
 import { ToneSelector } from './ToneSelector';
