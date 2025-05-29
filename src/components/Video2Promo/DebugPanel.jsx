@@ -77,7 +77,50 @@ export const DebugPanel = ({ isVisible = true }) => {
         }
       };
 
-      // Test 4: Video2Promo API (only if authenticated)
+     // Test 4: Usage Tracking API (only if authenticated)
+      if (session) {
+        console.log('🧪 Testing Usage API...');
+        try {
+          const usageResponse = await fetch(`${API_BASE}/api/usage/limits`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          });
+
+          console.log('🧪 Usage API response status:', usageResponse.status);
+
+          if (usageResponse.ok) {
+            const usageData = await usageResponse.json();
+            console.log('🧪 Usage API data:', usageData);
+            results.usageAPI = {
+              status: 'success',
+              message: `Usage API accessible - User tier: ${usageData.user_tier || 'unknown'}`,
+              details: usageData
+            };
+          } else {
+            const errorData = await usageResponse.json();
+            results.usageAPI = {
+              status: 'warning',
+              message: `Usage API responded with ${usageResponse.status}: ${errorData.error || 'Unknown error'}`,
+              details: errorData
+            };
+          }
+        } catch (error) {
+          results.usageAPI = {
+            status: 'error',
+            message: `Usage API test failed: ${error.message}`
+          };
+        }
+      } else {
+        results.usageAPI = {
+          status: 'warning',
+          message: 'Skipped - No authentication'
+        };
+      }
+
+      // Test 5: Video2Promo API (only if authenticated)
       if (session) {
         console.log('🧪 Testing Video2Promo API...');
         try {

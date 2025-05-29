@@ -29,6 +29,7 @@ export const useVideo2Promo = () => {
   });
 
 // Enhanced extractTranscript function with detailed debugging
+ // Enhanced extractTranscript function with detailed debugging
 const extractTranscript = useCallback(async (videoUrl, method = 'auto') => {
   try {
     // Check if user is authenticated
@@ -324,7 +325,7 @@ const extractTranscript = useCallback(async (videoUrl, method = 'auto') => {
     }
   }, [state.selectedBenefits, state.extractedBenefits, state.extractedFeatures, state.websiteData, state.utmParams, session, updateUsage]);
 
-  // Process video URL (updated to use backend) - FIXED VERSION
+  // Process video URL (updated to use backend) - FIXED VERSION with better error handling
 const processVideo = useCallback(async (videoUrl, additionalData = {}) => {
   try {
     console.log('🎥 processVideo called with:', { videoUrl, additionalData });
@@ -400,6 +401,7 @@ const processVideo = useCallback(async (videoUrl, additionalData = {}) => {
     };
   }
 }, [checkUsageLimit, extractTranscript]);
+  
   
 
   // Process complete video workflow
