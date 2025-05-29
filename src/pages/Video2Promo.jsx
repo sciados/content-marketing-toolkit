@@ -313,7 +313,7 @@ export default function Video2Promo() {
                 <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
                   <div className="flex items-center gap-2 text-purple-800 text-sm">
                     <span>🚀</span>
-                    <span className="font-medium">Email generation powered by Python backend</span>
+                    <span className="font-medium">Email generation powered by Rodgers Digital</span>
                     <span className="ml-auto text-xs bg-purple-100 px-2 py-1 rounded">
                       Claude/OpenAI
                     </span>
@@ -347,7 +347,7 @@ export default function Video2Promo() {
                     Your video has been transformed into a high-converting email series.
                   </p>
                   <div className="text-sm text-gray-500 bg-green-50 p-2 rounded">
-                    ⚡ Processed by Python Backend • 🤖 AI-Powered Content • 🔒 Secure & Fast
+                    ⚡ Processed by Rodgers Digital • 🤖 AI-Powered Content • 🔒 Secure & Fast
                   </div>
                 </div>
 
