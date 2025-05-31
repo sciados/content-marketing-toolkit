@@ -386,7 +386,7 @@ const AppRoutes = () => {
         
         {/* NEW: Content Library Route */}
         <Route 
-          path="/content-library" 
+          path="/tools/library" 
           element={
             <LazyRoute pageName="Content Library">
               <ContentLibrary />
