@@ -1,8 +1,8 @@
 // src/components/ContentLibrary/ContentLibraryCard.jsx
 import React from 'react';
-import { Card } from '../Common/Card';
-import { Button } from '../Common/Button';
-import { Badge } from '../Common/Badge';
+import Card from '../Common/Card';
+import Button from '../Common/Button';
+import Badge from '../Common/Badge';
 
 export const ContentLibraryCard = ({
   item,

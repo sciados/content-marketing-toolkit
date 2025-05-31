@@ -1,6 +1,6 @@
 // src/components/ContentLibrary/ContentLibraryFilters.jsx
 import React from 'react';
-import { Badge } from '../Common/Badge';
+import Badge from '../Common/Badge';
 
 export const ContentLibraryFilters = ({ 
   filters, 
