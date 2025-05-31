@@ -118,19 +118,19 @@ const Profile = lazy(() => {
   });
 });
 
-// NEW: Content Library
-const ContentLibrary = lazy(() => {
-  const tracker = trackLazyLoading('ContentLibrary');
-  return import('../pages/ContentLibrary').then(module => {
+// Tool Pages
+const SalesPageEmailGenerator = lazy(() => {
+  const tracker = trackLazyLoading('SalesPageEmailGenerator');
+  return import('../pages/SalesPageEmailGenerator').then(module => {
     if (tracker) tracker();
     return module;
   });
 });
 
-// Tool Pages
-const SalesPageEmailGenerator = lazy(() => {
-  const tracker = trackLazyLoading('SalesPageEmailGenerator');
-  return import('../pages/SalesPageEmailGenerator').then(module => {
+// NEW: Content Library
+const ContentLibrary = lazy(() => {
+  const tracker = trackLazyLoading('ContentLibrary');
+  return import('../pages/ContentLibrary').then(module => {
     if (tracker) tracker();
     return module;
   });
@@ -386,7 +386,7 @@ const AppRoutes = () => {
         
         {/* NEW: Content Library Route */}
         <Route 
-          path="/tools/library" 
+          path="/tools/content-library" 
           element={
             <LazyRoute pageName="Content Library">
               <ContentLibrary />
