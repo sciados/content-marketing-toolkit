@@ -47,17 +47,7 @@ const AdminUsers = lazy(() => {
 
 const AdminDashboard = lazy(() => {
   const tracker = trackLazyLoading('AdminDashboard');
-  return import('../pages/Admin/AdminDashboard').catch(() => {
-    // Fallback component for non-existent admin pages
-    return { 
-      default: () => (
-        <div className="p-8 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Admin Dashboard</h2>
-          <p className="text-gray-600">System analytics and management coming soon!</p>
-        </div>
-      )
-    };
-  }).then(module => {
+  return import('../pages/Admin/AdminDashboard').then(module => {
     if (tracker) tracker();
     return module;
   });
@@ -65,17 +55,7 @@ const AdminDashboard = lazy(() => {
 
 const AdminAnalytics = lazy(() => {
   const tracker = trackLazyLoading('AdminAnalytics');
-  return import('../pages/Admin/AdminAnalytics').catch(() => {
-    // Fallback component for non-existent admin pages
-    return { 
-      default: () => (
-        <div className="p-8 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">System Analytics</h2>
-          <p className="text-gray-600">Advanced system analytics dashboard coming soon!</p>
-        </div>
-      )
-    };
-  }).then(module => {
+  return import('../pages/Admin/AdminAnalytics').then(module => {
     if (tracker) tracker();
     return module;
   });
@@ -141,45 +121,7 @@ const Profile = lazy(() => {
 // NEW: Content Library
 const ContentLibrary = lazy(() => {
   const tracker = trackLazyLoading('ContentLibrary');
-  return import('../pages/ContentLibrary').catch(() => {
-    // Fallback component until Content Library is implemented
-    return { 
-      default: () => (
-        <div className="max-w-4xl mx-auto p-8 text-center">
-          <div className="text-6xl mb-4">📚</div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Content Library</h2>
-          <p className="text-lg text-gray-600 mb-6">
-            Your personal library of extracted YouTube transcripts, scanned sales pages, and generated content.
-          </p>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-            <h3 className="text-lg font-semibold text-blue-900 mb-2">Coming Soon!</h3>
-            <p className="text-blue-700">
-              The Content Library will allow you to save, organize, and reuse all your extracted content. 
-              Features include search, favorites, tags, and seamless integration with Video2Promo and Email Generator.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-            <div className="bg-white p-4 rounded-lg border">
-              <h4 className="font-medium text-gray-900 mb-2">🎥 Video Transcripts</h4>
-              <p className="text-sm text-gray-600">Save and reuse YouTube video transcripts</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg border">
-              <h4 className="font-medium text-gray-900 mb-2">🌐 Scanned Pages</h4>
-              <p className="text-sm text-gray-600">Store analyzed sales page data</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg border">
-              <h4 className="font-medium text-gray-900 mb-2">📄 Generated Assets</h4>
-              <p className="text-sm text-gray-600">Access your marketing materials</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg border">
-              <h4 className="font-medium text-gray-900 mb-2">🔍 Smart Search</h4>
-              <p className="text-sm text-gray-600">Find content by keywords or tags</p>
-            </div>
-          </div>
-        </div>
-      )
-    };
-  }).then(module => {
+  return import('../pages/ContentLibrary').then(module => {
     if (tracker) tracker();
     return module;
   });
@@ -230,25 +172,7 @@ const Analytics = lazy(() => {
 // Future tool pages - with better fallbacks
 const AIWritingAssistant = lazy(() => {
   const tracker = trackLazyLoading('AIWritingAssistant');
-  return import('../pages/Tools/AIWritingAssistant').catch(() => {
-    return { 
-      default: () => (
-        <div className="max-w-4xl mx-auto p-8 text-center">
-          <div className="text-6xl mb-4">✍️</div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">AI Writing Assistant</h2>
-          <p className="text-lg text-gray-600 mb-6">
-            Generate blog posts, articles, social media content, and marketing copy with advanced AI.
-          </p>
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-indigo-900 mb-2">Coming Soon!</h3>
-            <p className="text-indigo-700">
-              The AI Writing Assistant will help you create high-quality content for any purpose.
-            </p>
-          </div>
-        </div>
-      )
-    };
-  }).then(module => {
+  return import('../pages/Tools/AIWritingAssistant').then(module => {
     if (tracker) tracker();
     return module;
   });
@@ -256,25 +180,7 @@ const AIWritingAssistant = lazy(() => {
 
 const CompetitorAnalysis = lazy(() => {
   const tracker = trackLazyLoading('CompetitorAnalysis');
-  return import('../pages/Tools/CompetitorAnalysis').catch(() => {
-    return { 
-      default: () => (
-        <div className="max-w-4xl mx-auto p-8 text-center">
-          <div className="text-6xl mb-4">🔍</div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Competitor Analysis</h2>
-          <p className="text-lg text-gray-600 mb-6">
-            Analyze competitor websites, SEO strategies, and market positioning.
-          </p>
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-purple-900 mb-2">Coming Soon!</h3>
-            <p className="text-purple-700">
-              Comprehensive competitor research and market intelligence tools.
-            </p>
-          </div>
-        </div>
-      )
-    };
-  }).then(module => {
+  return import('../pages/Tools/CompetitorAnalysis').then(module => {
     if (tracker) tracker();
     return module;
   });
