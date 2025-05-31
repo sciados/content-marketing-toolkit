@@ -229,7 +229,8 @@ export const useContentLibrary = () => {
       .slice(0, count);
   }, [items]);
 
-  return {
+  // DEBUG: Log what we're returning
+  const returnValue = {
     // State
     items,
     loading,
@@ -256,4 +257,16 @@ export const useContentLibrary = () => {
     getRecentItems,
     getMostUsedItems
   };
+
+  console.log('DEBUG - hook returning:', returnValue);
+  console.log('DEBUG - individual values:', {
+    items,
+    loading,
+    filters,
+    toggleFavorite,
+    useContentItem,
+    deleteItem
+  });
+
+  return returnValue;
 };
