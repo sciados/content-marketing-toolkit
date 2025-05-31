@@ -30,11 +30,11 @@ export const useContentLibrary = () => {
     
     try {
       const params = new URLSearchParams({
-        type: filters.type,
-        search: searchTerm,
-        favorited: filters.favorited.toString(),
-        tags: filters.tags.join(','),
-        sort: filters.sortBy,
+        type: filters.type || 'all',
+        search: searchTerm || '',
+        favorited: (filters.favorited || false).toString(),
+        tags: Array.isArray(filters.tags) ? filters.tags.join(',') : '',
+        sort: filters.sortBy || 'created_desc',
         limit: '50'
       });
 
