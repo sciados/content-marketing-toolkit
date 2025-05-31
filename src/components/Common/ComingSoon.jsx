@@ -1,8 +1,8 @@
 // src/components/Common/ComingSoon.jsx - Universal Coming Soon Placeholder
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from './Button';
-import { Card } from './Card';
+import  Button from './Button';
+import  Card from './Card';
 
 const FEATURE_CONFIG = {
   // Admin Pages
@@ -231,7 +231,7 @@ export const ComingSoon = ({
           <div className="text-8xl mb-6">{config.icon}</div>
           
           <div className="mb-4">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${badge.bg} ${badge.text}`}>
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${badge.bg} ${badge.textColor}`}>
               {badge.text}
             </span>
           </div>
