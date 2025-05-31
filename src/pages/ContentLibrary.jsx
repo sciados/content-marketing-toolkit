@@ -1,61 +1,19 @@
-// src/pages/ContentLibrary.jsx
+// src/pages/ContentLibrary.jsx - MINIMAL TEST VERSION
 import React from 'react';
-import { ContentLibraryGrid } from '../components/ContentLibrary/ContentLibraryGrid';
-import { ContentLibraryFilters } from '../components/ContentLibrary/ContentLibraryFilters';
-import { ContentLibrarySearch } from '../components/ContentLibrary/ContentLibrarySearch';
-import { useContentLibrary } from '../hooks/useContentLibrary';
-
-// Add this right after the imports in ContentLibrary.jsx
-console.log('ContentLibraryGrid:', ContentLibraryGrid);
-console.log('ContentLibraryFilters:', ContentLibraryFilters);
-console.log('ContentLibrarySearch:', ContentLibrarySearch);
-console.log('useContentLibrary:', useContentLibrary);
 
 export const ContentLibrary = () => {
-  const {
-    items,
-    loading,
-    filters,
-    setFilters,
-    searchTerm,
-    setSearchTerm,
-    toggleFavorite,
-    useContentItem,
-    deleteItem
-  } = useContentLibrary();
-
+  console.log('ContentLibrary component is rendering!');
+  
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Content Library</h1>
-        <p className="text-gray-600 mt-2">
-          Your collection of extracted transcripts, scanned pages, and reusable content
-        </p>
+      <h1 className="text-2xl font-bold text-gray-900">Content Library - Test</h1>
+      <p className="text-gray-600 mt-2">
+        If you see this, the basic routing works! The error was in component imports.
+      </p>
+      
+      <div className="mt-6 p-4 bg-green-100 rounded-lg">
+        <p className="text-green-800">✅ ContentLibrary component loaded successfully</p>
       </div>
-
-      {/* Search and Filters */}
-      <div className="mb-6 space-y-4">
-        <ContentLibrarySearch
-          value={searchTerm}
-          onChange={setSearchTerm}
-          placeholder="Search transcripts, pages, benefits..."
-        />
-        
-        <ContentLibraryFilters
-          filters={filters}
-          onChange={setFilters}
-        />
-      </div>
-
-      {/* Content Grid */}
-      <ContentLibraryGrid
-        items={items}
-        loading={loading}
-        onToggleFavorite={toggleFavorite}
-        onUseItem={useContentItem}
-        onDeleteItem={deleteItem}
-      />
     </div>
   );
 };
