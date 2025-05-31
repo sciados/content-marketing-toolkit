@@ -4,6 +4,11 @@ import Card from '../Common/Card';
 import Button from '../Common/Button';
 import Badge from '../Common/Badge';
 
+// Add this right after the imports in ContentLibraryCard.jsx
+console.log('Card:', Card);
+console.log('Button:', Button);
+console.log('Badge:', Badge);
+
 export const ContentLibraryCard = ({
   item,
   onToggleFavorite,

@@ -97,8 +97,8 @@ export const ContentLibraryFilters = ({
               {filters.tags.map((tag, index) => (
                 <Badge
                   key={index}
-                  variant="secondary"
-                  size="sm"
+                  colorScheme="gray"
+                  variant="subtle"
                   className="cursor-pointer"
                   onClick={() => {
                     const newTags = filters.tags.filter((_, i) => i !== index);
@@ -128,12 +128,12 @@ export const ContentLibraryFilters = ({
         <div className="flex items-center space-x-2 text-sm text-gray-600">
           <span>Active filters:</span>
           {filters.type !== 'all' && (
-            <Badge variant="outline" size="sm">
+            <Badge colorScheme="blue" variant="outline">
               {contentTypes.find(t => t.id === filters.type)?.label}
             </Badge>
           )}
           {filters.favorited && (
-            <Badge variant="outline" size="sm">
+            <Badge colorScheme="green" variant="outline">
               Favorites
             </Badge>
           )}

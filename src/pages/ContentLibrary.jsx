@@ -5,6 +5,12 @@ import { ContentLibraryFilters } from '../components/ContentLibrary/ContentLibra
 import { ContentLibrarySearch } from '../components/ContentLibrary/ContentLibrarySearch';
 import { useContentLibrary } from '../hooks/useContentLibrary';
 
+// Add this right after the imports in ContentLibrary.jsx
+console.log('ContentLibraryGrid:', ContentLibraryGrid);
+console.log('ContentLibraryFilters:', ContentLibraryFilters);
+console.log('ContentLibrarySearch:', ContentLibrarySearch);
+console.log('useContentLibrary:', useContentLibrary);
+
 export const ContentLibrary = () => {
   const {
     items,
