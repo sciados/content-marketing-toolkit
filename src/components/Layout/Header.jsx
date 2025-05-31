@@ -100,7 +100,7 @@ const Header = () => {
               </div>
 
               {/* NEW: Content Library */}
-              <Link to="/content-library" className="text-gray-600 hover:text-indigo-600 mx-3 flex items-center">
+              <Link to="/tools/content-library" className="text-gray-600 hover:text-indigo-600 mx-3 flex items-center">
                 <span className="mr-1">📚</span>
                 Content Library
               </Link>

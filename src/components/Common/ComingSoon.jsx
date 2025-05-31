@@ -341,7 +341,7 @@ export const ComingSoon = ({
                   </div>
                 </Link>
                 <Link 
-                  to="/tools/email-generator" 
+                  to="/tools/content-library" 
                   className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <span className="text-lg">📧</span>
@@ -351,7 +351,7 @@ export const ComingSoon = ({
                   </div>
                 </Link>
                 <Link 
-                  to="/tools/content-library" 
+                  to="/analytics" 
                   className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <span className="text-lg">📊</span>

@@ -15,7 +15,7 @@ const Sidebar = () => {
   ];
 
   const contentItems = [
-    { name: 'Content Library', path: '/content-library', icon: 'library', description: 'Saved transcripts & pages', isNew: true },
+    { name: 'Content Library', path: '/tools/content-library', icon: 'library', description: 'Saved transcripts & pages', isNew: true },
     { name: 'Analytics', path: '/analytics', icon: 'chart', description: 'Usage & performance' },
   ];
 
