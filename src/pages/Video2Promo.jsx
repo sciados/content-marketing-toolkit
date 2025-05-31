@@ -1,12 +1,16 @@
-// src/pages/Video2Promo.jsx - UPDATED with Authentication Handling
+// src/pages/Video2Promo.jsx - UPDATED with Backend Integration and Asset Generation
 
 import React, { useState } from 'react';
 import { VideoUrlForm } from '../components/Video2Promo/VideoUrlForm';
 import { TranscriptDisplay } from '../components/Video2Promo/TranscriptDisplay';
 import { VideoEmailGenerator } from '../components/Video2Promo/VideoEmailGenerator';
+import { AssetGenerator } from '../components/Video2Promo/AssetGenerator';
+import { GeneratedAssets } from '../components/Video2Promo/GeneratedAssets';
 import { DebugPanel } from '../components/Video2Promo/DebugPanel';
 import { BackendStatusBanner } from '../components/Video2Promo/BackendStatusBanner';
 import { useVideo2Promo } from '../hooks/useVideo2Promo';
+import { useAssetGeneration } from '../hooks/useAssetGeneration';
+import { useUsageTracking } from '../hooks/useUsageTracking';
 import { useToast } from '../hooks/useToast';
 import useSupabase from '../hooks/useSupabase';
 
@@ -18,7 +22,7 @@ export default function Video2Promo() {
   const { showToast } = useToast();
   const { user, session } = useSupabase();
 
-  // Get all state and functions from the hook
+  // Get all state and functions from the Video2Promo hook
   const {
     currentStep,
     transcript,
@@ -36,6 +40,21 @@ export default function Video2Promo() {
     videoUrl
   } = useVideo2Promo();
 
+  // Asset generation hook
+  const {
+    generatedAssets,
+    isGenerating: isGeneratingAssets,
+    error: assetError,
+    generateAssets,
+    clearAssets
+  } = useAssetGeneration();
+
+  // Usage tracking
+  const { 
+    usageData,
+    remainingTokens
+  } = useUsageTracking();
+
   // Use manual step override if set, otherwise use hook's currentStep
   const effectiveStep = manualStep || currentStep;
 
@@ -44,14 +63,64 @@ export default function Video2Promo() {
     setManualStep('transcript');
   };
 
+  const handleProceedToBenefits = () => {
+    setManualStep('benefits');
+  };
+
+  const handleProceedToAssetGeneration = () => {
+    if (selectedBenefits && selectedBenefits.some(Boolean)) {
+      setManualStep('asset_generation');
+    } else {
+      showToast('Please select at least one benefit first', 'error');
+    }
+  };
+
   const handleProceedToEmailGeneration = () => {
     setManualStep('email_generation');
+  };
+
+  const handleAssetsGenerated = (result) => {
+    showToast(`Successfully generated ${result.assetsGenerated} marketing assets!`, 'success');
+    setManualStep('assets_complete');
   };
 
   const handleEmailsGenerated = (emails) => {
     setManualStep('complete');
     showToast(`Successfully generated ${emails.length} emails!`, 'success');
   };
+
+  // Generate marketing assets using backend
+  const handleGenerateAssets = async (params) => {
+    try {
+      if (!transcript || !extractedBenefits) {
+        showToast('Please extract transcript and benefits first', 'error');
+        return;
+      }
+
+      const result = await generateAssets({
+        transcript,
+        benefits: extractedBenefits,
+        benefitIndices: params.benefitIndices || selectedBenefits.map((selected, i) => selected ? i : -1).filter(i => i !== -1),
+        assetTypes: params.assetTypes,
+        generateVariants: params.generateVariants,
+        project: {
+          videoUrl,
+          videoData,
+          extractedAt: new Date().toISOString()
+        }
+      });
+
+      handleAssetsGenerated(result);
+      return result;
+
+    } catch (error) {
+      console.error('Asset generation failed:', error);
+      showToast(`Asset generation failed: ${error.message}`, 'error');
+    }
+  };
+
+  // Get user tier for feature access
+  const userTier = user?.subscription_tier || 'free';
 
   // Authentication check component
   const AuthenticationRequired = () => (
@@ -92,23 +161,23 @@ export default function Video2Promo() {
         {/* Backend Status Banner */}
         <BackendStatusBanner />
 
-        {/* Header with Python Backend Badge */}
+        {/* Header with Backend Integration Badge */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-2">
             <h1 className="text-3xl font-bold text-gray-900">
               🎥 Video2Promo Generator
             </h1>
             <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-              Python Backend v3.0
+              Backend API v4.0
             </div>
           </div>
           <p className="text-lg text-gray-600">
-            Transform YouTube videos into high-converting email campaigns
+            Transform YouTube videos into comprehensive marketing campaigns
           </p>
           <div className="mt-2 text-sm text-gray-500 flex items-center justify-center gap-4">
-            <span>⚡ No CORS Issues</span>
-            <span>🔒 Secure Backend Processing</span>
-            <span>🚀 Multi-AI Support</span>
+            <span>⚡ Webshare Rotating Proxies</span>
+            <span>🤖 AI Asset Generation</span>
+            <span>📊 Usage Tracking</span>
           </div>
         </div>
 
@@ -126,9 +195,11 @@ export default function Video2Promo() {
                     effectiveStep === 'input' ? 1 :
                     effectiveStep === 'transcript' ? 2 :
                     effectiveStep === 'benefits' ? 3 :
-                    effectiveStep === 'email_generation' ? 4 :
-                    effectiveStep === 'complete' ? 5 : 1
-                  } of 5
+                    effectiveStep === 'asset_generation' ? 4 :
+                    effectiveStep === 'assets_complete' ? 5 :
+                    effectiveStep === 'email_generation' ? 6 :
+                    effectiveStep === 'complete' ? 7 : 1
+                  } of 7
                 </span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
@@ -136,11 +207,13 @@ export default function Video2Promo() {
                   className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                   style={{ 
                     width: `${
-                      effectiveStep === 'input' ? 20 :
-                      effectiveStep === 'transcript' ? 40 :
-                      effectiveStep === 'benefits' ? 60 :
-                      effectiveStep === 'email_generation' ? 80 :
-                      effectiveStep === 'complete' ? 100 : 20
+                      effectiveStep === 'input' ? 14 :
+                      effectiveStep === 'transcript' ? 28 :
+                      effectiveStep === 'benefits' ? 42 :
+                      effectiveStep === 'asset_generation' ? 56 :
+                      effectiveStep === 'assets_complete' ? 70 :
+                      effectiveStep === 'email_generation' ? 85 :
+                      effectiveStep === 'complete' ? 100 : 14
                     }%` 
                   }}
                 ></div>
@@ -148,34 +221,40 @@ export default function Video2Promo() {
             </div>
 
             {/* Processing Status */}
-            {processingStage && (
+            {(processingStage || isGeneratingAssets) && (
               <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="flex items-center gap-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                  <span className="text-blue-800 font-medium">{processingStage}</span>
+                  <span className="text-blue-800 font-medium">
+                    {isGeneratingAssets ? 'Generating marketing assets...' : processingStage}
+                  </span>
                   <div className="ml-auto text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
-                    Python Backend
+                    Backend API
                   </div>
                 </div>
               </div>
             )}
 
             {/* Error Display */}
-            {error && (
+            {(error || assetError) && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                 <div className="flex items-center gap-2">
                   <span className="text-red-600">⚠️</span>
                   <div className="flex-1">
                     <p className="text-red-800 font-medium">Backend Processing Error</p>
-                    <p className="text-red-700">{error}</p>
+                    <p className="text-red-700">{error || assetError}</p>
                     <p className="text-xs text-red-600 mt-1">
-                      This error occurred in the Python backend. Check the debug panel below for more details.
+                      This error occurred in the backend API. Check the debug panel below for more details.
                     </p>
                   </div>
                 </div>
                 <div className="mt-3 flex gap-2">
                   <button
-                    onClick={reset}
+                    onClick={() => {
+                      reset();
+                      clearAssets();
+                      setManualStep(null);
+                    }}
                     className="px-3 py-1 bg-red-100 text-red-800 rounded hover:bg-red-200 text-sm"
                   >
                     🔄 Start Over
@@ -196,9 +275,9 @@ export default function Video2Promo() {
                 <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center gap-2 text-green-800 text-sm">
                     <span>✅</span>
-                    <span className="font-medium">Ready for Python Backend Processing</span>
+                    <span className="font-medium">Webshare Rotating Proxies Active (95-100% Success Rate)</span>
                     <span className="ml-auto text-xs bg-green-100 px-2 py-1 rounded">
-                      yt-dlp + Claude/OpenAI
+                      v4.0 Ready
                     </span>
                   </div>
                 </div>
@@ -216,7 +295,7 @@ export default function Video2Promo() {
                 <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="flex items-center gap-2 text-blue-800 text-sm">
                     <span>🎯</span>
-                    <span className="font-medium">Transcript extracted via Python backend</span>
+                    <span className="font-medium">Transcript extracted via Webshare rotating proxies</span>
                     {debug?.transcriptLength && (
                       <span className="ml-auto text-xs bg-blue-100 px-2 py-1 rounded">
                         {debug.transcriptLength} characters
@@ -228,6 +307,7 @@ export default function Video2Promo() {
                   transcript={transcript}
                   benefits={extractedBenefits}
                   onExtractBenefits={extractBenefits}
+                  onProceed={handleProceedToBenefits}
                   loading={loading}
                   error={error}
                   debug={debug}
@@ -240,7 +320,7 @@ export default function Video2Promo() {
               <div className="bg-white rounded-lg shadow-sm p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-xl font-bold text-gray-800">
-                    📋 Select Benefits for Email Generation
+                    📋 Select Benefits for Content Generation
                   </h2>
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-gray-500">
@@ -282,7 +362,7 @@ export default function Video2Promo() {
                     <div className="text-center py-8 text-gray-500">
                       <div className="mb-2">⚠️</div>
                       <p>No benefits extracted yet.</p>
-                      <p className="text-xs">Please extract benefits from the transcript using the Python backend.</p>
+                      <p className="text-xs">Please extract benefits from the transcript using the backend AI.</p>
                     </div>
                   )}
                 </div>
@@ -297,25 +377,93 @@ export default function Video2Promo() {
                   </button>
                   
                   <button
-                    onClick={handleProceedToEmailGeneration}
+                    onClick={handleProceedToAssetGeneration}
                     disabled={!selectedBenefits || selectedBenefits.filter(Boolean).length === 0}
                     className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Generate Emails →
+                    Generate Marketing Assets →
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Step 4: Email Generation */}
-            {effectiveStep === 'email_generation' && transcript && (
+            {/* Step 4: Asset Generation */}
+            {effectiveStep === 'asset_generation' && transcript && extractedBenefits && (
               <div>
                 <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg">
                   <div className="flex items-center gap-2 text-purple-800 text-sm">
                     <span>🚀</span>
-                    <span className="font-medium">Email generation powered by Rodgers Digital</span>
+                    <span className="font-medium">Backend AI asset generation ready</span>
                     <span className="ml-auto text-xs bg-purple-100 px-2 py-1 rounded">
                       Claude/OpenAI
+                    </span>
+                  </div>
+                </div>
+                
+                <AssetGenerator
+                  project={{ 
+                    benefits: extractedBenefits,
+                    transcript,
+                    videoUrl,
+                    videoData 
+                  }}
+                  onGenerate={handleGenerateAssets}
+                  loading={isGeneratingAssets}
+                  selectedBenefits={selectedBenefits.map((selected, i) => selected ? i : -1).filter(i => i !== -1)}
+                  userTier={userTier}
+                  remainingTokens={remainingTokens}
+                  transcript={transcript}
+                  benefits={extractedBenefits}
+                />
+              </div>
+            )}
+
+            {/* Step 5: Generated Assets Display */}
+            {effectiveStep === 'assets_complete' && generatedAssets.length > 0 && (
+              <div>
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-green-800 text-sm">
+                    <span>✅</span>
+                    <span className="font-medium">{generatedAssets.length} marketing assets generated successfully</span>
+                    <span className="ml-auto text-xs bg-green-100 px-2 py-1 rounded">
+                      Backend Generated
+                    </span>
+                  </div>
+                </div>
+
+                <GeneratedAssets 
+                  assets={generatedAssets}
+                  onUseAsset={(asset) => console.log('Using asset:', asset)}
+                />
+
+                {/* Navigation Buttons */}
+                <div className="flex justify-between mt-6">
+                  <button
+                    onClick={() => setManualStep('asset_generation')}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                  >
+                    ← Generate More Assets
+                  </button>
+                  
+                  <button
+                    onClick={handleProceedToEmailGeneration}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  >
+                    Continue to Email Generation →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 6: Email Generation */}
+            {effectiveStep === 'email_generation' && transcript && (
+              <div>
+                <div className="mb-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-indigo-800 text-sm">
+                    <span>📧</span>
+                    <span className="font-medium">Email generation powered by backend AI</span>
+                    <span className="ml-auto text-xs bg-indigo-100 px-2 py-1 rounded">
+                      Final Step
                     </span>
                   </div>
                 </div>
@@ -333,25 +481,25 @@ export default function Video2Promo() {
               </div>
             )}
 
-            {/* Step 5: Completion */}
+            {/* Step 7: Completion */}
             {effectiveStep === 'complete' && (
               <div className="bg-white rounded-lg shadow-sm p-6 text-center">
                 <div className="mb-6">
                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="text-green-600 text-2xl">✅</span>
+                    <span className="text-green-600 text-2xl">🎉</span>
                   </div>
                   <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                    Email Campaign Generated Successfully!
+                    Complete Marketing Campaign Generated!
                   </h2>
                   <p className="text-gray-600 mb-2">
-                    Your video has been transformed into a high-converting email series.
+                    Your video has been transformed into a comprehensive marketing campaign with assets and emails.
                   </p>
                   <div className="text-sm text-gray-500 bg-green-50 p-2 rounded">
-                    ⚡ Processed by Rodgers Digital • 🤖 AI-Powered Content • 🔒 Secure & Fast
+                    🎯 {generatedAssets.length} Assets Created • 📧 Email Series Generated • 🤖 AI-Powered • 🔒 Secure
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                   <button
                     onClick={() => window.location.href = '/saved-emails'}
                     className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
@@ -360,7 +508,18 @@ export default function Video2Promo() {
                   </button>
                   
                   <button
-                    onClick={reset}
+                    onClick={() => setManualStep('assets_complete')}
+                    className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 font-medium"
+                  >
+                    🎨 View Marketing Assets
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      reset();
+                      clearAssets();
+                      setManualStep(null);
+                    }}
                     className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
                   >
                     🎥 Process Another Video
@@ -369,22 +528,26 @@ export default function Video2Promo() {
 
                 {/* Success Stats */}
                 {debug && (
-                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
                     <div className="bg-gray-50 p-3 rounded">
                       <div className="font-semibold text-gray-800">User Tier</div>
-                      <div className="text-gray-600 capitalize">{debug.userTier}</div>
+                      <div className="text-gray-600 capitalize">{userTier}</div>
                     </div>
                     <div className="bg-gray-50 p-3 rounded">
                       <div className="font-semibold text-gray-800">Benefits Found</div>
-                      <div className="text-gray-600">{debug.benefitsCount}</div>
+                      <div className="text-gray-600">{extractedBenefits?.length || 0}</div>
                     </div>
                     <div className="bg-gray-50 p-3 rounded">
-                      <div className="font-semibold text-gray-800">Selected</div>
-                      <div className="text-gray-600">{debug.selectedCount}</div>
+                      <div className="font-semibold text-gray-800">Assets Generated</div>
+                      <div className="text-gray-600">{generatedAssets.length}</div>
                     </div>
                     <div className="bg-gray-50 p-3 rounded">
-                      <div className="font-semibold text-gray-800">Backend URL</div>
-                      <div className="text-gray-600 text-xs">{debug.backendUrl?.split('//')[1]}</div>
+                      <div className="font-semibold text-gray-800">Tokens Used</div>
+                      <div className="text-gray-600">{usageData?.monthly_tokens_used || 0}</div>
+                    </div>
+                    <div className="bg-gray-50 p-3 rounded">
+                      <div className="font-semibold text-gray-800">Backend</div>
+                      <div className="text-gray-600 text-xs">v4.0 API</div>
                     </div>
                   </div>
                 )}
@@ -395,11 +558,33 @@ export default function Video2Promo() {
             {effectiveStep !== 'input' && effectiveStep !== 'complete' && (
               <div className="mt-8 text-center">
                 <button
-                  onClick={reset}
+                  onClick={() => {
+                    reset();
+                    clearAssets();
+                    setManualStep(null);
+                  }}
                   className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
                 >
                   🔄 Start Over
                 </button>
+              </div>
+            )}
+
+            {/* Content Library Integration */}
+            {transcript && (
+              <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-medium text-blue-900">Save to Content Library</h3>
+                    <p className="text-sm text-blue-700">This transcript will be saved for future reuse</p>
+                  </div>
+                  <button
+                    onClick={() => window.location.href = '/content-library'}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                  >
+                    📚 View Library
+                  </button>
+                </div>
               </div>
             )}
           </>
@@ -407,7 +592,16 @@ export default function Video2Promo() {
 
         {/* Debug Panel - Always visible in development, or when there's an error */}
         <div className="mt-8">
-          <DebugPanel isVisible={import.meta.env.DEV || !!error} />
+          <DebugPanel 
+            isVisible={import.meta.env.DEV || !!error || !!assetError}
+            additionalInfo={{
+              assetsGenerated: generatedAssets.length,
+              isGeneratingAssets,
+              assetError,
+              userTier,
+              remainingTokens
+            }}
+          />
         </div>
 
         {/* Development Info Footer */}
@@ -418,13 +612,15 @@ export default function Video2Promo() {
               <div>
                 <strong>Current Step:</strong> {effectiveStep}<br/>
                 <strong>Loading:</strong> {loading ? 'Yes' : 'No'}<br/>
-                <strong>Has Error:</strong> {error ? 'Yes' : 'No'}<br/>
+                <strong>Generating Assets:</strong> {isGeneratingAssets ? 'Yes' : 'No'}<br/>
+                <strong>Has Error:</strong> {error || assetError ? 'Yes' : 'No'}<br/>
                 <strong>User:</strong> {user?.email || 'Not logged in'}
               </div>
               <div>
                 <strong>Backend URL:</strong> {import.meta.env.VITE_API_BASE_URL}<br/>
-                <strong>User Tier:</strong> {debug?.userTier || 'Unknown'}<br/>
-                <strong>Benefits Count:</strong> {debug?.benefitsCount || 0}<br/>
+                <strong>User Tier:</strong> {userTier}<br/>
+                <strong>Assets Count:</strong> {generatedAssets.length}<br/>
+                <strong>Remaining Tokens:</strong> {remainingTokens}<br/>
                 <strong>Session:</strong> {session ? 'Active' : 'None'}
               </div>
             </div>
