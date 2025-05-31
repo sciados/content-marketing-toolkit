@@ -4,11 +4,6 @@ import Card from '../Common/Card';
 import Button from '../Common/Button';
 import Badge from '../Common/Badge';
 
-// Add this right after the imports in ContentLibraryCard.jsx
-console.log('Card:', Card);
-console.log('Button:', Button);
-console.log('Badge:', Badge);
-
 export const ContentLibraryCard = ({
   item,
   onToggleFavorite,
@@ -63,11 +58,11 @@ export const ContentLibraryCard = ({
               {item.title || 'Untitled Content'}
             </h3>
             <div className="flex items-center space-x-2 mt-1">
-              <Badge variant="outline" size="sm">
+              <Badge colorScheme="blue" variant="outline">
                 {getItemTypeLabel(item.type)}
               </Badge>
               {item.is_favorited && (
-                <Badge variant="yellow" size="sm">
+                <Badge colorScheme="green" variant="subtle">
                   ⭐ Favorite
                 </Badge>
               )}
