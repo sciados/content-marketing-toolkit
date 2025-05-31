@@ -54,25 +54,7 @@ const FEATURE_CONFIG = {
     category: 'admin',
     estimatedLaunch: 'Q3 2025'
   },
-
-  // Content Library
-  'content-library': {
-    icon: '📚',
-    title: 'Content Library',
-    subtitle: 'Your content repository',
-    description: 'Personal library of extracted YouTube transcripts, scanned sales pages, and generated marketing assets with powerful search and organization.',
-    features: [
-      'Save video transcripts for reuse',
-      'Store scanned sales page data',
-      'Organize with tags and favorites',
-      'Powerful search functionality',
-      'Usage tracking and analytics',
-      'Export and sharing options'
-    ],
-    category: 'core',
-    estimatedLaunch: 'Q2 2025'
-  },
-
+  
   // AI Tools
   'ai-writer': {
     icon: '✍️',
@@ -359,7 +341,17 @@ export const ComingSoon = ({
                   </div>
                 </Link>
                 <Link 
-                  to="/analytics" 
+                  to="/tools/email-generator" 
+                  className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <span className="text-lg">📧</span>
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">Content Library</div>
+                    <div className="text-xs text-gray-500">Content Library</div>
+                  </div>
+                </Link>
+                <Link 
+                  to="/tools/content-library" 
                   className="flex items-center space-x-3 p-2 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   <span className="text-lg">📊</span>
