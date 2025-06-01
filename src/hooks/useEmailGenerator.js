@@ -1,12 +1,13 @@
-// src/hooks/useEmailGenerator.js - UPDATED for Backend Integration
+// src/hooks/useEmailGenerator.js - FIXED AUTH VERSION
 import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../services/supabase/supabaseClient'; // ADD THIS IMPORT
 
 // Backend API URL - Using your existing environment variable
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 /**
  * Custom hook for email scanning and generation with backend integration
- * Handles scanning sales pages and extracting benefits using the Python backend
+ * FIXED: Proper Supabase auth token handling
  */
 export const useEmailGenerator = ({ showToast, onScanComplete }) => {
   // Form inputs
@@ -36,15 +37,30 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
   const [isGeneratingEmails, setIsGeneratingEmails] = useState(false);
 
   /**
-   * Get auth headers for API calls
+   * FIXED: Get auth headers using proper Supabase session
    */
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('supabase.auth.token');
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': token ? `Bearer ${token}` : ''
-    };
-  };
+  const getAuthHeaders = useCallback(async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error || !session?.access_token) {
+        console.warn('No valid session for Email Generator API calls');
+        return {
+          'Content-Type': 'application/json'
+        };
+      }
+      
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      };
+    } catch (error) {
+      console.error('Failed to get auth headers:', error);
+      return {
+        'Content-Type': 'application/json'
+      };
+    }
+  }, []);
 
   // Check AI availability by testing backend connection
   useEffect(() => {
@@ -96,7 +112,7 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     });
   }, []);
   
-  // Handle scanning a sales page using backend API
+  // FIXED: Handle scanning a sales page using backend API with proper auth
   const handleScanPage = useCallback(async (e) => {
     if (e) e.preventDefault();
     
@@ -130,15 +146,23 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
       updateProgress('Connecting to backend...', 10);
       await new Promise(r => setTimeout(r, 500));
       
+      updateProgress('Getting auth token...', 20);
+      const headers = await getAuthHeaders(); // FIXED: Await the async function
+      
       updateProgress('Analyzing page structure...', 30);
       await new Promise(r => setTimeout(r, 500));
       
       updateProgress('Extracting content with AI...', 60);
       
-      // Call backend API for page scanning
+      console.log('🔧 Making scan request with headers:', { 
+        hasAuth: !!headers.Authorization,
+        url: url.trim()
+      });
+      
+      // FIXED: Call backend API for page scanning with proper auth
       const response = await fetch(`${API_BASE}/api/email-generator/scan-page`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers, // Now contains proper auth token
         body: JSON.stringify({
           url: url.trim(),
           keywords: keywords.trim(),
@@ -147,7 +171,7 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP ${response.status}: Failed to scan page`);
       }
 
@@ -205,9 +229,9 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     } finally {
       setIsScanning(false);
     }
-  }, [url, keywords, industry, showToast, onScanComplete]);
+  }, [url, keywords, industry, showToast, onScanComplete, getAuthHeaders]); // Added getAuthHeaders to dependencies
 
-  // Generate emails using backend API
+  // FIXED: Generate emails using backend API with proper auth
   const generateEmails = useCallback(async () => {
     if (!extractedBenefits.length || !selectedBenefits.some(Boolean)) {
       showToast('Please select at least one benefit to generate emails', 'error');
@@ -217,9 +241,16 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     setIsGeneratingEmails(true);
     
     try {
+      const headers = await getAuthHeaders(); // FIXED: Await the async function
+      
+      console.log('🔧 Making generate request with headers:', { 
+        hasAuth: !!headers.Authorization,
+        benefitsCount: extractedBenefits.length
+      });
+      
       const response = await fetch(`${API_BASE}/api/email-generator/generate`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers, // Now contains proper auth token
         body: JSON.stringify({
           benefits: extractedBenefits,
           selectedBenefits,
@@ -231,7 +262,7 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `HTTP ${response.status}: Email generation failed`);
       }
 
@@ -260,7 +291,7 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     } finally {
       setIsGeneratingEmails(false);
     }
-  }, [extractedBenefits, selectedBenefits, websiteData, tone, industry, affiliateLink, showToast]);
+  }, [extractedBenefits, selectedBenefits, websiteData, tone, industry, affiliateLink, showToast, getAuthHeaders]); // Added getAuthHeaders to dependencies
 
   // Clear all data
   const clearData = useCallback(() => {
