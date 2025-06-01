@@ -1,16 +1,18 @@
-// src/hooks/useContentLibrary.js - REWRITTEN for Real API Integration
+// src/hooks/useContentLibrary.js - FIXED VERSION with proper React Router navigation
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom'; // ADD THIS IMPORT
 import { supabase } from '../services/supabase/supabaseClient';
 
 // Backend API URL
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://aiworkers.onrender.com';
 
 export const useContentLibrary = () => {
+  const navigate = useNavigate(); // ADD THIS HOOK
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState({
-    content_type: 'all', // Updated to match your table: 'all', 'video_transcript', 'scanned_page', 'generated_asset'
+    content_type: 'all',
     favorited: false,
     tags: [],
     sortBy: 'created_desc'
@@ -148,7 +150,7 @@ export const useContentLibrary = () => {
 
       const headers = await getAuthHeaders();
       
-      // Build query parameters (updated for your table structure)
+      // Build query parameters
       const params = new URLSearchParams({
         type: filters.content_type || 'all',
         search: searchTerm || '',
@@ -258,9 +260,11 @@ export const useContentLibrary = () => {
     }
   }, [backendAvailable, getAuthHeaders]);
 
-  // Use content item (track usage and redirect)
+  // FIXED: Use content item (track usage and redirect) - NO MORE LOGOUT!
   const useContentItem = useCallback(async (item) => {
     try {
+      console.log('🔧 Using content item:', item.title, 'Type:', item.content_type);
+      
       // Optimistic update for usage count
       setItems(prev => prev.map(prevItem => 
         prevItem.id === item.id 
@@ -272,46 +276,57 @@ export const useContentLibrary = () => {
           : prevItem
       ));
 
+      // Track usage in backend (optional)
       if (backendAvailable) {
-        const headers = await getAuthHeaders();
-        const response = await fetch(`${API_BASE}/api/content-library/item/${item.id}/use`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            content_type: item.content_type
-          })
-        });
+        try {
+          const headers = await getAuthHeaders();
+          const response = await fetch(`${API_BASE}/api/content-library/item/${item.id}/use`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              content_type: item.content_type
+            })
+          });
 
-        if (!response.ok) {
-          console.warn('Failed to track usage on backend, but continuing with action');
+          if (!response.ok) {
+            console.warn('Failed to track usage on backend, but continuing with action');
+          }
+        } catch (trackingError) {
+          console.warn('Usage tracking failed:', trackingError);
         }
       }
 
-      // Redirect user to appropriate tool based on content type
+      // FIXED: Use React Router navigation instead of window.location
+      // This prevents the page reload that was logging you out!
       if (item.content_type === 'video_transcript') {
-        // For video transcripts, go to Video2Promo
-        window.location.href = '/tools/video2promo';
+        console.log('🔧 Navigating to Video2Promo with React Router');
+        navigate('/tools/video2promo');
       } else if (item.content_type === 'scanned_page') {
-        // For scanned pages, go to Email Generator
-        window.location.href = '/tools/email-generator';
+        console.log('🔧 Navigating to Email Generator with React Router');
+        navigate('/tools/email-generator');
       } else if (item.content_type === 'generated_asset') {
-        // For generated assets, could copy to clipboard or download
-        console.log('Using generated asset:', item);
+        console.log('🔧 Using generated asset:', item);
         
         // Try to copy content to clipboard if available in metadata
         if (navigator.clipboard && item.metadata?.content) {
           try {
             await navigator.clipboard.writeText(item.metadata.content);
-            console.log('Content copied to clipboard');
+            console.log('✅ Content copied to clipboard');
+            // Could show a toast notification here
           } catch (clipboardError) {
             console.warn('Failed to copy to clipboard:', clipboardError);
           }
         }
+        
+        // For generated assets, might want to open in a modal or copy to clipboard
+        // For now, navigate to email generator as a fallback
+        navigate('/tools/email-generator');
       }
     } catch (error) {
-      console.error('Failed to use content item:', error);
+      console.error('❌ Failed to use content item:', error);
+      setError('Failed to use content item');
     }
-  }, [backendAvailable, getAuthHeaders]);
+  }, [backendAvailable, getAuthHeaders, navigate]); // Added navigate to dependencies
 
   // Delete item
   const deleteItem = useCallback(async (itemId) => {
@@ -361,7 +376,7 @@ export const useContentLibrary = () => {
     }
   }, [items, backendAvailable, getAuthHeaders]);
 
-  // Add item to library
+  // Rest of the hook remains the same...
   const addToLibrary = useCallback(async (contentData) => {
     try {
       if (!backendAvailable) {
@@ -372,7 +387,6 @@ export const useContentLibrary = () => {
 
       const headers = await getAuthHeaders();
       
-      // Map to your table structure
       const mappedData = {
         content_type: contentData.type || contentData.content_type,
         title: contentData.title,
@@ -415,7 +429,7 @@ export const useContentLibrary = () => {
     }
   }, [backendAvailable, getAuthHeaders]);
 
-  // Helper functions (updated for your table structure)
+  // Helper functions
   const getItemsByType = useCallback((contentType) => {
     return items.filter(item => item.content_type === contentType);
   }, [items]);
@@ -443,12 +457,10 @@ export const useContentLibrary = () => {
       .slice(0, count);
   }, [items]);
 
-  // Clear error
   const clearError = useCallback(() => {
     setError(null);
   }, []);
 
-  // Refresh/refetch
   const refetch = useCallback(() => {
     fetchItems();
   }, [fetchItems]);
@@ -466,7 +478,7 @@ export const useContentLibrary = () => {
     setFilters,
     setSearchTerm,
     toggleFavorite,
-    useContentItem,
+    useContentItem, // This is now FIXED!
     deleteItem,
     addToLibrary,
     refetch,
@@ -478,12 +490,12 @@ export const useContentLibrary = () => {
     isEmpty: items.length === 0,
     hasError: !!error,
     
-    // Helper functions (updated for your table structure)
+    // Helper functions
     getItemsByType,
     getFavoriteItems,
     getRecentItems,
     getMostUsedItems,
-    getRecentlyUsedItems, // New: get recently used items
+    getRecentlyUsedItems,
     
     // Content type counts
     videoTranscriptCount: items.filter(item => item.content_type === 'video_transcript').length,

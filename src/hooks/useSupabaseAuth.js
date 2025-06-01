@@ -1,13 +1,13 @@
-// src/hooks/useSupabaseAuth.js
+// src/hooks/useSupabase.js
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase/supabaseClient';
 
-console.log('🔧 useSupabaseAuth.js: Loading...');
+console.log('🔧 useSupabase.js: Loading...');
 /**
  * Custom hook for Supabase authentication
  * Handles user authentication state and provides auth methods
  */
-export const useSupabaseAuth = () => {
+export const useSupabase = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

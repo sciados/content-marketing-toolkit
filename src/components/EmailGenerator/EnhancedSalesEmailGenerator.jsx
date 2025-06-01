@@ -1,6 +1,6 @@
-// src/components/EmailGenerator/EnhancedSalesEmailGenerator - Cleaned Version
+// src/components/EmailGenerator/EnhancedSalesEmailGenerator - FIXED VERSION
 import React, { useState } from 'react';
-import { useSupabaseAuth } from '../../hooks/useSupabaseAuth';
+import useSupabase from '../../hooks/useSupabase'; // CHANGED: Use the provider-based hook
 import { useEmailGenerator } from '../../hooks/useEmailGenerator';
 import { useEmailSeries } from '../../hooks/useEmailSeries';
 import { useSavedEmails } from '../../hooks/useSavedEmails';
@@ -13,12 +13,12 @@ import '../../styles/salesEmailGenerator.css';
 
 /**
  * Enhanced Sales Email Generator with Supabase integration
- * Focused on core email generation workflow: Scan → Benefits → Preview
+ * FIXED: Using consistent auth system (SupabaseProvider)
  */
 const EnhancedSalesEmailGenerator = () => {
 
-  // Auth state using custom hook
-  const { user } = useSupabaseAuth();
+  // FIXED: Use the provider-based auth hook instead of standalone
+  const { user } = useSupabase(); // This connects to your SupabaseProvider
   
   // UI state - removed 'saved' and 'analytics' views
   const [currentView, setCurrentView] = useState('input'); // 'input', 'benefits', 'preview'

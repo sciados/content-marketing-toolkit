@@ -1,6 +1,6 @@
 // src/components/Layout/AdminLayout.jsx
 import React, { useState } from 'react';
-import { useSupabaseAuth } from '../../hooks/useSupabaseAuth';
+import { useSupabase } from '../../hooks/useSupabase';
 
 const ADMIN_NAV_ITEMS = [
   {
@@ -71,7 +71,7 @@ export const AdminLayout = ({
   subtitle = '',
   className = ''
 }) => {
-  const { user, logout } = useSupabaseAuth();
+  const { user, logout } = useSupabase();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const currentNavItem = ADMIN_NAV_ITEMS.find(item => item.id === currentPage);
