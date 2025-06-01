@@ -124,7 +124,7 @@ class ClaudeAIService {
       const headers = await this.getAuthHeaders();
 
       // Make API call to YOUR backend instead of Anthropic directly
-      const response = await fetch(`${this.backendUrl}/api/ai/generate-content`, {
+      const response = await fetch(`${this.backendUrl}/api/email-generator/generate`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -132,7 +132,9 @@ class ClaudeAIService {
           model: modelConfig.model,
           maxTokens: maxTokens,
           temperature: temperature,
-          tier: tier
+          tier: tier,
+          isUsingAI: true, // ADDED: Ensure AI flag is sent
+          aiAvailable: true // ADDED: Ensure AI availability is sent
         })
       });
 
@@ -217,7 +219,7 @@ class ClaudeAIService {
       const headers = await this.getAuthHeaders();
 
       // Call backend email generation endpoint
-      const response = await fetch(`${this.backendUrl}/api/ai/generate-focused-email`, {
+      const response = await fetch(`${this.backendUrl}/api/email-generator/generate`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -236,7 +238,9 @@ class ClaudeAIService {
           wordLimit,
           subjectLimit,
           structure,
-          model: modelConfig.model
+          model: modelConfig.model,
+          isUsingAI: true, // ADDED: Ensure AI flag is sent
+          aiAvailable: true // ADDED: Ensure AI availability is sent
         })
       });
 
@@ -460,7 +464,7 @@ class ClaudeAIService {
    */
   async isAvailable() {
     try {
-      const response = await fetch(`${this.backendUrl}/api/ai/health`, {
+      const response = await fetch(`${this.backendUrl}/`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' }
       });
