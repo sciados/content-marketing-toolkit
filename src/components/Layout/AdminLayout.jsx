@@ -1,6 +1,6 @@
 // src/components/Layout/AdminLayout.jsx
 import React, { useState } from 'react';
-import { useSupabase } from '../../hooks/useSupabase';
+import useSupabase from '../../hooks/useSupabase';
 
 const ADMIN_NAV_ITEMS = [
   {
