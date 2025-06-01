@@ -1,6 +1,6 @@
 // src/hooks/useEmailGenerator.js - FIXED AUTH VERSION
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../services/supabase/supabaseClient'; // ADD THIS IMPORT
+// import { supabase } from '../services/supabase/supabaseClient'; // ADD THIS IMPORT
 
 // Backend API URL - Using your existing environment variable
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
@@ -39,48 +39,34 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
   /**
    * FIXED: Get auth headers using proper Supabase session
    */
+  // Replace your getAuthHeaders function with this simple version:
 const getAuthHeaders = useCallback(async () => {
   try {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    
-    if (error || !session?.access_token) {
-      console.warn('No valid session from supabase.auth.getSession(), trying localStorage fallback');
-      
-      // FALLBACK: Read directly from localStorage
-      const storedAuth = localStorage.getItem('sb-gjqpyfrdxvecxwfsmory-auth-token');
-      if (storedAuth) {
-        try {
-          const authData = JSON.parse(storedAuth);
-          if (authData.access_token) {
-            console.log('✅ Using auth token from localStorage fallback');
-            return {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${authData.access_token}`
-            };
-          }
-        } catch (parseError) {
-          console.error('Failed to parse stored auth data:', parseError);
-        }
+    // Simple localStorage read - we know this works from our test
+    const storedAuth = localStorage.getItem('sb-gjqpyfrdxvecxwfsmory-auth-token');
+    if (storedAuth) {
+      const authData = JSON.parse(storedAuth);
+      if (authData.access_token) {
+        return {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authData.access_token}`
+        };
       }
-      
-      console.warn('No valid auth token found anywhere');
-      return {
-        'Content-Type': 'application/json'
-      };
     }
     
-    console.log('✅ Using auth token from supabase session');
+    // No token found
     return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session.access_token}`
+      'Content-Type': 'application/json'
     };
+  // eslint-disable-next-line no-unused-vars
   } catch (error) {
-    console.error('Failed to get auth headers:', error);
+    // Fallback on any error
     return {
       'Content-Type': 'application/json'
     };
   }
 }, []);
+
 
   // Check AI availability by testing backend connection
   useEffect(() => {
