@@ -9,6 +9,8 @@ const SupabaseProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  console.log('🔧 App.jsx: Starting to load...');
+
   // Initialize auth state
   useEffect(() => {
     console.log('🔧 SupabaseProvider: useEffect running...');
@@ -50,6 +52,8 @@ const SupabaseProvider = ({ children }) => {
     };
     
     checkSession();
+    
+    console.log('🔧 App.jsx: About to render SupabaseProvider');
     
     // Set up auth state listener
     console.log('🔧 SupabaseProvider: Setting up auth listener...');
@@ -259,7 +263,7 @@ const SupabaseProvider = ({ children }) => {
     <SupabaseContext.Provider value={value}>
       {children}
     </SupabaseContext.Provider>
-  );
+  );  
 };
 
 export default SupabaseProvider;

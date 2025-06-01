@@ -11,6 +11,8 @@ import { setupPerformanceMonitoring } from './utils/performanceUtils';
 // Check if we're in development mode
 const isDevelopment = import.meta.env.DEV;
 
+console.log('🔧 App.jsx: Starting to load...');
+
 // Emergency reset button
 const EmergencyReset = () => (
   <div style={{ position: 'fixed', top: '10px', right: '10px', zIndex: 9999 }}>
@@ -52,6 +54,8 @@ const App = () => {
     }
   }, []);
 
+  console.log('🔧 App.jsx: About to render SupabaseProvider');
+  
   return (
     <>
       {/* Show emergency reset only in development */}
