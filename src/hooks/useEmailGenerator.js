@@ -244,6 +244,14 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     
     try {
       const headers = await getAuthHeaders(); // FIXED: Await the async function
+
+      // Add this right after: const headers = await getAuthHeaders();
+console.log('🔧 Debug Auth Token:', {
+  hasAuthHeader: !!headers.Authorization,
+  tokenLength: headers.Authorization?.length,
+  tokenStart: headers.Authorization?.substring(0, 50) + '...',
+  contentType: headers['Content-Type']
+});
       
       // FIXED: Include AI flags in request data
       const requestData = {
