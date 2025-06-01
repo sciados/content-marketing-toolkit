@@ -195,11 +195,12 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
       // Validate results
       if (!Array.isArray(benefits) || benefits.length === 0) {
         console.warn("No benefits found. Using fallback.");
-        setExtractedBenefits([
+        const fallbackBenefits = [
           "Primary benefit not clearly identified", 
           "Try scanning with more specific keywords", 
           "Check if the page contains clear value propositions"
-        ]);
+        ];
+        setExtractedBenefits(fallbackBenefits);
       }
       
       updateProgress('Scan completed!', 100);
@@ -221,11 +222,12 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
       showToast(`Failed to scan the page: ${error.message}`, 'error');
       
       // Set fallback benefits
-      setExtractedBenefits([
+      const fallbackBenefits = [
         "Could not extract benefits from this page",
         "Try a different URL or check if the page is accessible",
         "Manual benefit entry may be required"
-      ]);
+      ];
+      setExtractedBenefits(fallbackBenefits);
     } finally {
       setIsScanning(false);
     }
@@ -243,22 +245,29 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     try {
       const headers = await getAuthHeaders(); // FIXED: Await the async function
       
+      // FIXED: Include AI flags in request data
+      const requestData = {
+        benefits: extractedBenefits,
+        selectedBenefits,
+        websiteData,
+        tone,
+        industry,
+        affiliateLink: affiliateLink.trim(),
+        isUsingAI, // ADDED: Send AI generation flag
+        aiAvailable // ADDED: Send AI availability flag
+      };
+      
       console.log('🔧 Making generate request with headers:', { 
         hasAuth: !!headers.Authorization,
         benefitsCount: extractedBenefits.length
       });
       
+      console.log('🔧 Email generation request data:', requestData);
+      
       const response = await fetch(`${API_BASE}/api/email-generator/generate`, {
         method: 'POST',
         headers, // Now contains proper auth token
-        body: JSON.stringify({
-          benefits: extractedBenefits,
-          selectedBenefits,
-          websiteData,
-          tone,
-          industry,
-          affiliateLink: affiliateLink.trim()
-        })
+        body: JSON.stringify(requestData) // FIXED: Send complete request data including AI flags
       });
 
       if (!response.ok) {
@@ -291,7 +300,7 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     } finally {
       setIsGeneratingEmails(false);
     }
-  }, [extractedBenefits, selectedBenefits, websiteData, tone, industry, affiliateLink, showToast, getAuthHeaders]); // Added getAuthHeaders to dependencies
+  }, [extractedBenefits, selectedBenefits, websiteData, tone, industry, affiliateLink, showToast, getAuthHeaders, isUsingAI, aiAvailable]); // FIXED: Added missing dependencies
 
   // Clear all data
   const clearData = useCallback(() => {
