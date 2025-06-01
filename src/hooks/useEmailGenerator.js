@@ -39,28 +39,48 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
   /**
    * FIXED: Get auth headers using proper Supabase session
    */
-  const getAuthHeaders = useCallback(async () => {
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession();
+const getAuthHeaders = useCallback(async () => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error || !session?.access_token) {
+      console.warn('No valid session from supabase.auth.getSession(), trying localStorage fallback');
       
-      if (error || !session?.access_token) {
-        console.warn('No valid session for Email Generator API calls');
-        return {
-          'Content-Type': 'application/json'
-        };
+      // FALLBACK: Read directly from localStorage
+      const storedAuth = localStorage.getItem('sb-gjqpyfrdxvecxwfsmory-auth-token');
+      if (storedAuth) {
+        try {
+          const authData = JSON.parse(storedAuth);
+          if (authData.access_token) {
+            console.log('✅ Using auth token from localStorage fallback');
+            return {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authData.access_token}`
+            };
+          }
+        } catch (parseError) {
+          console.error('Failed to parse stored auth data:', parseError);
+        }
       }
       
-      return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`
-      };
-    } catch (error) {
-      console.error('Failed to get auth headers:', error);
+      console.warn('No valid auth token found anywhere');
       return {
         'Content-Type': 'application/json'
       };
     }
-  }, []);
+    
+    console.log('✅ Using auth token from supabase session');
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`
+    };
+  } catch (error) {
+    console.error('Failed to get auth headers:', error);
+    return {
+      'Content-Type': 'application/json'
+    };
+  }
+}, []);
 
   // Check AI availability by testing backend connection
   useEffect(() => {
