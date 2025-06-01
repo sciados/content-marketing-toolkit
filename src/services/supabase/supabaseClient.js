@@ -1,6 +1,8 @@
 // src/services/supabase/supabaseClient.js
 import { createClient } from '@supabase/supabase-js';
 
+console.log('🔧 supabaseClient.js: Loading...');
+
 // Initialize Supabase client with environment variables
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;

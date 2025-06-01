@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabase/supabaseClient';
 
+console.log('🔧 useSupabaseAuth.js: Loading...');
 /**
  * Custom hook for Supabase authentication
  * Handles user authentication state and provides auth methods

@@ -1,7 +1,7 @@
 // src/hooks/useSupabase.js
 import { useContext } from 'react';
 import SupabaseContext from '../context/SupabaseContext';
-
+console.log('🔧 useSupabase.js: Loading...');
 /**
  * Custom hook for using Supabase authentication and client
  * @returns {Object} Supabase auth state and methods

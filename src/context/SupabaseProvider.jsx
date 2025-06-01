@@ -9,7 +9,7 @@ const SupabaseProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  console.log('🔧 App.jsx: Starting to load...');
+console.log('🔧 SupabaseProvider.jsx: Loading...');
 
   // Initialize auth state
   useEffect(() => {
