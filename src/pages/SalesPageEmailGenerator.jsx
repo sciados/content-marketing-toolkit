@@ -4,6 +4,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import EnhancedSalesEmailGenerator from '../components/EmailGenerator/EnhancedSalesEmailGenerator';
 import useSupabase from '../hooks/useSupabase';
 import Loader from '../components/Common/Loader';
+// Add these imports at the top of your file
+import RenderAuthDiagnostic from '../components/Debug/RenderAuthDiagnostic';
+import AuthDebugComponent from '../components/Debug/AuthDebugComponent';
 
 /**
  * Container component for the Email Generator tool
@@ -51,6 +54,9 @@ const SalesPageEmailGenerator = () => {
   
   return (
     <div className="container mx-auto px-4 py-8">
+      <RenderAuthDiagnostic />
+      <AuthDebugComponent />
+      
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-800">AI Sales Email Generator</h1>
         <p className="text-gray-600">

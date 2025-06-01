@@ -1,13 +1,12 @@
-// src/hooks/useEmailGenerator.js - FIXED AUTH VERSION
+// src/hooks/useEmailGenerator.js - ENHANCED DEBUG VERSION
 import { useState, useEffect, useCallback } from 'react';
-// import { supabase } from '../services/supabase/supabaseClient'; // ADD THIS IMPORT
 
 // Backend API URL - Using your existing environment variable
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 /**
  * Custom hook for email scanning and generation with backend integration
- * FIXED: Proper Supabase auth token handling
+ * ENHANCED DEBUG VERSION - More detailed logging for auth troubleshooting
  */
 export const useEmailGenerator = ({ showToast, onScanComplete }) => {
   // Form inputs
@@ -18,8 +17,8 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
   const [industry, setIndustry] = useState('general');
   
   // AI state
-  const [isUsingAI, setIsUsingAI] = useState(true); // Default to true since backend handles AI
-  const [aiAvailable, setAiAvailable] = useState(true); // Backend handles AI availability
+  const [isUsingAI, setIsUsingAI] = useState(true);
+  const [aiAvailable, setAiAvailable] = useState(true);
   
   // Scanning state
   const [isScanning, setIsScanning] = useState(false);
@@ -37,36 +36,105 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
   const [isGeneratingEmails, setIsGeneratingEmails] = useState(false);
 
   /**
-   * FIXED: Get auth headers using proper Supabase session
+   * ENHANCED DEBUG: Get auth headers with Vercel→Render CORS fixes
    */
-  // Replace your getAuthHeaders function with this simple version:
-const getAuthHeaders = useCallback(async () => {
-  try {
-    // Simple localStorage read - we know this works from our test
-    const storedAuth = localStorage.getItem('sb-gjqpyfrdxvecxwfsmory-auth-token');
-    if (storedAuth) {
-      const authData = JSON.parse(storedAuth);
-      if (authData.access_token) {
-        return {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authData.access_token}`
-        };
-      }
-    }
+  const getAuthHeaders = useCallback(async () => {
+    console.log('🔧 getAuthHeaders: Starting auth header retrieval (Vercel→Render)...');
     
-    // No token found
-    return {
-      'Content-Type': 'application/json'
-    };
-  // eslint-disable-next-line no-unused-vars
-  } catch (error) {
-    // Fallback on any error
-    return {
-      'Content-Type': 'application/json'
-    };
-  }
-}, []);
+    try {
+      // Check localStorage directly
+      const storedAuth = localStorage.getItem('sb-gjqpyfrdxvecxwfsmory-auth-token');
+      console.log('🔧 getAuthHeaders: Raw localStorage data exists:', !!storedAuth);
+      console.log('🔧 getAuthHeaders: Raw data length:', storedAuth?.length || 0);
+      
+      if (storedAuth) {
+        const authData = JSON.parse(storedAuth);
+        console.log('🔧 getAuthHeaders: Parsed auth data keys:', Object.keys(authData));
+        console.log('🔧 getAuthHeaders: Has access_token:', !!authData.access_token);
+        console.log('🔧 getAuthHeaders: Token length:', authData.access_token?.length || 0);
+        console.log('🔧 getAuthHeaders: Token preview:', authData.access_token?.substring(0, 50) + '...');
+        
+        if (authData.access_token) {
+          // VERCEL→RENDER FIX: Enhanced headers for cross-origin requests
+          const headers = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${authData.access_token}`,
+            // Add origin header for better CORS handling
+            'Origin': window.location.origin
+          };
+          
+          console.log('🔧 getAuthHeaders: Vercel→Render headers:', {
+            hasContentType: !!headers['Content-Type'],
+            hasAccept: !!headers['Accept'],
+            hasAuthorization: !!headers['Authorization'],
+            hasOrigin: !!headers['Origin'],
+            origin: headers['Origin'],
+            authHeaderLength: headers['Authorization']?.length,
+            authHeaderPreview: headers['Authorization']?.substring(0, 70) + '...'
+          });
+          
+          return headers;
+        }
+      }
+      
+      console.log('❌ getAuthHeaders: No valid token found, returning basic headers');
+      return {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Origin': window.location.origin
+      };
+    } catch (error) {
+      console.error('❌ getAuthHeaders: Error processing auth data:', error);
+      return {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Origin': window.location.origin
+      };
+    }
+  }, []);
 
+        // Enhanced manual auth test function for Render backend
+  const testAuthManually = useCallback(async () => {
+    console.log('\n🧪 === MANUAL AUTH TEST START (Vercel→Render) ===');
+    
+    try {
+      const headers = await getAuthHeaders();
+      console.log('🧪 Manual test headers for Render backend:', headers);
+      console.log('🧪 API_BASE URL:', API_BASE);
+      
+      // Test with a simple endpoint first
+      const testResponse = await fetch(`${API_BASE}/api/usage/limits`, {
+        method: 'GET',
+        headers: headers,
+        mode: 'cors',
+        credentials: 'omit'
+      });
+      
+      console.log('🧪 Manual test response from Render:', {
+        status: testResponse.status,
+        statusText: testResponse.statusText,
+        ok: testResponse.ok,
+        url: testResponse.url,
+        type: testResponse.type,
+        redirected: testResponse.redirected
+      });
+      
+      // Log response headers
+      console.log('🧪 Response headers from Render:');
+      for (let [key, value] of testResponse.headers.entries()) {
+        console.log(`   ${key}: ${value}`);
+      }
+      
+      const responseText = await testResponse.text();
+      console.log('🧪 Manual test response body:', responseText);
+      
+      return testResponse.ok;
+    } catch (error) {
+      console.error('🧪 Manual test failed (Vercel→Render):', error);
+      return false;
+    }
+  }, [getAuthHeaders]);
 
   // Check AI availability by testing backend connection
   useEffect(() => {
@@ -118,7 +186,7 @@ const getAuthHeaders = useCallback(async () => {
     });
   }, []);
   
-  // FIXED: Handle scanning a sales page using backend API with proper auth
+  // ENHANCED DEBUG: Handle scanning a sales page
   const handleScanPage = useCallback(async (e) => {
     if (e) e.preventDefault();
     
@@ -143,6 +211,8 @@ const getAuthHeaders = useCallback(async () => {
     setWebsiteData(null);
     
     try {
+      console.log('\n🚀 === SCAN PAGE REQUEST START ===');
+      
       // Update progress in stages
       const updateProgress = (stage, progress) => {
         setScanStage(stage);
@@ -153,35 +223,61 @@ const getAuthHeaders = useCallback(async () => {
       await new Promise(r => setTimeout(r, 500));
       
       updateProgress('Getting auth token...', 20);
-      const headers = await getAuthHeaders(); // FIXED: Await the async function
+      const headers = await getAuthHeaders();
+      
+      // Detailed request logging
+      const requestData = {
+        url: url.trim(),
+        keywords: keywords.trim(),
+        industry
+      };
+      
+      console.log('🚀 SCAN: Request details:', {
+        endpoint: `${API_BASE}/api/email-generator/scan-page`,
+        method: 'POST',
+        headers: headers,
+        body: requestData
+      });
       
       updateProgress('Analyzing page structure...', 30);
       await new Promise(r => setTimeout(r, 500));
       
       updateProgress('Extracting content with AI...', 60);
       
-      console.log('🔧 Making scan request with headers:', { 
-        hasAuth: !!headers.Authorization,
-        url: url.trim()
-      });
-      
-      // FIXED: Call backend API for page scanning with proper auth
+      // Make the request with Vercel→Render CORS handling
+      console.log('🚀 SCAN: Making fetch request (Vercel→Render)...');
       const response = await fetch(`${API_BASE}/api/email-generator/scan-page`, {
         method: 'POST',
-        headers, // Now contains proper auth token
-        body: JSON.stringify({
-          url: url.trim(),
-          keywords: keywords.trim(),
-          industry
-        })
+        headers: headers,
+        body: JSON.stringify(requestData),
+        // Add CORS mode for cross-origin requests
+        mode: 'cors',
+        credentials: 'omit' // Don't send cookies, rely on Authorization header
+      });
+
+      console.log('🚀 SCAN: Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorText = await response.text();
+        console.error('🚀 SCAN: Error response body:', errorText);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+        
         throw new Error(errorData.error || `HTTP ${response.status}: Failed to scan page`);
       }
 
       const result = await response.json();
+      console.log('🚀 SCAN: Success response:', result);
 
       if (!result.success) {
         throw new Error(result.error || 'Page scanning failed');
@@ -212,7 +308,7 @@ const getAuthHeaders = useCallback(async () => {
       updateProgress('Scan completed!', 100);
       showToast(result.message || 'Scan completed successfully!', 'success');
       
-      console.log('✅ Page scan successful:', {
+      console.log('✅ SCAN: Page scan successful:', {
         benefits: benefits.length,
         features: features.length,
         websiteData: websiteInfo
@@ -222,7 +318,7 @@ const getAuthHeaders = useCallback(async () => {
         onScanComplete();
       }
     } catch (error) {
-      console.error('❌ Page scanning error:', error);
+      console.error('❌ SCAN: Page scanning error:', error);
       setScanStage('Scan failed');
       setScanProgress(0);
       showToast(`Failed to scan the page: ${error.message}`, 'error');
@@ -237,9 +333,9 @@ const getAuthHeaders = useCallback(async () => {
     } finally {
       setIsScanning(false);
     }
-  }, [url, keywords, industry, showToast, onScanComplete, getAuthHeaders]); // Added getAuthHeaders to dependencies
+  }, [url, keywords, industry, showToast, onScanComplete, getAuthHeaders]);
 
-  // FIXED: Generate emails using backend API with proper auth
+  // ENHANCED DEBUG: Generate emails with extensive logging
   const generateEmails = useCallback(async () => {
     if (!extractedBenefits.length || !selectedBenefits.some(Boolean)) {
       showToast('Please select at least one benefit to generate emails', 'error');
@@ -249,17 +345,10 @@ const getAuthHeaders = useCallback(async () => {
     setIsGeneratingEmails(true);
     
     try {
-      const headers = await getAuthHeaders(); // FIXED: Await the async function
-
-      // Add this right after: const headers = await getAuthHeaders();
-console.log('🔧 Debug Auth Token:', {
-  hasAuthHeader: !!headers.Authorization,
-  tokenLength: headers.Authorization?.length,
-  tokenStart: headers.Authorization?.substring(0, 50) + '...',
-  contentType: headers['Content-Type']
-});
+      console.log('\n📧 === EMAIL GENERATION REQUEST START ===');
       
-      // FIXED: Include AI flags in request data
+      const headers = await getAuthHeaders();
+      
       const requestData = {
         benefits: extractedBenefits,
         selectedBenefits,
@@ -267,29 +356,50 @@ console.log('🔧 Debug Auth Token:', {
         tone,
         industry,
         affiliateLink: affiliateLink.trim(),
-        isUsingAI, // ADDED: Send AI generation flag
-        aiAvailable // ADDED: Send AI availability flag
+        isUsingAI,
+        aiAvailable
       };
       
-      console.log('🔧 Making generate request with headers:', { 
-        hasAuth: !!headers.Authorization,
-        benefitsCount: extractedBenefits.length
+      console.log('📧 EMAIL: Request details:', {
+        endpoint: `${API_BASE}/api/email-generator/generate`,
+        method: 'POST',
+        headers: headers,
+        body: requestData
       });
       
-      console.log('🔧 Email generation request data:', requestData);
-      
+      console.log('📧 EMAIL: Making fetch request (Vercel→Render)...');
       const response = await fetch(`${API_BASE}/api/email-generator/generate`, {
         method: 'POST',
-        headers, // Now contains proper auth token
-        body: JSON.stringify(requestData) // FIXED: Send complete request data including AI flags
+        headers: headers,
+        body: JSON.stringify(requestData),
+        // Add CORS mode for cross-origin requests
+        mode: 'cors',
+        credentials: 'omit' // Don't send cookies, rely on Authorization header
+      });
+
+      console.log('📧 EMAIL: Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries())
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        const errorText = await response.text();
+        console.error('📧 EMAIL: Error response body:', errorText);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
+        
         throw new Error(errorData.error || `HTTP ${response.status}: Email generation failed`);
       }
 
       const result = await response.json();
+      console.log('📧 EMAIL: Success response:', result);
 
       if (!result.success) {
         throw new Error(result.error || 'Email generation failed');
@@ -300,7 +410,7 @@ console.log('🔧 Debug Auth Token:', {
 
       showToast(result.message || `Generated ${emails.length} emails successfully!`, 'success');
       
-      console.log('✅ Email generation successful:', {
+      console.log('✅ EMAIL: Email generation successful:', {
         emailsGenerated: emails.length,
         totalTokens: result.total_tokens
       });
@@ -308,13 +418,13 @@ console.log('🔧 Debug Auth Token:', {
       return emails;
 
     } catch (error) {
-      console.error('❌ Email generation error:', error);
+      console.error('❌ EMAIL: Email generation error:', error);
       showToast(`Failed to generate emails: ${error.message}`, 'error');
       throw error;
     } finally {
       setIsGeneratingEmails(false);
     }
-  }, [extractedBenefits, selectedBenefits, websiteData, tone, industry, affiliateLink, showToast, getAuthHeaders, isUsingAI, aiAvailable]); // FIXED: Added missing dependencies
+  }, [extractedBenefits, selectedBenefits, websiteData, tone, industry, affiliateLink, showToast, getAuthHeaders, isUsingAI, aiAvailable]);
 
   // Clear all data
   const clearData = useCallback(() => {
@@ -364,6 +474,10 @@ console.log('🔧 Debug Auth Token:', {
     handleScanPage,
     generateEmails,
     clearData,
-    getSelectedBenefits
+    getSelectedBenefits,
+    
+    // DEBUG METHODS
+    testAuthManually,
+    getAuthHeaders
   };
 };
