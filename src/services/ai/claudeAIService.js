@@ -1,20 +1,22 @@
-// src/services/ai/claudeAIService.js - Updated for Supabase-only architecture
+// src/services/ai/claudeAIService.js - UPDATED for Backend-Only Architecture
 
 /**
- * Service for interacting with Claude AI API with tier-based model selection
- * Updated for Supabase-only architecture (no Firebase)
+ * Service for interacting with Claude AI API via Backend Only
+ * UPDATED: All AI calls now go through backend, no direct frontend calls to Anthropic
  */
 class ClaudeAIService {
   constructor() {
-    // Use direct Anthropic API endpoint or Supabase Edge Function (no Firebase)
-    this.apiUrl = import.meta.env.VITE_CLAUDE_API_ENDPOINT || 'https://api.anthropic.com/v1/messages';
-    this.apiKey = import.meta.env.VITE_CLAUDE_API_KEY;
-    this.defaultModel = import.meta.env.VITE_CLAUDE_MODEL || 'claude-3-haiku-20240307';
+    // Backend API URL - All AI calls go through your Python backend
+    this.backendUrl = import.meta.env.VITE_API_BASE_URL || 'https://aiworkers.onrender.com';
+    
+    // Remove direct Anthropic API configuration - backend handles this now
+    this.apiUrl = null;
+    this.apiKey = null;
     
     // Enable debug logging
     this.enableLogging = import.meta.env.VITE_ENABLE_API_LOGGING === 'true';
     
-    // Model configuration for different tiers
+    // Model configuration for different tiers (for display purposes only)
     this.tierModels = {
       'free': {
         model: 'claude-3-haiku-20240307',
@@ -38,19 +40,15 @@ class ClaudeAIService {
     
     // Log configuration if logging is enabled
     if (this.enableLogging) {
-      console.log('🤖 Claude AI Service Configuration (Supabase-only):');
-      console.log('API URL:', this.apiUrl);
-      console.log('API Key:', this.apiKey ? 'Set (begins with ' + this.apiKey.substring(0, 10) + '...)' : 'Not set');
-      console.log('Default Model:', this.defaultModel);
+      console.log('🤖 Claude AI Service Configuration (Backend-Only):');
+      console.log('Backend URL:', this.backendUrl);
       console.log('Available Tier Models:', Object.keys(this.tierModels));
+      console.log('⚠️ All AI calls now go through backend - no direct Anthropic API calls');
     }
     
-    // Remove axios dependency - use fetch only
-    // this.client = axios.create({ ... });
-    
-    // Log if the API key is not set
-    if (!this.apiKey) {
-      console.warn('⚠️ Claude API key not set. Email generation may fail.');
+    // Prevent direct API calls from frontend
+    if (typeof window !== 'undefined') {
+      console.log('🔒 Claude AI Service running in browser - all calls will route through backend');
     }
   }
 
@@ -61,7 +59,7 @@ class ClaudeAIService {
     const config = this.tierModels[userTier] || this.tierModels.free;
     
     if (this.enableLogging) {
-      console.log(`🎯 Selected ${config.displayName} for ${userTier} tier user`);
+      console.log(`🎯 Selected ${config.displayName} for ${userTier} tier user (backend will handle)`);
       console.log('Model features:', config.features);
     }
     
@@ -69,7 +67,36 @@ class ClaudeAIService {
   }
 
   /**
-   * Generate content using Claude AI (for Video2Promo benefit extraction)
+   * Get auth headers for backend API calls
+   */
+  async getAuthHeaders() {
+    // Import supabase dynamically to avoid issues
+    try {
+      const { supabase } = await import('../supabase/supabaseClient');
+      const { data: { session }, error } = await supabase.auth.getSession();
+      
+      if (error || !session?.access_token) {
+        console.warn('No valid session for Claude AI API calls');
+        return {
+          'Content-Type': 'application/json'
+        };
+      }
+      
+      return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      };
+    } catch (error) {
+      console.error('Failed to get auth headers for Claude AI:', error);
+      return {
+        'Content-Type': 'application/json'
+      };
+    }
+  }
+
+  /**
+   * Generate content using Claude AI via Backend
+   * UPDATED: All calls now go through your Python backend
    */
   async generateContent(prompt, options = {}) {
     try {
@@ -79,69 +106,65 @@ class ClaudeAIService {
         tier = 'free'
       } = options;
 
-      // Get model configuration for tier
+      // Get model configuration for tier (for display/logging only)
       const modelConfig = this.getModelForTier(tier);
-      const selectedModel = modelConfig.model;
 
       if (this.enableLogging) {
-        console.log('🤖 Claude AI Debug Information:');
+        console.log('🤖 Claude AI Backend Request:');
         console.log('- Prompt length:', prompt.length);
         console.log('- User tier:', tier);
-        console.log('- Selected model:', selectedModel);
+        console.log('- Selected model:', modelConfig.model);
         console.log('- Max tokens:', maxTokens);
         console.log('- Temperature:', temperature);
+        console.log('- Backend URL:', this.backendUrl);
         console.log('- First 200 chars of prompt:', prompt.substring(0, 200) + '...');
-        
-        // Check if prompt contains actual transcript data
-        const hasTranscriptData = prompt.includes('TRANSCRIPT CONTENT:') && 
-                                 prompt.length > 1000 && 
-                                 !prompt.includes('template') && 
-                                 !prompt.includes('example');
-        
-        console.log('- Contains real transcript data:', hasTranscriptData);
-        
-        if (!hasTranscriptData) {
-          console.warn('⚠️ Warning: Prompt appears to lack real transcript data');
-        }
       }
 
-      // Make the API call using direct method (no proxy)
-      const response = await this.makeDirectClaudeRequest({
-        prompt: prompt,
-        model: selectedModel,
-        maxTokens: maxTokens,
-        temperature: temperature
+      // Get auth headers
+      const headers = await this.getAuthHeaders();
+
+      // Make API call to YOUR backend instead of Anthropic directly
+      const response = await fetch(`${this.backendUrl}/api/ai/generate-content`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          prompt: prompt,
+          model: modelConfig.model,
+          maxTokens: maxTokens,
+          temperature: temperature,
+          tier: tier
+        })
       });
 
-      if (this.enableLogging) {
-        console.log('✅ Claude Response received, length:', response.content?.[0]?.text?.length || 0);
-        
-        if (response.content?.[0]?.text) {
-          const responseText = response.content[0].text;
-          console.log('🔍 Response analysis:');
-          console.log('- Contains JSON:', responseText.includes('{') && responseText.includes('}'));
-          console.log('- Contains "benefits":', responseText.toLowerCase().includes('benefits'));
-          console.log('- Contains "template":', responseText.toLowerCase().includes('template'));
-          console.log('- First 200 chars:', responseText.substring(0, 200));
-        }
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Backend AI request failed: ${response.status}`);
       }
 
-      if (response.content && response.content[0] && response.content[0].text) {
-        const tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
-        
+      const result = await response.json();
+
+      if (this.enableLogging) {
+        console.log('✅ Claude Backend Response received:', {
+          success: result.success,
+          contentLength: result.content?.length || 0,
+          tokensUsed: result.tokensUsed || 0
+        });
+      }
+
+      if (result.success && result.content) {
         return {
           success: true,
-          content: response.content[0].text,
-          tokensUsed: tokensUsed,
-          model: selectedModel,
-          usage: response.usage
+          content: result.content,
+          tokensUsed: result.tokensUsed || 0,
+          model: result.model || modelConfig.model,
+          usage: result.usage || {}
         };
       } else {
-        throw new Error('Invalid response format from Claude API');
+        throw new Error(result.error || 'Backend AI generation failed');
       }
       
     } catch (error) {
-      console.error('❌ Claude AI Service Error:', error);
+      console.error('❌ Claude AI Backend Error:', error);
       return {
         success: false,
         error: error.message,
@@ -151,89 +174,8 @@ class ClaudeAIService {
   }
 
   /**
-   * Make direct API request to Claude (Supabase-only version)
-   */
-  async makeDirectClaudeRequest(params) {
-    const { prompt, model, maxTokens, temperature = 0.7 } = params;
-
-    try {
-      console.log('🤖 Making direct Claude API request (Supabase-only)...');
-      
-      // Method 1: Try direct Anthropic API call
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: model,
-          max_tokens: maxTokens,
-          temperature: temperature,
-          messages: [{
-            role: 'user',
-            content: prompt
-          }]
-        })
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Claude API Error:', errorText);
-        throw new Error(`Claude API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      
-      if (this.enableLogging) {
-        console.log('✅ Direct Claude API request successful');
-      }
-
-      return data;
-
-    } catch (error) {
-      console.error('❌ Direct Claude request failed:', error);
-      
-      // If direct API fails, try with a simple proxy approach
-      try {
-        console.log('🔧 Trying alternative proxy approach...');
-        
-        // Use a simple proxy that adds CORS headers
-        const proxyResponse = await fetch(`https://cors-anywhere.herokuapp.com/https://api.anthropic.com/v1/messages`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': this.apiKey,
-            'anthropic-version': '2023-06-01',
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          body: JSON.stringify({
-            model: model,
-            max_tokens: maxTokens,
-            temperature: temperature,
-            messages: [{
-              role: 'user',
-              content: prompt
-            }]
-          })
-        });
-
-        if (proxyResponse.ok) {
-          console.log('✅ Proxy request successful');
-          return await proxyResponse.json();
-        }
-      } catch (proxyError) {
-        console.error('❌ Proxy request also failed:', proxyError);
-      }
-      
-      throw error;
-    }
-  }
-
-  /**
    * Generate a focused email highlighting a single feature or benefit
-   * Updated for 5th grade reading level and affiliate marketing focus
+   * UPDATED: Routes through backend instead of direct Anthropic calls
    */
   async generateFocusedEmail(params) {
     const { 
@@ -242,7 +184,7 @@ class ClaudeAIService {
       totalEmails, 
       websiteData, 
       websiteUrl, 
-      keywords, // Kept for backwards compatibility
+      keywords,
       tone, 
       industry, 
       includeCta, 
@@ -255,112 +197,109 @@ class ClaudeAIService {
       structure = 'problem-solution-cta'
     } = params;
     
-    // Use keywords in debug log to avoid unused variable warning
-    if (this.enableLogging && keywords) {
-      console.log('Keywords provided (for future use):', keywords);
-    }
-    
     try {
       // Get the appropriate model for the user's tier
       const tier = userTier || user?.subscription_tier || 'free';
       const modelConfig = this.getModelForTier(tier);
       
-      const websiteName = this.extractWebsiteName(websiteUrl);
-      
-      // Enhanced system prompt for 5th grade reading level
-      let systemPrompt = `You are an expert email marketing copywriter who specializes in creating promotional affiliate marketing emails written at a 5th grade reading level.
-
-CRITICAL REQUIREMENTS:
-- Write ALL content at a 5th grade reading level (simple words, short sentences)
-- Keep email between ${wordLimit.min}-${wordLimit.max} words total
-- Subject line must be under ${subjectLimit} characters
-- Use simple, everyday words that a 10-year-old would understand
-- Avoid complex words, industry jargon, or technical terms
-- Keep sentences short and clear
-- Focus on benefits, not features
-- Use ${structure} structure
-
-EMAIL STRUCTURE REQUIRED:
-1. Short, catchy subject line (under ${subjectLimit} characters)
-2. Opening that explains a common problem or need
-3. Middle that describes how the product solves that problem
-4. Strong call to action with the affiliate link
-5. Simple, friendly closing
-
-TONE: Write in a ${tone} tone while keeping language simple and clear.
-READING LEVEL: ${readingLevel}
-INCLUDE CTA: ${includeCta ? 'Yes' : 'No'}`;
-
-      if (tier === 'gold') {
-        systemPrompt += ` Use premium persuasion techniques but keep language at 5th grade level.`;
-      } else if (tier === 'pro') {
-        systemPrompt += ` Use professional persuasion while maintaining simple language.`;
-      }
-
-      // Build user message for 5th grade level
-      let userMessage = this.buildFifthGradeUserMessage({
-        websiteData,
-        websiteName,
-        focusItem,
-        emailNumber,
-        totalEmails,
-        industry,
-        tone,
-        includeCta,
-        affiliateLink,
-        tier,
-        wordLimit,
-        subjectLimit
-      });
-
-      // Track tokens
-      const inputText = systemPrompt + userMessage;
-      const estimatedInputTokens = this.estimateTokens(inputText);
-
       if (this.enableLogging) {
-        console.log('🎯 Generating 5th grade focused email:', {
+        console.log('🎯 Generating focused email via backend:', {
           focusItem,
           emailNumber,
           model: modelConfig.model,
           tier: tier,
-          estimatedInputTokens,
           wordLimit,
           readingLevel
         });
       }
 
-      // Make the API call using direct method
-      const result = await this.makeClaudeRequest({
-        userMessage,
-        systemPrompt,
-        model: modelConfig.model,
-        maxTokens: modelConfig.maxTokens,
-        affiliateLink
+      // Get auth headers
+      const headers = await this.getAuthHeaders();
+
+      // Call backend email generation endpoint
+      const response = await fetch(`${this.backendUrl}/api/ai/generate-focused-email`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          focusItem,
+          emailNumber,
+          totalEmails,
+          websiteData,
+          websiteUrl,
+          keywords,
+          tone,
+          industry,
+          includeCta,
+          affiliateLink,
+          tier,
+          readingLevel,
+          wordLimit,
+          subjectLimit,
+          structure,
+          model: modelConfig.model
+        })
       });
 
-      // Calculate costs
-      const estimatedOutputTokens = this.estimateTokens(result.subject + result.body);
-      const totalTokens = estimatedInputTokens + estimatedOutputTokens;
-      const estimatedCost = this.calculateCost(estimatedInputTokens, estimatedOutputTokens, modelConfig.model);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Backend email generation failed: ${response.status}`);
+      }
 
-      return {
-        ...result,
-        usage: {
-          inputTokens: estimatedInputTokens,
-          outputTokens: estimatedOutputTokens,
-          totalTokens: totalTokens,
-          estimatedCost: estimatedCost,
-          model: modelConfig.model,
-          modelDisplayName: modelConfig.displayName,
-          focusItem: focusItem,
-          readingLevel: '5th grade',
-          wordCount: this.countWords(result.body)
-        }
-      };
+      const result = await response.json();
+
+      if (result.success) {
+        return {
+          subject: result.subject,
+          body: result.body,
+          usage: result.usage || {
+            inputTokens: 0,
+            outputTokens: 0,
+            totalTokens: 0,
+            estimatedCost: 0,
+            model: modelConfig.model,
+            modelDisplayName: modelConfig.displayName,
+            focusItem: focusItem,
+            readingLevel: readingLevel,
+            wordCount: this.countWords(result.body)
+          }
+        };
+      } else {
+        throw new Error(result.error || 'Backend email generation failed');
+      }
       
     } catch (error) {
-      console.error('Error generating focused email with Claude AI:', error);
+      console.error('Error generating focused email via backend:', error);
       throw this.handleError(error);
+    }
+  }
+
+  /**
+   * REMOVED: No longer make direct Claude API requests from frontend
+   * All AI requests now go through your Python backend
+   */
+  async makeDirectClaudeRequest() {
+    console.warn('⚠️ Direct Claude requests disabled - all AI calls now go through backend');
+    throw new Error('Direct Claude API calls disabled. Use backend endpoints instead.');
+  }
+
+  /**
+   * REMOVED: No longer make direct Claude API requests from frontend
+   */
+  async makeClaudeRequest() {
+    console.warn('⚠️ Direct Claude requests disabled - all AI calls now go through backend');
+    throw new Error('Direct Claude API calls disabled. Use backend endpoints instead.');
+  }
+
+  /**
+   * Extract content from backend AI response
+   */
+  extractContentFromResponse(data) {
+    if (data.content) {
+      return data.content;
+    } else if (data.body) {
+      return data.body;
+    } else {
+      return data.text || data.toString();
     }
   }
 
@@ -373,225 +312,7 @@ INCLUDE CTA: ${includeCta ? 'Yes' : 'No'}`;
   }
 
   /**
-   * Build user message for 5th grade reading level emails
-   */
-  buildFifthGradeUserMessage({ websiteData, websiteName, focusItem, emailNumber, totalEmails, industry, tone, includeCta, affiliateLink, tier, wordLimit, subjectLimit }) {
-    // Use websiteData in debug log to avoid unused variable warning
-    if (this.enableLogging && websiteData) {
-      console.log('Website data available for context:', !!websiteData);
-    }
-    
-    let userMessage = `# EMAIL ASSIGNMENT
-
-Create a promotional affiliate marketing email about "${focusItem}" for ${websiteName}.
-
-## WEBSITE INFORMATION
-- Website Name: ${websiteName}
-- Main Benefit Focus: "${focusItem}"
-- Industry: ${industry}
-- Email ${emailNumber} of ${totalEmails} in series
-
-## 5TH GRADE READING LEVEL REQUIREMENTS
-CRITICAL: Write everything at a 5th grade reading level.
-
-USE SIMPLE WORDS ONLY:
-- Say "get" not "obtain" or "acquire"
-- Say "help" not "assist" or "facilitate" 
-- Say "make better" not "enhance" or "improve"
-- Say "start" not "commence" or "begin"
-- Say "hard" not "difficult" or "challenging"
-- Say "show" not "demonstrate" or "illustrate"
-- Say "buy" not "purchase" or "invest in"
-- Say "great" not "excellent" or "exceptional"
-- Say "many" not "numerous" or "multiple"
-- Say "change" not "transform" or "modify"
-
-SENTENCE RULES:
-- Keep sentences short (under 15 words each)
-- Use simple sentence structure
-- One idea per sentence
-- No complex grammar
-
-## EMAIL STRUCTURE (${wordLimit.min}-${wordLimit.max} words total)
-
-### 1. SUBJECT LINE (under ${subjectLimit} characters)
-Create a short, catchy subject that:
-- Uses simple words a 10-year-old knows
-- Creates curiosity about the benefit
-- Stays under ${subjectLimit} characters
-- Makes people want to open the email
-
-### 2. OPENING (20-40 words)
-Start with a common problem that relates to "${focusItem}":
-- Ask a simple question about their problem
-- Use words everyone understands  
-- Make them feel understood
-- Connect to their daily life
-
-### 3. MIDDLE SECTION (60-120 words)
-Explain how ${websiteName} solves their problem:
-- Use simple words to describe the solution
-- Focus on benefits they can understand
-- Keep sentences short and clear
-- Make it sound easy to use
-- Show how it helps with "${focusItem}"
-- Add social proof with simple language
-
-### 4. CALL TO ACTION (20-40 words)`;
-
-    if (includeCta) {
-      userMessage += `
-Create urgency with the affiliate link:`;
-      
-      if (affiliateLink) {
-        userMessage += `
-- Include this exact link: ${affiliateLink}
-- Format as HTML: <a href="${affiliateLink}">simple action words</a>
-- Use action words like "Get this now" or "Try it today"
-- Create urgency but keep language simple`;
-      } else {
-        userMessage += `
-- Use placeholder: [AffiliateLinkHere]
-- Format as HTML: <a href="[AffiliateLinkHere]">simple action words</a>
-- Use action words like "Get this now" or "Try it today"`;
-      }
-    } else {
-      userMessage += `
-Create a simple closing statement without links.`;
-    }
-
-    userMessage += `
-
-### 5. CLOSING (10-20 words)
-Simple, friendly closing that matches ${tone} tone.
-
-## TONE REQUIREMENTS
-Write in ${tone} tone while keeping language simple:`;
-
-    if (tone === 'persuasive') {
-      userMessage += `
-- Sound helpful and encouraging
-- Make them want to try it
-- Build excitement about the benefit`;
-    } else if (tone === 'urgent') {
-      userMessage += `
-- Create urgency with simple words
-- Make them feel they need to act fast
-- Use words like "hurry" and "don't wait"`;
-    } else if (tone === 'professional') {
-      userMessage += `
-- Sound trustworthy and reliable
-- Be helpful but professional
-- Keep it business-like but simple`;
-    } else if (tone === 'friendly') {
-      userMessage += `
-- Sound like a helpful friend
-- Be warm and caring
-- Use casual, simple language`;
-    } else if (tone === 'educational') {
-      userMessage += `
-- Teach them something new
-- Explain things simply
-- Help them understand the benefit`;
-    }
-
-    // Add tier-specific instructions
-    if (tier === 'gold') {
-      userMessage += `
-
-## PREMIUM TIER INSTRUCTIONS (Gold)
-Create exceptional quality while keeping 5th grade reading level:
-- Use more persuasive simple words
-- Add emotional simple language
-- Create stronger desire for the benefit
-- Use premium but simple positioning`;
-    } else if (tier === 'pro') {
-      userMessage += `
-
-## PROFESSIONAL TIER INSTRUCTIONS (Pro)  
-Create high quality while keeping 5th grade reading level:
-- Use strong but simple persuasion
-- Add good emotional triggers
-- Make the benefit very appealing
-- Professional but simple language`;
-    }
-
-    userMessage += `
-
-## FINAL REMINDERS
-- Total email: ${wordLimit.min}-${wordLimit.max} words
-- Subject: Under ${subjectLimit} characters  
-- Reading level: 5th grade (10-year-old can understand)
-- Focus: How "${focusItem}" helps solve their problem
-- Structure: Problem → Solution → Call to Action
-- Language: Simple, clear, no big words
-
-Format the response with:
-Subject: [your subject line]
-
-[email body with proper spacing]`;
-
-    return userMessage;
-  }
-
-  /**
-   * Make the actual Claude API request (direct to Anthropic)
-   */
-  async makeClaudeRequest({ userMessage, systemPrompt, model, maxTokens, affiliateLink }) {
-    try {
-      console.log('🤖 Making Claude API request...');
-      
-      // Combine system prompt and user message
-      const fullPrompt = `${systemPrompt}\n\n${userMessage}`;
-      
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: model,
-          max_tokens: maxTokens,
-          temperature: 0.7,
-          messages: [{
-            role: 'user',
-            content: fullPrompt
-          }]
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Claude API request failed with status: ${response.status}. ${errorText}`);
-      }
-      
-      const data = await response.json();
-      let emailContent = this.extractContentFromResponse(data);
-      return this.parseEmailContent(emailContent, affiliateLink);
-      
-    } catch (error) {
-      console.error('❌ Claude API request failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Extract content from Claude API response
-   */
-  extractContentFromResponse(data) {
-    if (data.content && data.content[0]) {
-      return data.content[0].text;
-    } else if (data.completion) {
-      return data.completion;
-    } else {
-      return data.text || data.toString();
-    }
-  }
-
-  /**
-   * Estimate tokens for cost calculation
+   * Estimate tokens for cost calculation (approximate)
    */
   estimateTokens(text) {
     if (!text) return 0;
@@ -601,7 +322,7 @@ Subject: [your subject line]
   }
 
   /**
-   * Calculate cost based on model and token usage
+   * Calculate cost based on model and token usage (approximate)
    */
   calculateCost(inputTokens, outputTokens, model) {
     const pricing = {
@@ -621,21 +342,21 @@ Subject: [your subject line]
   handleError(error) {
     let errorMessage = 'Failed to generate content with AI. ';
     
-    if (error.message.includes('API key')) {
-      errorMessage += 'API key issue: ' + error.message;
-    } else if (error.message.includes('model')) {
-      errorMessage += 'Model issue: ' + error.message;
+    if (error.message.includes('Backend')) {
+      errorMessage += 'Backend service error: ' + error.message;
+    } else if (error.message.includes('auth')) {
+      errorMessage += 'Authentication error: ' + error.message;
     } else if (error.message.includes('status')) {
       errorMessage += 'Server error: ' + error.message;
     } else {
-      errorMessage += 'Please try again or check AI service configuration.';
+      errorMessage += 'Please try again or check backend service.';
     }
     
     return new Error(errorMessage);
   }
 
   /**
-   * Parse the email content from Claude AI to extract subject and body
+   * Parse the email content to extract subject and body
    */
   parseEmailContent(content, affiliateLink = '') {
     let subject = '';
@@ -734,40 +455,24 @@ Subject: [your subject line]
   }
   
   /**
-   * Check if the Claude AI service is available
+   * Check if the Claude AI service is available via backend
+   * UPDATED: Checks backend availability instead of direct Anthropic API
    */
   async isAvailable() {
-    if (!this.apiKey) {
-      console.warn('Claude AI service not properly configured');
-      return false;
-    }
-    
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.apiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: this.defaultModel,
-          max_tokens: 10,
-          messages: [{
-            role: 'user',
-            content: 'Hello'
-          }]
-        })
+      const response = await fetch(`${this.backendUrl}/api/ai/health`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
       });
       
       const isOk = response.ok;
       if (this.enableLogging) {
-        console.log('Claude AI availability check:', isOk ? 'Available' : 'Unavailable');
+        console.log('Claude AI backend availability check:', isOk ? 'Available' : 'Unavailable');
       }
       
       return isOk;
     } catch (error) {
-      console.error('Claude AI service check failed:', error);
+      console.error('Claude AI backend service check failed:', error);
       return false;
     }
   }
@@ -780,7 +485,7 @@ Subject: [your subject line]
   }
 }
 
-// Export a single instance and the class for Video2Promo compatibility  
+// Export a single instance and the class
 const claudeAIService = new ClaudeAIService();
 
 export { claudeAIService };
