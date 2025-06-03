@@ -1,13 +1,10 @@
-// src/hooks/useContentLibrary.js - FIXED VERSION with proper React Router navigation
+// src/hooks/useContentLibrary.js - FIXED VERSION
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom'; // ADD THIS IMPORT
-import { supabase } from '../services/supabase/supabaseClient';
-
-// Backend API URL
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://aiworkers.onrender.com';
+import { useNavigate } from 'react-router-dom';
+import { contentLibraryApi } from '../services/api';
 
 export const useContentLibrary = () => {
-  const navigate = useNavigate(); // ADD THIS HOOK
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -20,125 +17,52 @@ export const useContentLibrary = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [backendAvailable, setBackendAvailable] = useState(true);
 
-  // Get authentication headers
-  const getAuthHeaders = useCallback(async () => {
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error || !session?.access_token) {
-        console.warn('No valid session for Content Library API calls');
-        return {
-          'Content-Type': 'application/json'
-        };
-      }
-      
-      return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`
-      };
-    } catch (error) {
-      console.error('Failed to get auth headers:', error);
-      return {
-        'Content-Type': 'application/json'
-      };
-    }
-  }, []);
-
   // Check if backend APIs are available
   const checkBackendAvailability = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(5000)
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const hasContentLibrary = data.endpoints?.some(endpoint => 
-          endpoint.includes('content-library')
-        );
-        setBackendAvailable(hasContentLibrary);
-        return hasContentLibrary;
-      }
-      
-      setBackendAvailable(false);
-      return false;
+      await contentLibraryApi.getHealth();
+      setBackendAvailable(true);
+      return true;
     } catch (error) {
-      console.warn('Backend availability check failed:', error);
+      console.warn('Content Library backend unavailable:', error);
       setBackendAvailable(false);
       return false;
     }
   }, []);
 
-  // Demo data for fallback (matches your table structure)
+  // Demo data for fallback
   const getDemoData = () => [
     {
       id: 'demo-1',
       content_type: 'video_transcript',
-      source_id: null,
       title: 'Marketing Strategy Video Transcript',
-      description: 'Transcript from a 30-minute marketing strategy video discussing customer acquisition.',
+      description: 'Transcript from a 30-minute marketing strategy video.',
       tags: ['marketing', 'strategy'],
-      metadata: { 
-        video_id: 'demo123',
-        duration: '30:45', 
-        extraction_method: 'webshare_rotating',
-        word_count: 4500
-      },
+      metadata: { video_id: 'demo123', duration: '30:45', word_count: 4500 },
       is_favorited: true,
       usage_count: 3,
       created_at: '2025-05-20T10:00:00Z',
-      last_used_at: '2025-05-20T14:30:00Z',
-      updated_at: '2025-05-20T14:30:00Z'
+      last_used_at: '2025-05-20T14:30:00Z'
     },
     {
       id: 'demo-2',
       content_type: 'scanned_page',
-      source_id: null,
       title: 'ConvertKit Sales Page Analysis',
-      description: 'Extracted benefits and features from ConvertKit landing page.',
+      description: 'Extracted benefits from ConvertKit landing page.',
       tags: ['email marketing', 'saas'],
-      metadata: { 
-        url: 'https://convertkit.com/pricing',
-        benefits_count: 8, 
-        features_count: 12,
-        domain: 'convertkit.com'
-      },
+      metadata: { url: 'https://convertkit.com/pricing', benefits_count: 8 },
       is_favorited: false,
       usage_count: 1,
-      created_at: '2025-05-19T15:30:00Z',
-      last_used_at: '2025-05-19T16:00:00Z',
-      updated_at: '2025-05-19T16:00:00Z'
-    },
-    {
-      id: 'demo-3',
-      content_type: 'generated_asset',
-      source_id: null,
-      title: 'Email Series: Product Launch',
-      description: 'Generated 5-email sequence for product launch campaign.',
-      tags: ['email series', 'product launch'],
-      metadata: { 
-        type: 'email_series',
-        emails_count: 5, 
-        tone: 'professional',
-        industry: 'saas'
-      },
-      is_favorited: true,
-      usage_count: 2,
-      created_at: '2025-05-18T09:15:00Z',
-      last_used_at: '2025-05-18T11:45:00Z',
-      updated_at: '2025-05-18T11:45:00Z'
+      created_at: '2025-05-19T15:30:00Z'
     }
   ];
 
-  // Fetch items from backend API
+  // Fetch items using centralized API
   const fetchItems = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Check backend availability first
       const isAvailable = await checkBackendAvailability();
       
       if (!isAvailable) {
@@ -148,10 +72,8 @@ export const useContentLibrary = () => {
         return;
       }
 
-      const headers = await getAuthHeaders();
-      
-      // Build query parameters
-      const params = new URLSearchParams({
+      // Use centralized API service
+      const data = await contentLibraryApi.getItems({
         type: filters.content_type || 'all',
         search: searchTerm || '',
         favorited: (filters.favorited || false).toString(),
@@ -160,47 +82,30 @@ export const useContentLibrary = () => {
         limit: '50'
       });
 
-      const response = await fetch(`${API_BASE}/api/content-library/items?${params}`, {
-        method: 'GET',
-        headers
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        
-        if (data.success) {
-          setItems(data.items || []);
-          console.log(`✅ Fetched ${data.items?.length || 0} Content Library items`);
-        } else {
-          throw new Error(data.error || 'API returned unsuccessful response');
-        }
-      } else if (response.status === 401) {
-        setError('Authentication required. Please log in to access your Content Library.');
-        setItems([]);
-      } else if (response.status === 503) {
-        console.warn('Backend database unavailable, using demo data');
-        setItems(getDemoData());
+      if (data.success) {
+        setItems(data.items || []);
+        console.log(`✅ Fetched ${data.items?.length || 0} Content Library items`);
       } else {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(data.error || 'API returned unsuccessful response');
       }
     } catch (error) {
       console.error('Failed to fetch content library:', error);
       setError(error.message);
       
-      // Fallback to demo data for development/testing
+      // Fallback to demo data
       console.warn('Using demo data as fallback');
       setItems(getDemoData());
     } finally {
       setLoading(false);
     }
-  }, [filters, searchTerm, getAuthHeaders, checkBackendAvailability]);
+  }, [filters, searchTerm, checkBackendAvailability]);
 
   // Initial load
   useEffect(() => {
     fetchItems();
   }, [fetchItems]);
 
-  // Toggle favorite status
+  // Toggle favorite using centralized API
   const toggleFavorite = useCallback(async (itemId, currentFavorited) => {
     try {
       // Optimistic update
@@ -215,39 +120,16 @@ export const useContentLibrary = () => {
         return;
       }
 
-      const headers = await getAuthHeaders();
-      const response = await fetch(`${API_BASE}/api/content-library/item/${itemId}/favorite`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          is_favorited: !currentFavorited
-        })
-      });
+      // Use centralized API service
+      const result = await contentLibraryApi.toggleFavorite(itemId, !currentFavorited);
 
-      if (!response.ok) {
+      if (!result.success) {
         // Revert optimistic update on failure
         setItems(prev => prev.map(item => 
           item.id === itemId 
             ? { ...item, is_favorited: currentFavorited }
             : item
         ));
-        
-        if (response.status === 401) {
-          setError('Authentication required to save favorites');
-        } else {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `HTTP ${response.status}`);
-        }
-      } else {
-        const result = await response.json();
-        if (!result.success) {
-          // Revert on API failure
-          setItems(prev => prev.map(item => 
-            item.id === itemId 
-              ? { ...item, is_favorited: currentFavorited }
-              : item
-          ));
-        }
       }
     } catch (error) {
       console.error('Failed to toggle favorite:', error);
@@ -258,9 +140,9 @@ export const useContentLibrary = () => {
           : item
       ));
     }
-  }, [backendAvailable, getAuthHeaders]);
+  }, [backendAvailable]);
 
-  // FIXED: Use content item (track usage and redirect) - NO MORE LOGOUT!
+  // Use content item with centralized API
   const useContentItem = useCallback(async (item) => {
     try {
       console.log('🔧 Using content item:', item.title, 'Type:', item.content_type);
@@ -276,28 +158,16 @@ export const useContentLibrary = () => {
           : prevItem
       ));
 
-      // Track usage in backend (optional)
+      // Track usage using centralized API
       if (backendAvailable) {
         try {
-          const headers = await getAuthHeaders();
-          const response = await fetch(`${API_BASE}/api/content-library/item/${item.id}/use`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              content_type: item.content_type
-            })
-          });
-
-          if (!response.ok) {
-            console.warn('Failed to track usage on backend, but continuing with action');
-          }
+          await contentLibraryApi.trackUsage(item.id, item.content_type);
         } catch (trackingError) {
           console.warn('Usage tracking failed:', trackingError);
         }
       }
 
-      // FIXED: Use React Router navigation instead of window.location
-      // This prevents the page reload that was logging you out!
+      // Navigate using React Router (prevents logout issue)
       if (item.content_type === 'video_transcript') {
         console.log('🔧 Navigating to Video2Promo with React Router');
         navigate('/tools/video2promo');
@@ -307,36 +177,40 @@ export const useContentLibrary = () => {
       } else if (item.content_type === 'generated_asset') {
         console.log('🔧 Using generated asset:', item);
         
-        // Try to copy content to clipboard if available in metadata
+        // Try to copy content to clipboard if available
         if (navigator.clipboard && item.metadata?.content) {
           try {
             await navigator.clipboard.writeText(item.metadata.content);
             console.log('✅ Content copied to clipboard');
-            // Could show a toast notification here
           } catch (clipboardError) {
             console.warn('Failed to copy to clipboard:', clipboardError);
           }
         }
         
-        // For generated assets, might want to open in a modal or copy to clipboard
-        // For now, navigate to email generator as a fallback
         navigate('/tools/email-generator');
       }
     } catch (error) {
       console.error('❌ Failed to use content item:', error);
       setError('Failed to use content item');
     }
-  }, [backendAvailable, getAuthHeaders, navigate]); // Added navigate to dependencies
+  }, [backendAvailable, navigate]);
 
-  // Delete item
+  // Delete item using centralized API - FIXED VERSION
   const deleteItem = useCallback(async (itemId) => {
     if (!confirm('Are you sure you want to delete this item?')) {
       return;
     }
 
+    // Store the item to delete BEFORE removing it (for potential restoration)
+    const itemToDelete = items.find(item => item.id === itemId);
+    
+    if (!itemToDelete) {
+      console.warn('Item not found for deletion:', itemId);
+      return;
+    }
+
     try {
       // Optimistic removal
-      const itemToDelete = items.find(item => item.id === itemId);
       setItems(prev => prev.filter(item => item.id !== itemId));
 
       if (!backendAvailable) {
@@ -344,39 +218,20 @@ export const useContentLibrary = () => {
         return;
       }
 
-      const headers = await getAuthHeaders();
-      const response = await fetch(`${API_BASE}/api/content-library/item/${itemId}`, {
-        method: 'DELETE',
-        headers
-      });
+      // Use centralized API service
+      await contentLibraryApi.deleteItem(itemId);
+      console.log('✅ Item deleted successfully:', itemId);
 
-      if (!response.ok) {
-        // Restore item on failure
-        if (itemToDelete) {
-          setItems(prev => [itemToDelete, ...prev]);
-        }
-        
-        if (response.status === 401) {
-          setError('Authentication required to delete items');
-        } else if (response.status === 404) {
-          console.log('Item already deleted or not found');
-        } else {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `HTTP ${response.status}`);
-        }
-      }
     } catch (error) {
       console.error('Failed to delete item:', error);
       setError('Failed to delete item');
-      // Restore item on error
-      const itemToDelete = items.find(item => item.id === itemId);
-      if (itemToDelete) {
-        setItems(prev => [itemToDelete, ...prev]);
-      }
+      
+      // Restore item on error using the stored reference
+      setItems(prev => [itemToDelete, ...prev]);
     }
-  }, [items, backendAvailable, getAuthHeaders]);
+  }, [items, backendAvailable]);
 
-  // Rest of the hook remains the same...
+  // Add to library using centralized API
   const addToLibrary = useCallback(async (contentData) => {
     try {
       if (!backendAvailable) {
@@ -385,8 +240,6 @@ export const useContentLibrary = () => {
         return null;
       }
 
-      const headers = await getAuthHeaders();
-      
       const mappedData = {
         content_type: contentData.type || contentData.content_type,
         title: contentData.title,
@@ -400,34 +253,22 @@ export const useContentLibrary = () => {
         }
       };
 
-      const response = await fetch(`${API_BASE}/api/content-library/items`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(mappedData)
-      });
+      // Use centralized API service
+      const result = await contentLibraryApi.createItem(mappedData);
 
-      if (response.ok) {
-        const result = await response.json();
-        if (result.success && result.item) {
-          setItems(prev => [result.item, ...prev]);
-          console.log(`✅ Added to Content Library: ${contentData.title}`);
-          return result.item;
-        } else {
-          throw new Error(result.error || 'Failed to add item');
-        }
-      } else if (response.status === 401) {
-        setError('Authentication required to add items to library');
-        return null;
+      if (result.success && result.item) {
+        setItems(prev => [result.item, ...prev]);
+        console.log(`✅ Added to Content Library: ${contentData.title}`);
+        return result.item;
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        throw new Error(result.error || 'Failed to add item');
       }
     } catch (error) {
       console.error('Failed to add to library:', error);
       setError(`Failed to add to library: ${error.message}`);
       return null;
     }
-  }, [backendAvailable, getAuthHeaders]);
+  }, [backendAvailable]);
 
   // Helper functions
   const getItemsByType = useCallback((contentType) => {
@@ -441,19 +282,6 @@ export const useContentLibrary = () => {
   const getRecentItems = useCallback((count = 5) => {
     return items
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, count);
-  }, [items]);
-
-  const getMostUsedItems = useCallback((count = 5) => {
-    return items
-      .sort((a, b) => (b.usage_count || 0) - (a.usage_count || 0))
-      .slice(0, count);
-  }, [items]);
-
-  const getRecentlyUsedItems = useCallback((count = 5) => {
-    return items
-      .filter(item => item.last_used_at)
-      .sort((a, b) => new Date(b.last_used_at) - new Date(a.last_used_at))
       .slice(0, count);
   }, [items]);
 
@@ -478,7 +306,7 @@ export const useContentLibrary = () => {
     setFilters,
     setSearchTerm,
     toggleFavorite,
-    useContentItem, // This is now FIXED!
+    useContentItem,
     deleteItem,
     addToLibrary,
     refetch,
@@ -494,22 +322,10 @@ export const useContentLibrary = () => {
     getItemsByType,
     getFavoriteItems,
     getRecentItems,
-    getMostUsedItems,
-    getRecentlyUsedItems,
     
     // Content type counts
     videoTranscriptCount: items.filter(item => item.content_type === 'video_transcript').length,
     scannedPageCount: items.filter(item => item.content_type === 'scanned_page').length,
-    generatedAssetCount: items.filter(item => item.content_type === 'generated_asset').length,
-    
-    // Debug info
-    debug: {
-      backendUrl: API_BASE,
-      backendAvailable,
-      itemsCount: items.length,
-      filtersActive: filters.content_type !== 'all' || filters.favorited || searchTerm.length > 0,
-      isDemo: !backendAvailable || items.some(item => item.id?.startsWith('demo-')),
-      tableStructure: 'updated_for_actual_schema'
-    }
+    generatedAssetCount: items.filter(item => item.content_type === 'generated_asset').length
   };
 };

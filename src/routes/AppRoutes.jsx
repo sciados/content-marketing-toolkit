@@ -1,8 +1,9 @@
-// src/routes/AppRoutes.jsx - UPDATED with Content Library and Admin Integration
+// src/routes/AppRoutes.jsx - UPDATED with ErrorBoundary wrapper
 import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { preloadEmailComponents } from '../utils/emailPreloaderUtils';
 import { trackLazyLoading, useRenderTime } from '../utils/performanceUtils';
+import { ErrorBoundary } from '../components/Common';
 
 // Check if we're in development mode
 const isDevelopment = import.meta.env.DEV;
@@ -80,7 +81,7 @@ const Welcome = lazy(() => {
 
 const Login = lazy(() => {
   const tracker = trackLazyLoading('Login');
-  return import('../pages/Auth/Login').then(module => {
+  return import('../components/Auth/Login').then(module => {
     if (tracker) tracker();
     return module;
   });
@@ -88,7 +89,7 @@ const Login = lazy(() => {
 
 const Register = lazy(() => {
   const tracker = trackLazyLoading('Register');
-  return import('../pages/Auth/Register').then(module => {
+  return import('../components/Auth/Register').then(module => {
     if (tracker) tracker();
     return module;
   });
@@ -96,7 +97,7 @@ const Register = lazy(() => {
 
 const ResetPassword = lazy(() => {
   const tracker = trackLazyLoading('ResetPassword');
-  return import('../pages/Auth/ResetPassword').then(module => {
+  return import('../components/Auth/ResetPassword').then(module => {
     if (tracker) tracker();
     return module;
   });
@@ -261,19 +262,21 @@ const PageLoader = ({ pageName }) => {
   );
 };
 
-// Enhanced route wrapper with preloading
+// Enhanced route wrapper with preloading and error boundary
 const LazyRoute = ({ 
   children, 
   pageName, 
   preloadOnHover = false, 
   preloadFunction = null 
 }) => (
-  <Suspense 
-    fallback={<PageLoader pageName={pageName} />}
-    onMouseEnter={preloadOnHover && preloadFunction ? preloadFunction : undefined}
-  >
-    {children}
-  </Suspense>
+  <ErrorBoundary>
+    <Suspense 
+      fallback={<PageLoader pageName={pageName} />}
+      onMouseEnter={preloadOnHover && preloadFunction ? preloadFunction : undefined}
+    >
+      {children}
+    </Suspense>
+  </ErrorBoundary>
 );
 
 const AppRoutes = () => {
@@ -281,279 +284,281 @@ const AppRoutes = () => {
   useRenderTime('AppRoutes', isDevelopment);
 
   return (
-    <Routes>
-      {/* Welcome Page - Root Route for Unauthenticated Users */}
-      <Route 
-        path="/" 
-        element={
-          <LazyRoute pageName="Welcome">
-            <Welcome />
-          </LazyRoute>
-        } 
-      />
-      
-      {/* Auth Routes */}
-      <Route element={<AuthLayout />}>
+    <ErrorBoundary>
+      <Routes>
+        {/* Welcome Page - Root Route for Unauthenticated Users */}
         <Route 
-          path="/login" 
+          path="/" 
           element={
-            <LazyRoute pageName="Login">
-              <Login />
-            </LazyRoute>
-          } 
-        />
-        <Route 
-          path="/register" 
-          element={
-            <LazyRoute pageName="Register">
-              <Register />
-            </LazyRoute>
-          } 
-        />
-        <Route 
-          path="/reset-password" 
-          element={
-            <LazyRoute pageName="Reset Password">
-              <ResetPassword />
-            </LazyRoute>
-          } 
-        />
-      </Route>
-      
-      {/* Admin Routes - Using AdminLayout */}
-      <Route element={<AdminLayout />}>
-        <Route 
-          path="/admin" 
-          element={
-            <LazyRoute pageName="Admin Dashboard">
-              <AdminDashboard />
-            </LazyRoute>
-          } 
-        />
-        <Route 
-          path="/admin/users" 
-          element={
-            <LazyRoute pageName="Admin Users">
-              <AdminUsers />
-            </LazyRoute>
-          } 
-        />
-        <Route 
-          path="/admin/analytics" 
-          element={
-            <LazyRoute pageName="Admin Analytics">
-              <AdminAnalytics />
-            </LazyRoute>
-          } 
-        />
-        <Route 
-          path="/admin/fix-status" 
-          element={
-            <LazyRoute pageName="Fix Status">
-              <FixSuperAdmin />
-            </LazyRoute>
-          } 
-        />
-        <Route 
-          path="/admin/ads" 
-          element={
-            <LazyRoute pageName="Admin Ads">
-              <AdminAds />
-            </LazyRoute>
-          } 
-        />
-      </Route>
-      
-      {/* Protected Routes - Main Application */}
-      <Route element={<MainLayout />}>
-        <Route 
-          path="/dashboard" 
-          element={
-            <LazyRoute pageName="Dashboard">
-              <Dashboard />
+            <LazyRoute pageName="Welcome">
+              <Welcome />
             </LazyRoute>
           } 
         />
         
-        <Route 
-          path="/profile" 
-          element={
-            <LazyRoute pageName="Profile">
-              <Profile />
-            </LazyRoute>
-          } 
-        />
+        {/* Auth Routes */}
+        <Route element={<AuthLayout />}>
+          <Route 
+            path="/login" 
+            element={
+              <LazyRoute pageName="Login">
+                <Login />
+              </LazyRoute>
+            } 
+          />
+          <Route 
+            path="/register" 
+            element={
+              <LazyRoute pageName="Register">
+                <Register />
+              </LazyRoute>
+            } 
+          />
+          <Route 
+            path="/reset-password" 
+            element={
+              <LazyRoute pageName="Reset Password">
+                <ResetPassword />
+              </LazyRoute>
+            } 
+          />
+        </Route>
         
-        {/* NEW: Content Library Route */}
-        <Route 
-          path="/tools/content-library" 
-          element={
-            <LazyRoute pageName="Content Library">
-              <ContentLibrary />
-            </LazyRoute>
-          } 
-        />
+        {/* Admin Routes - Using AdminLayout */}
+        <Route element={<AdminLayout />}>
+          <Route 
+            path="/admin" 
+            element={
+              <LazyRoute pageName="Admin Dashboard">
+                <AdminDashboard />
+              </LazyRoute>
+            } 
+          />
+          <Route 
+            path="/admin/users" 
+            element={
+              <LazyRoute pageName="Admin Users">
+                <AdminUsers />
+              </LazyRoute>
+            } 
+          />
+          <Route 
+            path="/admin/analytics" 
+            element={
+              <LazyRoute pageName="Admin Analytics">
+                <AdminAnalytics />
+              </LazyRoute>
+            } 
+          />
+          <Route 
+            path="/admin/fix-status" 
+            element={
+              <LazyRoute pageName="Fix Status">
+                <FixSuperAdmin />
+              </LazyRoute>
+            } 
+          />
+          <Route 
+            path="/admin/ads" 
+            element={
+              <LazyRoute pageName="Admin Ads">
+                <AdminAds />
+              </LazyRoute>
+            } 
+          />
+        </Route>
         
-        {/* Analytics Route */}
-        <Route 
-          path="/analytics" 
-          element={
-            <LazyRoute pageName="Analytics">
-              <Analytics />
-            </LazyRoute>
-          } 
-        />
-        
-        {/* Core Tool Routes */}
-        <Route 
-          path="/tools/video2promo" 
-          element={
-            <LazyRoute pageName="Video2Promo">
-              <Video2Promo />
-            </LazyRoute>
-          } 
-        />
-        
-        <Route 
-          path="/tools/email-generator" 
-          element={
-            <LazyRoute 
-              pageName="Email Generator"
-              preloadOnHover={true}
-              preloadFunction={preloadEmailComponents}
-            >
-              <SalesPageEmailGenerator />
-            </LazyRoute>
-          } 
-        />
+        {/* Protected Routes - Main Application */}
+        <Route element={<MainLayout />}>
+          <Route 
+            path="/dashboard" 
+            element={
+              <LazyRoute pageName="Dashboard">
+                <Dashboard />
+              </LazyRoute>
+            } 
+          />
+          
+          <Route 
+            path="/profile" 
+            element={
+              <LazyRoute pageName="Profile">
+                <Profile />
+              </LazyRoute>
+            } 
+          />
+          
+          {/* NEW: Content Library Route */}
+          <Route 
+            path="/tools/content-library" 
+            element={
+              <LazyRoute pageName="Content Library">
+                <ContentLibrary />
+              </LazyRoute>
+            } 
+          />
+          
+          {/* Analytics Route */}
+          <Route 
+            path="/analytics" 
+            element={
+              <LazyRoute pageName="Analytics">
+                <Analytics />
+              </LazyRoute>
+            } 
+          />
+          
+          {/* Core Tool Routes */}
+          <Route 
+            path="/tools/video2promo" 
+            element={
+              <LazyRoute pageName="Video2Promo">
+                <Video2Promo />
+              </LazyRoute>
+            } 
+          />
+          
+          <Route 
+            path="/tools/email-generator" 
+            element={
+              <LazyRoute 
+                pageName="Email Generator"
+                preloadOnHover={true}
+                preloadFunction={preloadEmailComponents}
+              >
+                <SalesPageEmailGenerator />
+              </LazyRoute>
+            } 
+          />
 
+          <Route 
+            path="/tools/email-series" 
+            element={
+              <LazyRoute pageName="Email Series List">
+                <EmailSeriesListPage />
+              </LazyRoute>
+            } 
+          />
+          <Route 
+            path="/tools/email-series/:seriesId" 
+            element={
+              <LazyRoute pageName="Email Series Detail">
+                <EmailSeriesDetailPage />
+              </LazyRoute>
+            } 
+          />
+          
+          {/* Future Tool Routes */}
+          <Route 
+            path="/tools/ai-writer" 
+            element={
+              <LazyRoute pageName="AI Writing Assistant">
+                <AIWritingAssistant />
+              </LazyRoute>
+            } 
+          />
+          
+          <Route 
+            path="/tools/competitor-analysis" 
+            element={
+              <LazyRoute pageName="Competitor Analysis">
+                <CompetitorAnalysis />
+              </LazyRoute>
+            } 
+          />
+          
+          <Route 
+            path="/tools/seo-generator" 
+            element={
+              <LazyRoute pageName="SEO Generator">
+                <div className="max-w-4xl mx-auto p-8 text-center">
+                  <div className="text-6xl mb-4">📊</div>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-4">SEO Content Generator</h2>
+                  <p className="text-lg text-gray-600">Coming soon!</p>
+                </div>
+              </LazyRoute>
+            } 
+          />
+          
+          <Route 
+            path="/tools/social-scheduler" 
+            element={
+              <LazyRoute pageName="Social Scheduler">
+                <div className="max-w-4xl mx-auto p-8 text-center">
+                  <div className="text-6xl mb-4">📱</div>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-4">Social Media Scheduler</h2>
+                  <p className="text-lg text-gray-600">Coming soon!</p>
+                </div>
+              </LazyRoute>
+            } 
+          />
+          
+          {/* Legacy Email Series Routes */}
+          <Route 
+            path="/email-series" 
+            element={
+              <LazyRoute pageName="Email Series List">
+                <EmailSeriesListPage />
+              </LazyRoute>
+            } 
+          />
+          <Route 
+            path="/email-series/:seriesId" 
+            element={
+              <LazyRoute pageName="Email Series Detail">
+                <EmailSeriesDetailPage />
+              </LazyRoute>
+            } 
+          />
+          
+          {/* Legacy Tool Routes */}
+          <Route 
+            path="/blog-creator" 
+            element={
+              <LazyRoute pageName="Blog Post Creator">
+                <BlogPostCreator />
+              </LazyRoute>
+            } 
+          />
+          
+          <Route 
+            path="/newsletter-creator" 
+            element={
+              <LazyRoute pageName="Newsletter Creator">
+                <NewsletterCreator />
+              </LazyRoute>
+            } 
+          />
+        </Route>
+        
+        {/* Alternative Video2Promo Route Names - OUTSIDE MainLayout */}
         <Route 
-          path="/tools/email-series" 
-          element={
-            <LazyRoute pageName="Email Series List">
-              <EmailSeriesListPage />
-            </LazyRoute>
-          } 
+          path="/video-to-email" 
+          element={<Navigate to="/tools/video2promo" replace />}
         />
         <Route 
-          path="/tools/email-series/:seriesId" 
+          path="/tools/video-to-email" 
+          element={<Navigate to="/tools/video2promo" replace />}
+        />
+        <Route 
+          path="/video2promo" 
+          element={<Navigate to="/tools/video2promo" replace />}
+        />
+        
+        {/* Subscription Route - Outside MainLayout for full page experience */}
+        <Route 
+          path="/subscription" 
           element={
-            <LazyRoute pageName="Email Series Detail">
-              <EmailSeriesDetailPage />
+            <LazyRoute pageName="Subscription">
+              <Subscription />
             </LazyRoute>
           } 
         />
         
-        {/* Future Tool Routes */}
-        <Route 
-          path="/tools/ai-writer" 
-          element={
-            <LazyRoute pageName="AI Writing Assistant">
-              <AIWritingAssistant />
-            </LazyRoute>
-          } 
-        />
-        
-        <Route 
-          path="/tools/competitor-analysis" 
-          element={
-            <LazyRoute pageName="Competitor Analysis">
-              <CompetitorAnalysis />
-            </LazyRoute>
-          } 
-        />
-        
-        <Route 
-          path="/tools/seo-generator" 
-          element={
-            <LazyRoute pageName="SEO Generator">
-              <div className="max-w-4xl mx-auto p-8 text-center">
-                <div className="text-6xl mb-4">📊</div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">SEO Content Generator</h2>
-                <p className="text-lg text-gray-600">Coming soon!</p>
-              </div>
-            </LazyRoute>
-          } 
-        />
-        
-        <Route 
-          path="/tools/social-scheduler" 
-          element={
-            <LazyRoute pageName="Social Scheduler">
-              <div className="max-w-4xl mx-auto p-8 text-center">
-                <div className="text-6xl mb-4">📱</div>
-                <h2 className="text-3xl font-bold text-gray-900 mb-4">Social Media Scheduler</h2>
-                <p className="text-lg text-gray-600">Coming soon!</p>
-              </div>
-            </LazyRoute>
-          } 
-        />
-        
-        {/* Legacy Email Series Routes */}
-        <Route 
-          path="/email-series" 
-          element={
-            <LazyRoute pageName="Email Series List">
-              <EmailSeriesListPage />
-            </LazyRoute>
-          } 
-        />
-        <Route 
-          path="/email-series/:seriesId" 
-          element={
-            <LazyRoute pageName="Email Series Detail">
-              <EmailSeriesDetailPage />
-            </LazyRoute>
-          } 
-        />
-        
-        {/* Legacy Tool Routes */}
-        <Route 
-          path="/blog-creator" 
-          element={
-            <LazyRoute pageName="Blog Post Creator">
-              <BlogPostCreator />
-            </LazyRoute>
-          } 
-        />
-        
-        <Route 
-          path="/newsletter-creator" 
-          element={
-            <LazyRoute pageName="Newsletter Creator">
-              <NewsletterCreator />
-            </LazyRoute>
-          } 
-        />
-      </Route>
-      
-      {/* Alternative Video2Promo Route Names - OUTSIDE MainLayout */}
-      <Route 
-        path="/video-to-email" 
-        element={<Navigate to="/tools/video2promo" replace />}
-      />
-      <Route 
-        path="/tools/video-to-email" 
-        element={<Navigate to="/tools/video2promo" replace />}
-      />
-      <Route 
-        path="/video2promo" 
-        element={<Navigate to="/tools/video2promo" replace />}
-      />
-      
-      {/* Subscription Route - Outside MainLayout for full page experience */}
-      <Route 
-        path="/subscription" 
-        element={
-          <LazyRoute pageName="Subscription">
-            <Subscription />
-          </LazyRoute>
-        } 
-      />
-      
-      {/* Fallback for undefined routes */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* Fallback for undefined routes */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </ErrorBoundary>
   );
 };
 

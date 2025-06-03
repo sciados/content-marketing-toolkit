@@ -1,326 +1,217 @@
-// src/hooks/useUsageTracking.js - FIXED with Video2Promo support
-import { useState, useCallback } from 'react';
-import { subscriptions } from '../services/supabase/subscriptions';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL;
+// src/hooks/useUsageTracking.js - ENHANCED with real-time updates
+import { useState, useEffect, useCallback } from 'react';
+import { usageApi } from '../services/api';
 
-/**
- * Custom hook for tracking and managing usage limits
- */
 export const useUsageTracking = () => {
-  const [isTracking, setIsTracking] = useState(false);
+  const [limits, setLimits] = useState({
+    monthly_token_limit: 2000,
+    daily_token_limit: 200,
+    monthly_tokens_used: 0,
+    daily_tokens_used: 0,
+    daily_video_limit: 10,
+    daily_videos_processed: 0,
+    tier: 'free'
+  });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  /**
-   * Track email generation usage
-   * @param {number} count - Number of emails generated (default: 1)
-   */
-  const trackEmailGeneration = useCallback(async (count = 1) => {
-    setIsTracking(true);
+  // Fetch current usage limits
+  const fetchLimits = useCallback(async () => {
+    setLoading(true);
     setError(null);
     
     try {
-      await subscriptions.updateUsage('emails_generated', count);
-      console.log(`Tracked ${count} email(s) generated`);
-    } catch (err) {
-      console.error('Error tracking email generation:', err);
-      setError(err.message);
-      throw err;
-    } finally {
-      setIsTracking(false);
-    }
-  }, []);
-
-  /**
-   * Track email saving usage
-   * @param {number} count - Number of emails saved (default: 1)
-   */
-  const trackEmailSaved = useCallback(async (count = 1) => {
-    setIsTracking(true);
-    setError(null);
-    
-    try {
-      await subscriptions.updateUsage('emails_saved', count);
-      console.log(`Tracked ${count} email(s) saved`);
-    } catch (err) {
-      console.error('Error tracking email saved:', err);
-      setError(err.message);
-      throw err;
-    } finally {
-      setIsTracking(false);
-    }
-  }, []);
-
-  /**
-   * Track series creation usage
-   * @param {number} count - Number of series created (default: 1)
-   */
-  const trackSeriesCreated = useCallback(async (count = 1) => {
-    setIsTracking(true);
-    setError(null);
-    
-    try {
-      await subscriptions.updateUsage('series_created', count);
-      console.log(`Tracked ${count} series created`);
-    } catch (err) {
-      console.error('Error tracking series creation:', err);
-      setError(err.message);
-      throw err;
-    } finally {
-      setIsTracking(false);
-    }
-  }, []);
-
-  /**
-   * Track AI token usage
-   * @param {number} tokens - Number of AI tokens used
-   */
-  const trackAITokenUsage = useCallback(async (tokens) => {
-    if (!tokens || tokens <= 0) return;
-    
-    setIsTracking(true);
-    setError(null);
-    
-    try {
-      await subscriptions.updateUsage('ai_tokens_used', tokens);
-      console.log(`Tracked ${tokens} AI tokens used`);
-    } catch (err) {
-      console.error('Error tracking AI token usage:', err);
-      setError(err.message);
-      throw err;
-    } finally {
-      setIsTracking(false);
-    }
-  }, []);
-
-  /**
-   * Track Video2Promo project usage
-   * @param {number} count - Number of projects created (default: 1)
-   */
-  const trackVideo2PromoProject = useCallback(async (count = 1) => {
-    setIsTracking(true);
-    setError(null);
-    
-    try {
-      // For Video2Promo, we can track it as series or create a new usage type
-      await subscriptions.updateUsage('series_created', count);
-      console.log(`Tracked ${count} Video2Promo project(s) created`);
-    } catch (err) {
-      console.error('Error tracking Video2Promo project:', err);
-      setError(err.message);
-      throw err;
-    } finally {
-      setIsTracking(false);
-    }
-  }, []);
-
-  /**
-   * Check if user can perform an action based on usage limits
-   * @param {string} limitType - Type of limit to check ('emails', 'series', 'ai_tokens', 'video2promo_projects')
-   * @returns {Promise<Object>} - { allowed: boolean, current: number, limit: number, remaining: number }
-   */
-  const checkUsageLimit = useCallback(async (limitType) => {
-    try {
-      console.log(`🔍 Checking usage limit for: ${limitType}`);
+      const result = await usageApi.getLimits();
       
-      // Map Video2Promo projects to series limits for now
-      const mappedLimitType = limitType === 'video2promo_projects' ? 'series' : limitType;
-      
-      const result = await subscriptions.checkUsageLimit(mappedLimitType);
-      console.log(`Usage check for ${limitType} (mapped to ${mappedLimitType}):`, result);
-      
-      // Ensure we return the expected structure
-      if (!result || typeof result !== 'object') {
-        console.warn(`Invalid usage limit result for ${limitType}:`, result);
-        return {
-          allowed: false,
-          current_usage: 0,
-          limit_value: 0,
-          remaining: 0,
-          message: 'Invalid usage data'
-        };
+      if (result.success) {
+        setLimits(result.limits);
+        console.log('✅ Usage limits loaded:', result.limits);
+      } else {
+        throw new Error(result.error || 'Failed to fetch usage limits');
       }
-      
-      return {
-        allowed: result.allowed !== false, // Default to true if not explicitly false
-        current_usage: result.current_usage || 0,
-        limit_value: result.limit_value || 0,
-        remaining: result.remaining || 0,
-        message: result.message || 'Usage check completed'
-      };
     } catch (err) {
-      console.error(`Error checking usage limit for ${limitType}:`, err);
+      console.error('❌ Failed to fetch usage limits:', err);
       setError(err.message);
-      // Return safe defaults on error
-      return {
-        allowed: false,
-        current_usage: 0,
-        limit_value: 0,
-        remaining: 0,
-        message: `Error checking usage: ${err.message}`
-      };
-    }
-  }, []);
-
-  /**
-   * Update usage using the backend API (for Video2Promo and other backend features)
-   * @param {string} usageType - Type of usage to update
-   * @param {number} amount - Amount to add (default: 1)
-   */
-  const updateUsage = useCallback(async (usageType, amount = 1) => {
-    setIsTracking(true);
-    setError(null);
-    
-    try {
-      console.log(`🔍 Updating usage via backend: ${usageType} +${amount}`);
       
-      // Try to get session for backend API call
-      const session = JSON.parse(localStorage.getItem('supabase.auth.token'))?.currentSession;
-      
-      if (!session?.access_token) {
-        throw new Error('No valid session for backend API call');
-      }
-      
-      const response = await fetch(`${API_BASE}/api/usage/track`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({
-          usage_type: usageType,
-          amount: amount
-        })
+      // Use fallback limits
+      setLimits({
+        monthly_token_limit: 2000,
+        daily_token_limit: 200,
+        monthly_tokens_used: 0,
+        daily_tokens_used: 0,
+        daily_video_limit: 10,
+        daily_videos_processed: 0,
+        tier: 'free'
       });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Backend API error: ${response.status}`);
-      }
-      
-      const result = await response.json();
-      console.log(`✅ Backend usage update successful:`, result);
-      
-    } catch (err) {
-      console.error(`Error updating usage via backend for ${usageType}:`, err);
-      
-      // Fallback to Supabase method if backend fails
-      try {
-        console.log(`🔄 Falling back to Supabase for ${usageType}`);
-        const mappedType = usageType === 'video2promo_projects' ? 'series_created' : usageType;
-        await subscriptions.updateUsage(mappedType, amount);
-        console.log(`✅ Supabase fallback successful for ${usageType}`);
-      } catch (fallbackErr) {
-        console.error(`❌ Both backend and Supabase failed for ${usageType}:`, fallbackErr);
-        setError(fallbackErr.message);
-        throw fallbackErr;
-      }
     } finally {
-      setIsTracking(false);
+      setLoading(false);
     }
   }, []);
 
-  /**
-   * Get current usage statistics
-   * @returns {Promise<Object>} - Current month usage stats
-   */
-  const getCurrentUsage = useCallback(async () => {
+  // Track AI token usage
+  const trackAITokenUsage = useCallback(async (tokens, feature = 'general') => {
     try {
-      const stats = await subscriptions.getUsageStats();
-      console.log('Current usage stats:', stats);
-      return stats;
-    } catch (err) {
-      console.error('Error getting usage stats:', err);
-      setError(err.message);
-      // Return default stats on error
-      return {
-        emails_generated: 0,
-        emails_saved: 0,
-        ai_tokens_used: 0,
-        series_created: 0
+      const result = await usageApi.trackUsage({
+        tokens,
+        feature,
+        timestamp: new Date().toISOString()
+      });
+
+      if (result.success) {
+        // Update local state
+        setLimits(prev => ({
+          ...prev,
+          monthly_tokens_used: result.usage.monthly_tokens_used,
+          daily_tokens_used: result.usage.daily_tokens_used
+        }));
+
+        console.log(`✅ Tracked ${tokens} tokens for ${feature}`);
+        return result;
+      } else {
+        throw new Error(result.error || 'Failed to track usage');
+      }
+    } catch (error) {
+      console.error('❌ Failed to track token usage:', error);
+      throw error;
+    }
+  }, []);
+
+  // Track video processing
+  const trackVideoProcessing = useCallback(async (videoId, extractionMethod = 'webshare') => {
+    try {
+      const result = await usageApi.trackUsage({
+        feature: 'video_processing',
+        metadata: {
+          video_id: videoId,
+          extraction_method: extractionMethod
+        },
+        timestamp: new Date().toISOString()
+      });
+
+      if (result.success) {
+        setLimits(prev => ({
+          ...prev,
+          daily_videos_processed: result.usage.daily_videos_processed
+        }));
+
+        console.log(`✅ Tracked video processing: ${videoId}`);
+        return result;
+      } else {
+        throw new Error(result.error || 'Failed to track video processing');
+      }
+    } catch (error) {
+      console.error('❌ Failed to track video processing:', error);
+      throw error;
+    }
+  }, []);
+
+  // Convenience methods for backward compatibility
+  const trackEmailGeneration = useCallback((count = 1) => {
+    return trackAITokenUsage(150 * count, 'email_generation');
+  }, [trackAITokenUsage]);
+
+  const trackSeriesCreated = useCallback((count = 1) => {
+    return trackAITokenUsage(50 * count, 'series_creation');
+  }, [trackAITokenUsage]);
+
+  const trackEmailSaved = useCallback((count = 1) => {
+    return trackAITokenUsage(10 * count, 'email_save');
+  }, [trackAITokenUsage]);
+
+  // trackUsage method with metadata parameter (kept for API compatibility)
+  const trackUsage = useCallback((tokens, feature, _metadata = {}) => { // eslint-disable-line no-unused-vars
+    // Note: _metadata parameter kept for API compatibility but not used in current implementation
+    return trackAITokenUsage(tokens, feature);
+  }, [trackAITokenUsage]);
+
+  // Check if user can perform action
+  const canPerformAction = useCallback((actionType, tokensRequired = 0) => {
+    switch (actionType) {
+      case 'ai_generation':
+        return limits.daily_tokens_used + tokensRequired <= limits.daily_token_limit &&
+               limits.monthly_tokens_used + tokensRequired <= limits.monthly_token_limit;
+      
+      case 'video_processing':
+        return limits.daily_videos_processed < limits.daily_video_limit;
+      
+      default:
+        return true;
+    }
+  }, [limits]);
+
+  // Check token availability
+  const checkCanUseTokens = useCallback(async (requiredTokens) => {
+    const dailyAvailable = limits.daily_token_limit - limits.daily_tokens_used;
+    const monthlyAvailable = limits.monthly_token_limit - limits.monthly_tokens_used;
+    const available = Math.min(dailyAvailable, monthlyAvailable);
+    
+    if (available >= requiredTokens) {
+      return { allowed: true, available, required: requiredTokens };
+    } else {
+      return { 
+        allowed: false, 
+        available, 
+        required: requiredTokens,
+        needed: requiredTokens - available
       };
     }
-  }, []);
+  }, [limits]);
 
-  /**
-   * Check if user can generate emails (checks email limit)
-   * @param {number} emailCount - Number of emails to generate
-   * @returns {Promise<boolean>} - Whether generation is allowed
-   */
-  const canGenerateEmails = useCallback(async (emailCount = 1) => {
-    try {
-      const limit = await checkUsageLimit('emails');
-      return limit.allowed && limit.remaining >= emailCount;
-    } catch (err) {
-      console.error('Error checking email generation limit:', err);
-      return false;
-    }
-  }, [checkUsageLimit]);
+  // Get usage percentages
+  const getUsagePercentages = useCallback(() => {
+    return {
+      daily_tokens: Math.min((limits.daily_tokens_used / limits.daily_token_limit) * 100, 100),
+      monthly_tokens: Math.min((limits.monthly_tokens_used / limits.monthly_token_limit) * 100, 100),
+      daily_videos: Math.min((limits.daily_videos_processed / limits.daily_video_limit) * 100, 100)
+    };
+  }, [limits]);
 
-  /**
-   * Check if user can save emails (checks storage limit)
-   * @param {number} emailCount - Number of emails to save
-   * @returns {Promise<boolean>} - Whether saving is allowed
-   */
-  const canSaveEmails = useCallback(async (emailCount = 1) => {
-    try {
-      const limit = await checkUsageLimit('emails');
-      return limit.allowed && limit.remaining >= emailCount;
-    } catch (err) {
-      console.error('Error checking email save limit:', err);
-      return false;
-    }
-  }, [checkUsageLimit]);
+  // Get remaining limits
+  const getRemainingLimits = useCallback(() => {
+    return {
+      daily_tokens: Math.max(limits.daily_token_limit - limits.daily_tokens_used, 0),
+      monthly_tokens: Math.max(limits.monthly_token_limit - limits.monthly_tokens_used, 0),
+      daily_videos: Math.max(limits.daily_video_limit - limits.daily_videos_processed, 0)
+    };
+  }, [limits]);
 
-  /**
-   * Check if user can create series (checks series limit)
-   * @returns {Promise<boolean>} - Whether series creation is allowed
-   */
-  const canCreateSeries = useCallback(async () => {
-    try {
-      const limit = await checkUsageLimit('series');
-      return limit.allowed && limit.remaining >= 1;
-    } catch (err) {
-      console.error('Error checking series creation limit:', err);
-      return false;
-    }
-  }, [checkUsageLimit]);
+  // Initial load
+  useEffect(() => {
+    fetchLimits();
+  }, [fetchLimits]);
 
-  /**
-   * Check if user can create Video2Promo projects
-   * @returns {Promise<boolean>} - Whether Video2Promo creation is allowed
-   */
-  const canCreateVideo2Promo = useCallback(async () => {
-    try {
-      const limit = await checkUsageLimit('video2promo_projects');
-      return limit.allowed && limit.remaining >= 1;
-    } catch (err) {
-      console.error('Error checking Video2Promo creation limit:', err);
-      return false;
-    }
-  }, [checkUsageLimit]);
+  // Polling for usage updates every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(fetchLimits, 30000);
+    return () => clearInterval(interval);
+  }, [fetchLimits]);
 
   return {
-    // Tracking functions
-    trackEmailGeneration,
-    trackEmailSaved,
-    trackSeriesCreated,
-    trackAITokenUsage,
-    trackVideo2PromoProject, // NEW
-    
-    // Limit checking functions
-    checkUsageLimit,
-    getCurrentUsage,
-    canGenerateEmails,
-    canSaveEmails,
-    canCreateSeries,
-    canCreateVideo2Promo, // NEW
-    
-    // Backend integration
-    updateUsage, // NEW - for backend API calls
-    
     // State
-    isTracking,
-    error
+    limits,
+    loading,
+    error,
+    wsConnected: false, // WebSocket not implemented yet
+    
+    // Actions
+    fetchLimits,
+    trackAITokenUsage,
+    trackVideoProcessing,
+    trackEmailGeneration,
+    trackSeriesCreated,
+    trackEmailSaved,
+    trackUsage,
+    checkCanUseTokens,
+    
+    // Utilities
+    canPerformAction,
+    getUsagePercentages,
+    getRemainingLimits,
+    
+    // Computed values
+    isNearLimit: getUsagePercentages().daily_tokens > 80 || getUsagePercentages().monthly_tokens > 80,
+    isAtLimit: !canPerformAction('ai_generation', 100), // Check if user can use 100 tokens
+    hasVideoQuota: canPerformAction('video_processing')
   };
 };

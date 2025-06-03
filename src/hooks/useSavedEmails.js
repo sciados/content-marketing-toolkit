@@ -1,8 +1,21 @@
 // src/hooks/useSavedEmails.js
 import { useState, useEffect, useCallback } from 'react';
-import { extractDomain, createSeriesNameFromDomain } from '../services/emailGenerator';
 import { supabase } from '../services/supabase/supabaseClient';
-import { useUsageTracking } from './useUsageTracking'; // Add this import
+import { useUsageTracking } from './useUsageTracking';
+
+// Helper functions moved from legacy emailGenerator
+const extractDomain = (url) => {
+  try {
+    const domain = url.replace(/(^\w+:|^)\/\//, '').split('/')[0];
+    return domain.split('.').slice(-2, -1)[0] || domain;
+  } catch {
+    return 'website';
+  }
+};
+
+const createSeriesNameFromDomain = (domain) => {
+  return `${domain.charAt(0).toUpperCase() + domain.slice(1)} Email Series`;
+};
 
 /**
  * Custom hook for saved emails management
@@ -273,7 +286,7 @@ const loadSavedEmails = useCallback(async () => {
     
     // Check if this email is already saved
     const isDuplicate = savedEmails.some(
-      saved => saved.subject === emailToSave.subject && saved.body === emailToSave.body
+      saved => saved.subject === emailToSave.subject && saved.body === (emailToSave.body || emailToSave.content)
     );
     
     if (isDuplicate) {
@@ -299,7 +312,7 @@ const loadSavedEmails = useCallback(async () => {
           .insert({
             user_id: user.id,
             subject: emailWithMetadata.subject,
-            body: emailWithMetadata.body,
+            body: emailWithMetadata.body || emailWithMetadata.content,
             benefit: emailWithMetadata.benefit,
             email_number: emailWithMetadata.emailNumber || 1,
             domain: emailWithMetadata.domain,
@@ -366,7 +379,7 @@ const loadSavedEmails = useCallback(async () => {
       // Filter out any emails that are already saved
       const newEmails = emailSeries.filter(email => 
         !savedEmails.some(saved => 
-          saved.subject === email.subject && saved.body === email.body
+          saved.subject === email.subject && saved.body === (email.body || email.content)
         )
       );
       
@@ -414,7 +427,7 @@ const loadSavedEmails = useCallback(async () => {
             user_id: user.id,
             series_id: seriesId,
             subject: email.subject || 'Untitled Email',
-            body: email.body || '',
+            body: email.body || email.content || '',
             benefit: email.benefit || '',
             email_number: index + 1,
             layout: emailLayout || 'standard',

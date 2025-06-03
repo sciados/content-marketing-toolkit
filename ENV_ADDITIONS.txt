@@ -1,0 +1,14 @@
+# Frontend Streamlining - Additional Environment Variables 
+# Add these to your .env file 
+ 
+# WebSocket URL for real-time features 
+VITE_WS_URL=wss://aiworkers.onrender.com/ws 
+ 
+# API Base URL (should already exist) 
+VITE_API_BASE_URL=https://aiworkers.onrender.com 
+ 
+# Enable real-time features 
+VITE_ENABLE_WEBSOCKET=true 
+ 
+# Enable performance monitoring 
+VITE_ENABLE_PERFORMANCE_MONITORING=true 

@@ -1,12 +1,9 @@
-// src/hooks/useEmailGenerator.js - ENHANCED DEBUG VERSION
+// src/hooks/useEmailGenerator.js - UPDATED VERSION
 import { useState, useEffect, useCallback } from 'react';
-
-// Backend API URL - Using your existing environment variable
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+import { emailApi } from '../services/api';
 
 /**
- * Custom hook for email scanning and generation with backend integration
- * ENHANCED DEBUG VERSION - More detailed logging for auth troubleshooting
+ * Updated hook using centralized API service
  */
 export const useEmailGenerator = ({ showToast, onScanComplete }) => {
   // Form inputs
@@ -35,127 +32,15 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
   const [generatedEmails, setGeneratedEmails] = useState([]);
   const [isGeneratingEmails, setIsGeneratingEmails] = useState(false);
 
-  /**
-   * ENHANCED DEBUG: Get auth headers with Vercel→Render CORS fixes
-   */
-  const getAuthHeaders = useCallback(async () => {
-    console.log('🔧 getAuthHeaders: Starting auth header retrieval (Vercel→Render)...');
-    
-    try {
-      // Check localStorage directly
-      const storedAuth = localStorage.getItem('sb-gjqpyfrdxvecxwfsmory-auth-token');
-      console.log('🔧 getAuthHeaders: Raw localStorage data exists:', !!storedAuth);
-      console.log('🔧 getAuthHeaders: Raw data length:', storedAuth?.length || 0);
-      
-      if (storedAuth) {
-        const authData = JSON.parse(storedAuth);
-        console.log('🔧 getAuthHeaders: Parsed auth data keys:', Object.keys(authData));
-        console.log('🔧 getAuthHeaders: Has access_token:', !!authData.access_token);
-        console.log('🔧 getAuthHeaders: Token length:', authData.access_token?.length || 0);
-        console.log('🔧 getAuthHeaders: Token preview:', authData.access_token?.substring(0, 50) + '...');
-        
-        if (authData.access_token) {
-          // VERCEL→RENDER FIX: Enhanced headers for cross-origin requests
-          const headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${authData.access_token}`,
-            // Add origin header for better CORS handling
-            'Origin': window.location.origin
-          };
-          
-          console.log('🔧 getAuthHeaders: Vercel→Render headers:', {
-            hasContentType: !!headers['Content-Type'],
-            hasAccept: !!headers['Accept'],
-            hasAuthorization: !!headers['Authorization'],
-            hasOrigin: !!headers['Origin'],
-            origin: headers['Origin'],
-            authHeaderLength: headers['Authorization']?.length,
-            authHeaderPreview: headers['Authorization']?.substring(0, 70) + '...'
-          });
-          
-          return headers;
-        }
-      }
-      
-      console.log('❌ getAuthHeaders: No valid token found, returning basic headers');
-      return {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Origin': window.location.origin
-      };
-    } catch (error) {
-      console.error('❌ getAuthHeaders: Error processing auth data:', error);
-      return {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Origin': window.location.origin
-      };
-    }
-  }, []);
-
-        // Enhanced manual auth test function for Render backend
-  const testAuthManually = useCallback(async () => {
-    console.log('\n🧪 === MANUAL AUTH TEST START (Vercel→Render) ===');
-    
-    try {
-      const headers = await getAuthHeaders();
-      console.log('🧪 Manual test headers for Render backend:', headers);
-      console.log('🧪 API_BASE URL:', API_BASE);
-      
-      // Test with a simple endpoint first
-      const testResponse = await fetch(`${API_BASE}/api/usage/limits`, {
-        method: 'GET',
-        headers: headers,
-        mode: 'cors',
-        credentials: 'omit'
-      });
-      
-      console.log('🧪 Manual test response from Render:', {
-        status: testResponse.status,
-        statusText: testResponse.statusText,
-        ok: testResponse.ok,
-        url: testResponse.url,
-        type: testResponse.type,
-        redirected: testResponse.redirected
-      });
-      
-      // Log response headers
-      console.log('🧪 Response headers from Render:');
-      for (let [key, value] of testResponse.headers.entries()) {
-        console.log(`   ${key}: ${value}`);
-      }
-      
-      const responseText = await testResponse.text();
-      console.log('🧪 Manual test response body:', responseText);
-      
-      return testResponse.ok;
-    } catch (error) {
-      console.error('🧪 Manual test failed (Vercel→Render):', error);
-      return false;
-    }
-  }, [getAuthHeaders]);
-
-  // Check AI availability by testing backend connection
+  // Check AI availability
   useEffect(() => {
     const checkBackendAvailability = async () => {
       try {
-        const response = await fetch(`${API_BASE}/`, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          const backendAiAvailable = data.services?.claude || data.services?.openai || false;
-          setAiAvailable(backendAiAvailable);
-          setIsUsingAI(backendAiAvailable);
-          console.log('Backend AI services available:', backendAiAvailable);
-        } else {
-          setAiAvailable(false);
-          setIsUsingAI(false);
-          console.warn('Backend not available');
-        }
+        const health = await emailApi.getHealth();
+        const backendAiAvailable = health.services?.claude || health.services?.openai || false;
+        setAiAvailable(backendAiAvailable);
+        setIsUsingAI(backendAiAvailable);
+        console.log('Backend AI services available:', backendAiAvailable);
       } catch (error) {
         console.error('Error checking backend availability:', error);
         setAiAvailable(false);
@@ -186,7 +71,7 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     });
   }, []);
   
-  // ENHANCED DEBUG: Handle scanning a sales page
+  // Handle scanning a sales page
   const handleScanPage = useCallback(async (e) => {
     if (e) e.preventDefault();
     
@@ -222,61 +107,18 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
       updateProgress('Connecting to backend...', 10);
       await new Promise(r => setTimeout(r, 500));
       
-      updateProgress('Getting auth token...', 20);
-      const headers = await getAuthHeaders();
-      
-      // Detailed request logging
-      const requestData = {
-        url: url.trim(),
-        keywords: keywords.trim(),
-        industry
-      };
-      
-      console.log('🚀 SCAN: Request details:', {
-        endpoint: `${API_BASE}/api/email-generator/scan-page`,
-        method: 'POST',
-        headers: headers,
-        body: requestData
-      });
-      
       updateProgress('Analyzing page structure...', 30);
       await new Promise(r => setTimeout(r, 500));
       
       updateProgress('Extracting content with AI...', 60);
       
-      // Make the request with Vercel→Render CORS handling
-      console.log('🚀 SCAN: Making fetch request (Vercel→Render)...');
-      const response = await fetch(`${API_BASE}/api/email-generator/scan-page`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(requestData),
-        // Add CORS mode for cross-origin requests
-        mode: 'cors',
-        credentials: 'omit' // Don't send cookies, rely on Authorization header
+      // Use centralized API service
+      const result = await emailApi.scanPage({
+        url: url.trim(),
+        keywords: keywords.trim(),
+        industry
       });
 
-      console.log('🚀 SCAN: Response received:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('🚀 SCAN: Error response body:', errorText);
-        
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          errorData = { error: errorText };
-        }
-        
-        throw new Error(errorData.error || `HTTP ${response.status}: Failed to scan page`);
-      }
-
-      const result = await response.json();
       console.log('🚀 SCAN: Success response:', result);
 
       if (!result.success) {
@@ -333,9 +175,9 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     } finally {
       setIsScanning(false);
     }
-  }, [url, keywords, industry, showToast, onScanComplete, getAuthHeaders]);
+  }, [url, keywords, industry, showToast, onScanComplete]);
 
-  // ENHANCED DEBUG: Generate emails with extensive logging
+  // Generate emails
   const generateEmails = useCallback(async () => {
     if (!extractedBenefits.length || !selectedBenefits.some(Boolean)) {
       showToast('Please select at least one benefit to generate emails', 'error');
@@ -347,9 +189,8 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     try {
       console.log('\n📧 === EMAIL GENERATION REQUEST START ===');
       
-      const headers = await getAuthHeaders();
-      
-      const requestData = {
+      // Use centralized API service
+      const result = await emailApi.generateEmails({
         benefits: extractedBenefits,
         selectedBenefits,
         websiteData,
@@ -358,47 +199,8 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
         affiliateLink: affiliateLink.trim(),
         isUsingAI,
         aiAvailable
-      };
-      
-      console.log('📧 EMAIL: Request details:', {
-        endpoint: `${API_BASE}/api/email-generator/generate`,
-        method: 'POST',
-        headers: headers,
-        body: requestData
-      });
-      
-      console.log('📧 EMAIL: Making fetch request (Vercel→Render)...');
-      const response = await fetch(`${API_BASE}/api/email-generator/generate`, {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(requestData),
-        // Add CORS mode for cross-origin requests
-        mode: 'cors',
-        credentials: 'omit' // Don't send cookies, rely on Authorization header
       });
 
-      console.log('📧 EMAIL: Response received:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        headers: Object.fromEntries(response.headers.entries())
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('📧 EMAIL: Error response body:', errorText);
-        
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch {
-          errorData = { error: errorText };
-        }
-        
-        throw new Error(errorData.error || `HTTP ${response.status}: Email generation failed`);
-      }
-
-      const result = await response.json();
       console.log('📧 EMAIL: Success response:', result);
 
       if (!result.success) {
@@ -424,7 +226,7 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     } finally {
       setIsGeneratingEmails(false);
     }
-  }, [extractedBenefits, selectedBenefits, websiteData, tone, industry, affiliateLink, showToast, getAuthHeaders, isUsingAI, aiAvailable]);
+  }, [extractedBenefits, selectedBenefits, websiteData, tone, industry, affiliateLink, showToast, isUsingAI, aiAvailable]);
 
   // Clear all data
   const clearData = useCallback(() => {
@@ -474,10 +276,6 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     handleScanPage,
     generateEmails,
     clearData,
-    getSelectedBenefits,
-    
-    // DEBUG METHODS
-    testAuthManually,
-    getAuthHeaders
+    getSelectedBenefits
   };
 };

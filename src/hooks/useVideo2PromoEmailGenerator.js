@@ -3,7 +3,7 @@
 
 import { useState, useCallback } from 'react';
 import { nlpService } from '../services/video2promo/nlpService';
-import { generateAIEmailSeries } from '../services/emailGenerator/emailGenerator';
+import { emailApi } from '../services/api'; // Use centralized API
 import { useUsageTracking } from './useUsageTracking';
 
 export const useVideo2PromoEmailGenerator = ({ user, showToast }) => {
@@ -13,8 +13,8 @@ export const useVideo2PromoEmailGenerator = ({ user, showToast }) => {
   const [videoStage, setVideoStage] = useState('');
   
   // Benefits extraction state
-  const [extractedBenefits, setExtractedBenefits] = useState([]);
-  const [selectedBenefits, setSelectedBenefits] = useState([]);
+  const [extractedBenefits, setExtractedBenefits] = useState(/** @type {string[]} */ ([]));
+  const [selectedBenefits, setSelectedBenefits] = useState(/** @type {boolean[]} */ ([]));
   const [videoData, setVideoData] = useState(null);
   
   // Email generation state
@@ -93,7 +93,7 @@ export const useVideo2PromoEmailGenerator = ({ user, showToast }) => {
     }
   }, [user, showToast]);
   
-  // Generate emails from selected benefits
+  // Generate emails from selected benefits using centralized API
   const generateEmailsFromBenefits = useCallback(async (options = {}) => {
     try {
       // Get selected benefits
@@ -114,43 +114,62 @@ export const useVideo2PromoEmailGenerator = ({ user, showToast }) => {
       
       setIsGeneratingEmails(true);
       
-      // Generate emails using your existing system
-      const emailResult = await generateAIEmailSeries(
-        selectedBenefitList,
-        videoData,
-        {
-          domain: videoData?.domain || 'YouTube Video',
-          affiliateLink: options.affiliateLink || '',
-          tone: options.tone || 'persuasive',
-          industry: options.industry || 'general',
-          userTier: user?.subscription_tier || 'free',
-          user: user
-        }
-      );
+      // Generate emails using centralized emailApi
+      const emailResult = await emailApi.generateEmails({
+        benefits: selectedBenefitList,
+        selectedBenefits: selectedBenefitList.map(() => true),
+        websiteData: videoData,
+        tone: options.tone || 'persuasive',
+        industry: options.industry || 'general',
+        affiliateLink: options.affiliateLink || ''
+      });
       
-      if (!emailResult.emails || emailResult.emails.length === 0) {
-        throw new Error('Failed to generate emails');
+      if (!emailResult.success || !emailResult.emails || emailResult.emails.length === 0) {
+        throw new Error(emailResult.error || 'Failed to generate emails');
       }
       
       // Track token usage
-      if (emailResult.usage) {
-        await trackUsage(emailResult.usage.totalTokens, 'email_generation', {
+      if (emailResult.total_tokens) {
+        await trackUsage(emailResult.total_tokens, 'email_generation', {
           source: 'video2promo',
           emailCount: emailResult.emails.length,
           benefitCount: selectedBenefitList.length
         });
       }
       
-      // Set results
-      setGeneratedEmails(emailResult.emails);
-      setEmailUsage(emailResult.usage);
+      // Process emails to match expected format
+      const processedEmails = emailResult.emails.map((email, index) => ({
+        ...email,
+        id: `video-email-${index + 1}`,
+        emailNumber: index + 1,
+        createdAt: new Date().toISOString(),
+        source: 'video2promo',
+        benefit: selectedBenefitList[index] || email.benefit,
+        domain: videoData?.domain || 'YouTube Video',
+        generatedWithAI: true,
+        generationMethod: 'backend-api'
+      }));
       
-      showToast(`Successfully generated ${emailResult.emails.length} emails!`, 'success');
+      // Set results
+      setGeneratedEmails(processedEmails);
+      setEmailUsage({
+        totalTokens: emailResult.total_tokens || 0,
+        model: 'backend-ai',
+        aiSuccessRate: 100,
+        totalEmails: processedEmails.length
+      });
+      
+      showToast(`Successfully generated ${processedEmails.length} emails!`, 'success');
       
       return {
         success: true,
-        emails: emailResult.emails,
-        usage: emailResult.usage
+        emails: processedEmails,
+        usage: {
+          totalTokens: emailResult.total_tokens || 0,
+          model: 'backend-ai',
+          aiSuccessRate: 100,
+          totalEmails: processedEmails.length
+        }
       };
       
     } catch (error) {
@@ -164,7 +183,7 @@ export const useVideo2PromoEmailGenerator = ({ user, showToast }) => {
     } finally {
       setIsGeneratingEmails(false);
     }
-  }, [extractedBenefits, selectedBenefits, videoData, user, showToast, checkCanUseTokens, trackUsage]);
+  }, [extractedBenefits, selectedBenefits, videoData, showToast, checkCanUseTokens, trackUsage]);
   
   // Toggle benefit selection
   const toggleBenefit = useCallback((index) => {

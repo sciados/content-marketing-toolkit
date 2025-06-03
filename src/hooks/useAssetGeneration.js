@@ -1,9 +1,7 @@
-// src/hooks/useAssetGeneration.js - UPDATED for Backend Integration
+// src/hooks/useAssetGeneration.js - UPDATED VERSION
 import { useState, useCallback } from 'react';
+import { videoApi } from '../services/api';
 import { useUsageTracking } from './useUsageTracking';
-
-// Backend API URL - Using your existing environment variable
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 export function useAssetGeneration() {
   const [generatedAssets, setGeneratedAssets] = useState([]);
@@ -13,18 +11,7 @@ export function useAssetGeneration() {
   const { trackAITokenUsage } = useUsageTracking();
 
   /**
-   * Get auth headers for API calls
-   */
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('supabase.auth.token');
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': token ? `Bearer ${token}` : ''
-    };
-  };
-
-  /**
-   * Generate assets using backend API
+   * Generate assets using centralized API service
    */
   const generateAssets = useCallback(async (params) => {
     setIsGenerating(true);
@@ -52,25 +39,15 @@ export function useAssetGeneration() {
         generateVariants
       });
 
-      const response = await fetch(`${API_BASE}/api/video2promo/generate-assets`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          transcript,
-          benefits,
-          benefitIndices,
-          assetTypes,
-          generateVariants,
-          project
-        })
+      // Use centralized API service
+      const result = await videoApi.generateAssets({
+        transcript,
+        benefits,
+        benefitIndices,
+        assetTypes,
+        generateVariants,
+        project
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `HTTP ${response.status}`);
-      }
-
-      const result = await response.json();
 
       if (!result.success) {
         throw new Error(result.error || 'Asset generation failed');
@@ -105,9 +82,7 @@ export function useAssetGeneration() {
     }
   }, [trackAITokenUsage]);
 
-  /**
-   * Generate email series (legacy method - now uses backend)
-   */
+  // Rest of the methods remain the same...
   const generateEmailSeries = useCallback(async (params) => {
     return generateAssets({
       ...params,
@@ -115,9 +90,6 @@ export function useAssetGeneration() {
     });
   }, [generateAssets]);
 
-  /**
-   * Generate blog post (legacy method - now uses backend)
-   */
   const generateBlogPost = useCallback(async (params) => {
     return generateAssets({
       ...params,
@@ -125,9 +97,6 @@ export function useAssetGeneration() {
     });
   }, [generateAssets]);
 
-  /**
-   * Generate newsletter (legacy method - now uses backend)
-   */
   const generateNewsletter = useCallback(async (params) => {
     return generateAssets({
       ...params,
@@ -135,9 +104,6 @@ export function useAssetGeneration() {
     });
   }, [generateAssets]);
 
-  /**
-   * Generate multiple assets (updated to use backend)
-   */
   const generateMultipleAssets = useCallback(async (benefits, assetTypes, params = {}) => {
     const { transcript, project } = params;
     
@@ -145,7 +111,6 @@ export function useAssetGeneration() {
       throw new Error('Transcript is required for asset generation');
     }
 
-    // Create benefit indices (select all benefits)
     const benefitIndices = benefits.map((_, index) => index);
 
     return generateAssets({
@@ -158,24 +123,15 @@ export function useAssetGeneration() {
     });
   }, [generateAssets]);
 
-  /**
-   * Clear generated assets
-   */
   const clearAssets = useCallback(() => {
     setGeneratedAssets([]);
     setError(null);
   }, []);
 
-  /**
-   * Remove specific asset
-   */
   const removeAsset = useCallback((assetId) => {
     setGeneratedAssets(prev => prev.filter(asset => asset.id !== assetId));
   }, []);
 
-  /**
-   * Estimate tokens needed for generation
-   */
   const estimateTokens = useCallback((benefits, assetTypes, generateVariants = false) => {
     const tokenEstimates = {
       email_series: 800,
@@ -191,62 +147,6 @@ export function useAssetGeneration() {
     });
 
     return generateVariants ? Math.floor(total * 1.5) : total;
-  }, []);
-
-  /**
-   * Get asset by ID
-   */
-  const getAssetById = useCallback((assetId) => {
-    return generatedAssets.find(asset => asset.id === assetId);
-  }, [generatedAssets]);
-
-  /**
-   * Get assets by type
-   */
-  const getAssetsByType = useCallback((assetType) => {
-    return generatedAssets.filter(asset => asset.type === assetType);
-  }, [generatedAssets]);
-
-  /**
-   * Export asset to different formats
-   */
-  const exportAsset = useCallback((asset, format = 'json') => {
-    try {
-      switch (format) {
-        case 'json':
-          return JSON.stringify(asset, null, 2);
-        
-        case 'text':
-          if (asset.type === 'email_series') {
-            return asset.content.map(email => 
-              `Subject: ${email.subject}\n\n${email.content}`
-            ).join('\n\n---\n\n');
-          } else if (asset.type === 'blog_post') {
-            return `${asset.content.title}\n\n${asset.content.body}`;
-          } else if (asset.type === 'newsletter') {
-            return `${asset.content.headline}\n\n${asset.content.body}`;
-          }
-          return asset.content;
-        
-        case 'markdown':
-          if (asset.type === 'email_series') {
-            return asset.content.map(email => 
-              `## ${email.subject}\n\n${email.content}`
-            ).join('\n\n---\n\n');
-          } else if (asset.type === 'blog_post') {
-            return `# ${asset.content.title}\n\n${asset.content.body}`;
-          } else if (asset.type === 'newsletter') {
-            return `## ${asset.content.headline}\n\n${asset.content.body}`;
-          }
-          return asset.content;
-        
-        default:
-          return JSON.stringify(asset, null, 2);
-      }
-    } catch (error) {
-      console.error('Export error:', error);
-      return JSON.stringify(asset, null, 2);
-    }
   }, []);
 
   return {
@@ -267,9 +167,6 @@ export function useAssetGeneration() {
     generateNewsletter,
     
     // Utilities
-    estimateTokens,
-    getAssetById,
-    getAssetsByType,
-    exportAsset
+    estimateTokens
   };
 }

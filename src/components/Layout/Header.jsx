@@ -1,8 +1,9 @@
-// src/components/Layout/Header.jsx - UPDATED with Content Library and Enhanced Navigation
+// src/components/Layout/Header.jsx - UPDATED with UsageMeter integration
 import React from 'react';
 import { Link } from 'react-router-dom';
 import useSupabase from '../../hooks/useSupabase';
 import { useProfile } from '../../hooks/useProfile';
+import { UsageMeter } from '../Common';
 
 const Header = () => {
   const { user, logout } = useSupabase();
@@ -109,6 +110,11 @@ const Header = () => {
                 Analytics
               </Link>
 
+              {/* Usage Meter - Hidden on mobile, visible on desktop */}
+              <div className="hidden lg:flex items-center mx-3 px-3 py-1 bg-gray-50 rounded-lg">
+                <UsageMeter variant="compact" showLabels={true} />
+              </div>
+
               {/* Profile Dropdown */}
               <div className="relative group mx-3">
                 <button className="text-gray-600 hover:text-indigo-600 flex items-center">
@@ -127,6 +133,13 @@ const Header = () => {
                         {user.email}
                       </div>
                     </div>
+
+                    {/* Usage Meter in dropdown for mobile */}
+                    <div className="lg:hidden px-3 py-2 border-b border-gray-100">
+                      <div className="text-xs font-medium text-gray-500 mb-2">Usage</div>
+                      <UsageMeter variant="compact" showLabels={true} />
+                    </div>
+                    
                     <Link 
                       to="/profile" 
                       className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-md"
@@ -143,7 +156,7 @@ const Header = () => {
                       <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                       </svg>
-                      Subscription
+                      Usage & Billing
                     </Link>
                     
                     {/* Admin Section */}

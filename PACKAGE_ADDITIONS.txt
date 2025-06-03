@@ -1,0 +1,13 @@
+# Additional dependencies for frontend streamlining 
+# Add these to your package.json dependencies 
+ 
+## New Dependencies: 
+"ws": "^8.14.2",          # WebSocket client 
+"reconnecting-websocket": "^4.4.0",  # Auto-reconnecting WebSocket 
+ 
+## Optional Dependencies (for enhanced features): 
+"react-error-boundary": "^4.0.11",  # Enhanced error boundaries 
+"use-debounce": "^9.0.4",          # Debounced hooks 
+ 
+## Add to package.json: 
+npm install ws reconnecting-websocket 

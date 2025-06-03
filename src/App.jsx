@@ -1,11 +1,12 @@
-// src/App.jsx
+// src/App.jsx - FINAL VERSION without PerformanceMonitor
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import SupabaseProvider from './context/SupabaseProvider';
 import { ToastProvider } from './context/ToastContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { WebSocketProvider } from './context/WebSocketProvider';
+import { ErrorBoundary } from './components/Common';
 import AppRoutes from './routes/AppRoutes';
-import PerformanceMonitor from './components/PerformanceMonitor';
 import { setupPerformanceMonitoring } from './utils/performanceUtils';
 
 // Check if we're in development mode
@@ -13,7 +14,7 @@ const isDevelopment = import.meta.env.DEV;
 
 console.log('🔧 App.jsx: Starting to load...');
 
-// Emergency reset button
+// Emergency reset button for development
 const EmergencyReset = () => (
   <div style={{ position: 'fixed', top: '10px', right: '10px', zIndex: 9999 }}>
     <button 
@@ -42,7 +43,7 @@ const App = () => {
   useEffect(() => {
     // Only enable performance monitoring in development or when explicitly enabled
     const shouldMonitor = isDevelopment || 
-      localStorage.getItem('enablePerformanceMonitoring') === 'false';
+      localStorage.getItem('enablePerformanceMonitoring') === 'true';
     
     if (shouldMonitor) {
       setupPerformanceMonitoring({
@@ -54,29 +55,25 @@ const App = () => {
     }
   }, []);
 
-  console.log('🔧 App.jsx: About to render SupabaseProvider');
+  console.log('🔧 App.jsx: About to render with all providers');
   
   return (
-    <>
+    <ErrorBoundary>
       {/* Show emergency reset only in development */}
       {isDevelopment && <EmergencyReset />}
-      
-      {/* Performance monitoring component */}
-      <PerformanceMonitor 
-        enabled={isDevelopment || 
-                localStorage.getItem('enablePerformanceMonitoring') === 'true'} 
-      />
       
       <SupabaseProvider>
         <ThemeProvider>
           <ToastProvider>
-            <Router>
-              <AppRoutes />              
-            </Router>
+            <WebSocketProvider>
+              <Router>
+                <AppRoutes />              
+              </Router>
+            </WebSocketProvider>
           </ToastProvider>
         </ThemeProvider>
       </SupabaseProvider>
-    </>
+    </ErrorBoundary>
   );
 };
 

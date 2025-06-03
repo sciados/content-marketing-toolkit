@@ -1,238 +1,122 @@
-// src/components/Common/UpgradePrompt.jsx
+// src/components/Common/UpgradePrompt.jsx - FIXED VERSION
 import React from 'react';
-import { Button } from './Button';
+import { useUsageTracking } from '../../hooks/useUsageTracking';
 
-const TIER_INFO = {
-  free: {
-    name: 'Free',
-    nextTier: 'pro',
-    limits: {
-      monthlyTokens: 5000,
-      videoProjects: 1,
-      emails: 10,
-      series: 2
-    }
-  },
-  pro: {
-    name: 'Pro',
-    nextTier: 'gold',
-    limits: {
-      monthlyTokens: 100000,
-      videoProjects: 15,
-      emails: 200,
-      series: 30
-    }
-  },
-  gold: {
-    name: 'Gold',
-    nextTier: null,
-    limits: {
-      monthlyTokens: 500000,
-      videoProjects: 50,
-      emails: 1000,
-      series: 150
-    }
-  }
-};
+const UpgradePrompt = ({ feature, tokensRequired = 0, onUpgrade, onCancel }) => {
+  const { canPerformAction, getRemainingLimits } = useUsageTracking();
+  const remaining = getRemainingLimits();
+  
+  const canPerform = canPerformAction('ai_generation', tokensRequired);
+  
+  if (canPerform) return null;
 
-const PRICING = {
-  pro: {
-    monthly: 49,
-    annual: 39,
-    features: [
-      'AI-powered content generation',
-      '15 Video2Promo projects/month',
-      '200 emails, 30 series',
-      'A/B variant generation',
-      'Advanced analytics',
-      'Priority support'
-    ]
-  },
-  gold: {
-    monthly: 149,
-    annual: 119,
-    features: [
-      'Everything in Pro',
-      '50+ Video2Promo projects/month',
-      '1,000 emails, 150 series',
-      'White-label options',
-      'Custom integrations',
-      'Dedicated account manager'
-    ]
-  }
-};
-
-export const UpgradePrompt = ({ 
-  currentTier = 'free',
-  feature = 'this feature',
-  tokensNeeded = 0,
-  tokensRemaining = 0,
-  onUpgrade,
-  onClose,
-  className = ''
-}) => {
-  const tierInfo = TIER_INFO[currentTier];
-  const nextTier = tierInfo?.nextTier;
-  const pricing = nextTier ? PRICING[nextTier] : null;
-
-  if (!nextTier || !pricing) {
-    return null; // Already on highest tier
-  }
-
-  const handleUpgrade = () => {
-    if (onUpgrade) {
-      onUpgrade(nextTier);
-    } else {
-      // Default action - redirect to subscription page
-      window.location.href = '/subscription';
+  const tierBenefits = {
+    pro: {
+      name: 'Pro',
+      price: '$29/month',
+      features: [
+        '50,000 tokens/month',
+        '2,000 tokens/day',
+        '500 Content Library items',
+        '15+ Video2Promo projects',
+        'Priority support'
+      ]
+    },
+    gold: {
+      name: 'Gold',
+      price: '$99/month',
+      features: [
+        '200,000 tokens/month',
+        '8,000 tokens/day',
+        'Unlimited Content Library',
+        '40+ Video2Promo projects',
+        'Premium AI models',
+        'Team collaboration'
+      ]
     }
   };
 
-  const tokenShortfall = tokensNeeded - tokensRemaining;
-  const isTokenLimit = tokenShortfall > 0;
+  const recommendedTier = tokensRequired > 2000 ? 'gold' : 'pro';
+  const tier = tierBenefits[recommendedTier];
 
   return (
-    <div className={`bg-white rounded-lg border border-gray-200 shadow-lg ${className}`}>
-      {/* Content */}
-      <div className="px-6 py-6">
-        {/* Current vs Next Tier Comparison */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          {/* Current Tier */}
-          <div className="text-center">
-            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 mb-2">
-              Current: {tierInfo.name}
-            </div>
-            <div className="space-y-1 text-sm text-gray-600">
-              <div>{tierInfo.limits.monthlyTokens.toLocaleString()} tokens/month</div>
-              <div>{tierInfo.limits.videoProjects} video projects</div>
-              <div>{tierInfo.limits.emails} emails</div>
-            </div>
-          </div>
-
-          {/* Next Tier */}
-          <div className="text-center">
-            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800 mb-2">
-              Upgrade: {nextTier.charAt(0).toUpperCase() + nextTier.slice(1)}
-            </div>
-            <div className="space-y-1 text-sm text-gray-900">
-              <div className="font-medium">{TIER_INFO[nextTier].limits.monthlyTokens.toLocaleString()} tokens/month</div>
-              <div className="font-medium">{TIER_INFO[nextTier].limits.videoProjects} video projects</div>
-              <div className="font-medium">{TIER_INFO[nextTier].limits.emails} emails</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Token Usage Info */}
-        {isTokenLimit && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center space-x-2 text-red-800 mb-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-              <span className="font-medium">Token Limit Reached</span>
-            </div>
-            <div className="text-sm text-red-700 space-y-1">
-              <div>Tokens needed: {tokensNeeded.toLocaleString()}</div>
-              <div>Tokens remaining: {tokensRemaining.toLocaleString()}</div>
-              <div className="font-medium">Shortfall: {tokenShortfall.toLocaleString()} tokens</div>
-            </div>
-          </div>
-        )}
-
-        {/* Features List */}
-        <div className="mb-6">
-          <h4 className="font-medium text-gray-900 mb-3">
-            What you'll get with {nextTier.charAt(0).toUpperCase() + nextTier.slice(1)}:
-          </h4>
-          <ul className="space-y-2">
-            {pricing.features.map((feature, index) => (
-              <li key={index} className="flex items-center space-x-2 text-sm">
-                <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-gray-700">{feature}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Pricing */}
-        <div className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg p-4 mb-6">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-gray-900 mb-1">
-              ${pricing.monthly}/month
-            </div>
-            <div className="text-sm text-gray-600 mb-2">
-              or ${pricing.annual}/month paid annually
-            </div>
-            <div className="text-xs text-green-600 font-medium">
-              Save ${(pricing.monthly - pricing.annual) * 12}/year with annual billing
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <Button
-            onClick={handleUpgrade}
-            className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
-            size="lg"
-          >
-            Upgrade to {nextTier.charAt(0).toUpperCase() + nextTier.slice(1)}
-          </Button>
-          {onClose && (
-            <Button
-              onClick={onClose}
-              variant="outline"
-              className="flex-1 sm:flex-none"
-            >
-              Maybe Later
-            </Button>
-          )}
-        </div>
-        
-        <div className="mt-3 text-center">
-          <p className="text-xs text-gray-500">
-            ✓ 30-day money-back guarantee • ✓ Cancel anytime • ✓ Instant access
-          </p>
-        </div>
-      </div>   
- 
-     {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div className="p-6">
+          <div className="flex items-center mb-4">
             <div className="flex-shrink-0">
-              <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
-                <span className="text-white text-lg">🚀</span>
+              <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
               </div>
             </div>
-            <div>
+            <div className="ml-4">
               <h3 className="text-lg font-semibold text-gray-900">
-                Upgrade to {nextTier.charAt(0).toUpperCase() + nextTier.slice(1)}
+                Upgrade Required
               </h3>
               <p className="text-sm text-gray-600">
-                {isTokenLimit 
-                  ? `Need ${tokensNeeded.toLocaleString()} tokens for ${feature}`
-                  : `Unlock ${feature} with ${nextTier.charAt(0).toUpperCase() + nextTier.slice(1)}`
-                }
+                You've reached your {feature} limit
               </p>
             </div>
           </div>
-          {onClose && (
+
+          <div className="mb-6">
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <h4 className="font-medium text-gray-900 mb-2">Current Usage:</h4>
+              <div className="space-y-1 text-sm text-gray-600">
+                <div className="flex justify-between">
+                  <span>Daily tokens remaining:</span>
+                  <span className="font-medium">{remaining.daily_tokens.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Monthly tokens remaining:</span>
+                  <span className="font-medium">{remaining.monthly_tokens.toLocaleString()}</span>
+                </div>
+                {tokensRequired > 0 && (
+                  <div className="flex justify-between text-red-600">
+                    <span>Tokens needed:</span>
+                    <span className="font-medium">{tokensRequired.toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="border border-indigo-200 rounded-lg p-4 bg-indigo-50">
+              <h4 className="font-semibold text-indigo-900 mb-2">
+                Upgrade to {tier.name} - {tier.price}
+              </h4>
+              <ul className="space-y-1 text-sm text-indigo-800">
+                {tier.features.map((feature, index) => (
+                  <li key={index} className="flex items-center">
+                    <svg className="w-4 h-4 text-indigo-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div className="flex space-x-3">
             <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
+              onClick={onCancel}
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              Cancel
             </button>
-          )}
+            <button
+              onClick={() => onUpgrade(recommendedTier)}
+              className="flex-1 px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-md text-sm font-medium hover:from-indigo-700 hover:to-purple-700 transition-colors"
+            >
+              Upgrade Now
+            </button>
+          </div>
         </div>
       </div>
-      </div>
- );
-}
+    </div>
+  );
+};
+
+export default UpgradePrompt;

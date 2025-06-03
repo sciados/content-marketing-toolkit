@@ -1,24 +1,31 @@
-// src/pages/Subscription.jsx
+// src/pages/Subscription.jsx - UPDATED with UsageMeter integration
 import React, { useState, useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import useSupabase from '../hooks/useSupabase';
 import { useToast } from '../hooks/useToast';
+import { useUsageTracking } from '../hooks/useUsageTracking';
+import { useContentLibrary } from '../hooks/useContentLibrary';
 import { subscriptions } from '../services/supabase/subscriptions';
-import Card from '../components/Common/Card';
-import Button from '../components/Common/Button';
-import Badge from '../components/Common/Badge';
-import Loader from '../components/Common/Loader';
-import Toast from '../components/Common/Toast';
+import { Card, Button, Badge, Loader, Toast, UsageMeter, SystemStatus } from '../components/Common';
 
 const Subscription = () => {
   const { user } = useSupabase();
   const { toast, showToast } = useToast();
+  const { 
+    limits, 
+    getUsagePercentages, 
+    getRemainingLimits,
+    isNearLimit,
+    isAtLimit,
+    wsConnected,
+    loading: usageLoading 
+  } = useUsageTracking();
+  const { totalItems, videoTranscriptCount, generatedAssetCount } = useContentLibrary();
   
   // State management
   const [loading, setLoading] = useState(true);
   const [currentSubscription, setCurrentSubscription] = useState(null);
   const [availableTiers, setAvailableTiers] = useState([]);
-  const [usageStats, setUsageStats] = useState(null);
   const [subscriptionHistory, setSubscriptionHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
 
@@ -42,21 +49,7 @@ const Subscription = () => {
         setCurrentSubscription(subscription);
         setAvailableTiers(tiers);
         
-        // Try to fetch optional data (don't fail if these error)
-        try {
-          const usage = await subscriptions.getUsageStats();
-          setUsageStats(usage);
-        } catch (error) {
-          console.warn('Usage stats not available:', error);
-          // Set default usage stats if API fails
-          setUsageStats({
-            emails_generated: 0,
-            emails_saved: 0,
-            ai_tokens_used: 0,
-            series_created: 0
-          });
-        }
-        
+        // Try to fetch subscription history
         try {
           const history = await subscriptions.getSubscriptionHistory();
           setSubscriptionHistory(history || []);
@@ -77,7 +70,7 @@ const Subscription = () => {
   }, [user?.id, showToast]);
 
   // Filter tiers for display
-  const currentTier = currentSubscription?.subscription_tier || 'free';
+  const currentTier = currentSubscription?.subscription_tier || limits.tier || 'free';
   const filteredTiers = availableTiers.filter(tier => {
     // Hide Free and superAdmin tiers
     if (tier.name === 'free' || tier.name === 'superAdmin') {
@@ -112,12 +105,7 @@ const Subscription = () => {
       day: 'numeric'
     });
   };
-
-  const getUsagePercentage = (current, limit) => {
-    if (!limit || limit === -1) return 0;
-    return Math.min((current / limit) * 100, 100);
-  };
-
+  
   const getUsageBarColor = (percentage) => {
     if (percentage >= 90) return '#EF4444'; // Red
     if (percentage >= 75) return '#F59E0B'; // Orange  
@@ -125,7 +113,7 @@ const Subscription = () => {
   };
 
   // Loading state
-  if (loading) {
+  if (loading || usageLoading) {
     return (
       <div className="flex items-center justify-center h-80">
         <Loader size="lg" text="Loading subscription information..." />
@@ -138,14 +126,57 @@ const Subscription = () => {
     return <Navigate to="/login" replace />;
   }
 
+  const usagePercentages = getUsagePercentages();
+  const remainingLimits = getRemainingLimits();
+
   return (
     <div className="container mx-auto px-4 py-8">
       {toast && <Toast message={toast.message} type={toast.type} />}
       
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-800">Subscription Management</h1>
-        <p className="text-gray-600">Manage your plan and track your usage</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">Usage & Billing</h1>
+            <p className="text-gray-600">Manage your plan and track your real-time usage</p>
+          </div>
+          
+          {/* Real-time connection indicator */}
+          <div className="flex items-center space-x-2">
+            <div className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-400' : 'bg-gray-400'}`}></div>
+            <span className="text-xs text-gray-500">
+              {wsConnected ? 'Live updates' : 'Offline mode'}
+            </span>
+          </div>
+        </div>
       </div>
+
+      {/* Usage Alert Banner */}
+      {(isNearLimit || isAtLimit) && (
+        <div className={`mb-6 p-4 rounded-lg border ${
+          isAtLimit ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'
+        }`}>
+          <div className="flex items-center">
+            <div className={`flex-shrink-0 ${isAtLimit ? 'text-red-400' : 'text-yellow-400'}`}>
+              <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className={`text-sm font-medium ${isAtLimit ? 'text-red-800' : 'text-yellow-800'}`}>
+                {isAtLimit ? 'Usage Limit Reached' : 'Approaching Usage Limit'}
+              </h3>
+              <div className={`mt-2 text-sm ${isAtLimit ? 'text-red-700' : 'text-yellow-700'}`}>
+                <p>
+                  {isAtLimit 
+                    ? 'You\'ve reached your daily limits. Upgrade to continue using AI features.'
+                    : `You've used a significant portion of your daily allowance. Consider upgrading for unlimited access.`
+                  }
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Current Plan Section */}
@@ -175,144 +206,119 @@ const Subscription = () => {
                 </div>
               </div>
 
-              {/* Usage Statistics */}
-              {usageStats && currentSubscription?.tier && (
-                <div className="border-t border-gray-200 pt-6">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Usage This Month</h3>
-                  
-                  <div className="space-y-6">
-                    {/* Emails Generated */}
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-700">Emails Generated</span>
-                        <span className="text-sm text-gray-500">
-                          {usageStats.emails_generated || 0}
-                          {currentSubscription.tier.email_quota && currentSubscription.tier.email_quota !== -1 && 
-                            ` / ${currentSubscription.tier.email_quota}`
-                          }
-                          {currentSubscription.tier.email_quota === -1 && ' / Unlimited'}
-                        </span>
-                      </div>
-                      {currentSubscription.tier.email_quota && currentSubscription.tier.email_quota !== -1 && (
-                        <>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="h-2 rounded-full transition-all duration-300"
-                              style={{
-                                width: `${getUsagePercentage(usageStats.emails_generated || 0, currentSubscription.tier.email_quota)}%`,
-                                backgroundColor: getUsageBarColor(getUsagePercentage(usageStats.emails_generated || 0, currentSubscription.tier.email_quota))
-                              }}
-                            />
-                          </div>
-                          {getUsagePercentage(usageStats.emails_generated || 0, currentSubscription.tier.email_quota) >= 80 && (
-                            <p className="text-xs mt-1 text-orange-600">
-                              You're approaching your limit. Consider upgrading for more emails.
-                            </p>
-                          )}
-                        </>
-                      )}
-                    </div>
+              {/* Real-time Usage Meter */}
+              <div className="border-t border-gray-200 pt-6 mb-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Real-time Usage Overview</h3>
+                <UsageMeter variant="expanded" showLabels={true} className="mb-4" />
+              </div>
 
-                    {/* Emails Saved */}
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-700">Emails Saved</span>
-                        <span className="text-sm text-gray-500">
-                          {usageStats.emails_saved || 0}
-                          {currentSubscription.tier.storage_limit && currentSubscription.tier.storage_limit !== -1 && 
-                            ` / ${currentSubscription.tier.storage_limit}`
-                          }
-                          {currentSubscription.tier.storage_limit === -1 && ' / Unlimited'}
-                        </span>
-                      </div>
-                      {currentSubscription.tier.storage_limit && currentSubscription.tier.storage_limit !== -1 && (
-                        <>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="h-2 rounded-full transition-all duration-300"
-                              style={{
-                                width: `${getUsagePercentage(usageStats.emails_saved || 0, currentSubscription.tier.storage_limit)}%`,
-                                backgroundColor: getUsageBarColor(getUsagePercentage(usageStats.emails_saved || 0, currentSubscription.tier.storage_limit))
-                              }}
-                            />
-                          </div>
-                          {getUsagePercentage(usageStats.emails_saved || 0, currentSubscription.tier.storage_limit) >= 80 && (
-                            <p className="text-xs mt-1 text-orange-600">
-                              You're approaching your storage limit. Consider upgrading for more space.
-                            </p>
-                          )}
-                        </>
-                      )}
+              {/* Detailed Usage Statistics */}
+              <div className="border-t border-gray-200 pt-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Current Usage Details</h3>
+                
+                <div className="space-y-6">
+                  {/* Daily AI Tokens */}
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-gray-700">Daily AI Tokens</span>
+                      <span className="text-sm text-gray-500">
+                        {limits.daily_tokens_used.toLocaleString()} / {limits.daily_token_limit.toLocaleString()}
+                      </span>
                     </div>
-
-                    {/* Email Series Created */}
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium text-gray-700">Email Series Created</span>
-                        <span className="text-sm text-gray-500">
-                          {usageStats.series_created || 0}
-                          {currentSubscription.tier.series_limit && currentSubscription.tier.series_limit !== -1 && 
-                            ` / ${currentSubscription.tier.series_limit}`
-                          }
-                          {currentSubscription.tier.series_limit === -1 && ' / Unlimited'}
-                        </span>
-                      </div>
-                      {currentSubscription.tier.series_limit && currentSubscription.tier.series_limit !== -1 && (
-                        <>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="h-2 rounded-full transition-all duration-300"
-                              style={{
-                                width: `${getUsagePercentage(usageStats.series_created || 0, currentSubscription.tier.series_limit)}%`,
-                                backgroundColor: getUsageBarColor(getUsagePercentage(usageStats.series_created || 0, currentSubscription.tier.series_limit))
-                              }}
-                            />
-                          </div>
-                          {getUsagePercentage(usageStats.series_created || 0, currentSubscription.tier.series_limit) >= 80 && (
-                            <p className="text-xs mt-1 text-orange-600">
-                              You're approaching your series limit. Consider upgrading for more series.
-                            </p>
-                          )}
-                        </>
-                      )}
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${usagePercentages.daily_tokens}%`,
+                          backgroundColor: getUsageBarColor(usagePercentages.daily_tokens)
+                        }}
+                      />
                     </div>
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="text-xs text-gray-400">
+                        {remainingLimits.daily_tokens.toLocaleString()} remaining today
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {usagePercentages.daily_tokens.toFixed(1)}% used
+                      </span>
+                    </div>
+                  </div>
 
-                    {/* AI Tokens Used (if available) */}
-                    {currentSubscription.tier.ai_tokens_monthly && (
-                      <div>
-                        <div className="flex justify-between items-center mb-2">
-                          <span className="text-sm font-medium text-gray-700">AI Tokens Used</span>
-                          <span className="text-sm text-gray-500">
-                            {usageStats.ai_tokens_used || 0}
-                            {currentSubscription.tier.ai_tokens_monthly !== -1 && 
-                              ` / ${currentSubscription.tier.ai_tokens_monthly}`
-                            }
-                            {currentSubscription.tier.ai_tokens_monthly === -1 && ' / Unlimited'}
-                          </span>
-                        </div>
-                        {currentSubscription.tier.ai_tokens_monthly !== -1 && (
-                          <>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="h-2 rounded-full transition-all duration-300"
-                                style={{
-                                  width: `${getUsagePercentage(usageStats.ai_tokens_used || 0, currentSubscription.tier.ai_tokens_monthly)}%`,
-                                  backgroundColor: getUsageBarColor(getUsagePercentage(usageStats.ai_tokens_used || 0, currentSubscription.tier.ai_tokens_monthly))
-                                }}
-                              />
-                            </div>
-                            {getUsagePercentage(usageStats.ai_tokens_used || 0, currentSubscription.tier.ai_tokens_monthly) >= 80 && (
-                              <p className="text-xs mt-1 text-orange-600">
-                                You're approaching your AI token limit. Consider upgrading for more tokens.
-                              </p>
-                            )}
-                          </>
-                        )}
+                  {/* Monthly AI Tokens */}
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-gray-700">Monthly AI Tokens</span>
+                      <span className="text-sm text-gray-500">
+                        {limits.monthly_tokens_used.toLocaleString()} / {limits.monthly_token_limit.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${usagePercentages.monthly_tokens}%`,
+                          backgroundColor: getUsageBarColor(usagePercentages.monthly_tokens)
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="text-xs text-gray-400">
+                        {remainingLimits.monthly_tokens.toLocaleString()} remaining this month
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {usagePercentages.monthly_tokens.toFixed(1)}% used
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Video Processing */}
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-gray-700">Daily Video Processing</span>
+                      <span className="text-sm text-gray-500">
+                        {limits.daily_videos_processed} / {limits.daily_video_limit}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="h-2 rounded-full transition-all duration-300"
+                        style={{
+                          width: `${usagePercentages.daily_videos}%`,
+                          backgroundColor: getUsageBarColor(usagePercentages.daily_videos)
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="text-xs text-gray-400">
+                        {remainingLimits.daily_videos} videos remaining today
+                      </span>
+                      <span className="text-xs text-gray-400">
+                        {usagePercentages.daily_videos.toFixed(1)}% used
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Content Library Stats */}
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium text-gray-700">Content Library</span>
+                      <span className="text-sm text-gray-500">
+                        {totalItems} items stored
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 mt-2">
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="text-lg font-semibold text-gray-900">{videoTranscriptCount}</div>
+                        <div className="text-xs text-gray-500">Video Transcripts</div>
                       </div>
-                    )}
+                      <div className="text-center p-3 bg-gray-50 rounded-lg">
+                        <div className="text-lg font-semibold text-gray-900">{generatedAssetCount}</div>
+                        <div className="text-xs text-gray-500">Generated Assets</div>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </Card>
 
@@ -355,21 +361,21 @@ const Subscription = () => {
                       
                       <div className="space-y-2 mb-4">
                         <div className="flex justify-between text-sm">
-                          <span>Emails per month:</span>
+                          <span>Daily tokens:</span>
                           <span className="font-medium">
-                            {tier.email_quota === -1 ? 'Unlimited' : tier.email_quota}
+                            {tier.daily_tokens === -1 ? 'Unlimited' : tier.daily_tokens?.toLocaleString()}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span>Saved emails:</span>
+                          <span>Monthly tokens:</span>
                           <span className="font-medium">
-                            {tier.storage_limit === -1 ? 'Unlimited' : tier.storage_limit}
+                            {tier.monthly_tokens === -1 ? 'Unlimited' : tier.monthly_tokens?.toLocaleString()}
                           </span>
                         </div>
                         <div className="flex justify-between text-sm">
-                          <span>Email series:</span>
+                          <span>Daily videos:</span>
                           <span className="font-medium">
-                            {tier.series_limit === -1 ? 'Unlimited' : tier.series_limit}
+                            {tier.daily_videos === -1 ? 'Unlimited' : tier.daily_videos}
                           </span>
                         </div>
                       </div>
@@ -392,6 +398,9 @@ const Subscription = () => {
 
         {/* Sidebar */}
         <div className="lg:col-span-1">
+          {/* System Status */}
+          <SystemStatus className="mb-6" />
+
           <Card>
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h3>
@@ -406,12 +415,30 @@ const Subscription = () => {
                   </Button>
                 </Link>
               
+                <Link to="/tools/video2promo" className="block w-full">
+                  <Button variant="outline" className="w-full justify-start">
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    Process Videos
+                  </Button>
+                </Link>
+
                 <Link to="/tools/email-generator" className="block w-full">
                   <Button variant="outline" className="w-full justify-start">
                     <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                     </svg>
                     Generate Emails
+                  </Button>
+                </Link>
+
+                <Link to="/tools/content-library" className="block w-full">
+                  <Button variant="outline" className="w-full justify-start">
+                    <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 9a2 2 0 012-2h10a2 2 0 012 2v2M7 19h10a2 2 0 002-2v-4a2 2 0 00-2-2H7a2 2 0 00-2 2v4a2 2 0 002 2z" />
+                    </svg>
+                    Content Library
                   </Button>
                 </Link>
                 

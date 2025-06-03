@@ -1,191 +1,127 @@
-// src/components/Common/UsageMeter.jsx
+// src/components/Common/UsageMeter.jsx - NEW
 import React from 'react';
+import { useUsageTracking } from '../../hooks/useUsageTracking';
 
-const TIER_COLORS = {
-  free: {
-    bg: 'bg-gray-200',
-    fill: 'bg-gray-500',
-    text: 'text-gray-700',
-    accent: 'text-gray-500'
-  },
-  pro: {
-    bg: 'bg-indigo-200',
-    fill: 'bg-indigo-600',
-    text: 'text-indigo-700',
-    accent: 'text-indigo-600'
-  },
-  gold: {
-    bg: 'bg-yellow-200',
-    fill: 'bg-yellow-600',
-    text: 'text-yellow-700',
-    accent: 'text-yellow-600'
+const UsageMeter = ({ type = 'daily_tokens', showDetails = true, className = '' }) => {
+  const { limits, getUsagePercentages, getRemainingLimits, loading, wsConnected } = useUsageTracking();
+  
+  if (loading) {
+    return (
+      <div className={`animate-pulse ${className}`}>
+        <div className="h-4 bg-gray-200 rounded"></div>
+      </div>
+    );
   }
-};
 
-export const UsageMeter = ({
-  current = 0,
-  limit = 100,
-  label = 'Usage',
-  tier = 'free',
-  showPercentage = true,
-  showNumbers = true,
-  size = 'default', // 'small', 'default', 'large'
-  className = '',
-  warningThreshold = 80,
-  criticalThreshold = 95
-}) => {
-  const percentage = limit > 0 ? Math.min((current / limit) * 100, 100) : 0;
-  const remaining = Math.max(limit - current, 0);
-  const isWarning = percentage >= warningThreshold;
-  const isCritical = percentage >= criticalThreshold;
+  const percentages = getUsagePercentages();
+  const remaining = getRemainingLimits();
+  const percentage = percentages[type] || 0;
   
-  const colors = TIER_COLORS[tier] || TIER_COLORS.free;
-  
-  // Override colors for warning states
-  const barColors = isCritical 
-    ? { bg: 'bg-red-200', fill: 'bg-red-600', text: 'text-red-700', accent: 'text-red-600' }
-    : isWarning 
-    ? { bg: 'bg-orange-200', fill: 'bg-orange-600', text: 'text-orange-700', accent: 'text-orange-600' }
-    : colors;
-
-  const sizeClasses = {
-    small: 'h-2 text-xs',
-    default: 'h-3 text-sm',
-    large: 'h-4 text-base'
+  // Get meter configuration based on type
+  const getMeterConfig = () => {
+    switch (type) {
+      case 'daily_tokens':
+        return {
+          label: 'Daily Tokens',
+          used: limits.daily_tokens_used,
+          total: limits.daily_token_limit,
+          remaining: remaining.daily_tokens,
+          unit: 'tokens'
+        };
+      case 'monthly_tokens':
+        return {
+          label: 'Monthly Tokens',
+          used: limits.monthly_tokens_used,
+          total: limits.monthly_token_limit,
+          remaining: remaining.monthly_tokens,
+          unit: 'tokens'
+        };
+      case 'daily_videos':
+        return {
+          label: 'Daily Videos',
+          used: limits.daily_videos_processed,
+          total: limits.daily_video_limit,
+          remaining: remaining.daily_videos,
+          unit: 'videos'
+        };
+      default:
+        return {
+          label: 'Usage',
+          used: 0,
+          total: 100,
+          remaining: 100,
+          unit: ''
+        };
+    }
   };
 
-  const formatNumber = (num) => {
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-    return num.toLocaleString();
+   const config = getMeterConfig();
+  
+  // Get color based on percentage
+  const getColor = () => {
+    if (percentage >= 90) return 'red';
+    if (percentage >= 75) return 'yellow';
+    return 'green';
+  };
+
+  const color = getColor();
+  const colorClasses = {
+    green: 'bg-green-500',
+    yellow: 'bg-yellow-500',
+    red: 'bg-red-500'
   };
 
   return (
     <div className={`space-y-2 ${className}`}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <span className={`font-medium ${sizeClasses[size]} ${barColors.text}`}>
-            {label}
+      {showDetails && (
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-medium text-gray-700 flex items-center">
+            {config.label}
+            {wsConnected && (
+              <div className="ml-2 w-2 h-2 bg-green-400 rounded-full animate-pulse" title="Real-time updates active"></div>
+            )}
           </span>
-          {tier !== 'free' && (
-            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium capitalize
-              ${tier === 'pro' ? 'bg-indigo-100 text-indigo-800' : 'bg-yellow-100 text-yellow-800'}`}>
-              {tier}
-            </span>
-          )}
+          <span className="text-gray-600">
+            {config.used.toLocaleString()} / {config.total.toLocaleString()} {config.unit}
+          </span>
         </div>
-        
-        {showPercentage && (
-          <span className={`${sizeClasses[size]} font-medium ${barColors.accent}`}>
-            {percentage.toFixed(1)}%
-          </span>
-        )}
-      </div>
-
-      {/* Progress Bar */}
-      <div className="space-y-1">
-        <div className={`w-full ${barColors.bg} rounded-full ${sizeClasses[size]}`}>
+      )}
+      
+      <div className="relative">
+        {/* Background bar */}
+        <div className="w-full bg-gray-200 rounded-full h-2">
+          {/* Progress bar */}
           <div
-            className={`${sizeClasses[size]} ${barColors.fill} rounded-full transition-all duration-300 ease-out`}
-            style={{ width: `${percentage}%` }}
+            className={`h-2 rounded-full transition-all duration-500 ease-out ${colorClasses[color]}`}
+            style={{ width: `${Math.min(percentage, 100)}%` }}
           />
         </div>
         
-        {/* Numbers */}
-        {showNumbers && (
-          <div className="flex justify-between text-xs text-gray-600">
-            <span>
-              {formatNumber(current)} used
-            </span>
-            <span>
-              {formatNumber(remaining)} remaining of {formatNumber(limit)}
+        {/* Percentage overlay for high usage */}
+        {percentage >= 90 && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-xs font-bold text-white drop-shadow">
+              {percentage.toFixed(0)}%
             </span>
           </div>
         )}
       </div>
-
-      {/* Warning Messages */}
-      {isCritical && (
-        <div className="flex items-center space-x-2 text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
-          <span>Critical: Almost at limit!</span>
+      
+      {showDetails && (
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span>{config.remaining.toLocaleString()} {config.unit} remaining</span>
+          <span>{percentage.toFixed(1)}% used</span>
         </div>
       )}
       
-      {isWarning && !isCritical && (
-        <div className="flex items-center space-x-2 text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
-          <span>Warning: {100 - percentage.toFixed(1)}% remaining</span>
+      {/* Warning message for high usage */}
+      {percentage >= 90 && (
+        <div className="text-xs text-red-600 font-medium">
+          ⚠️ {percentage >= 100 ? 'Limit reached' : 'Approaching limit'}
         </div>
       )}
     </div>
   );
 };
 
-// Composite component for multiple usage metrics
-export const UsageMeters = ({ 
-  usageData = {},
-  userTier = 'free',
-  className = ''
-}) => {
-  const {
-    monthlyTokens = { current: 0, limit: 5000 },
-    dailyTokens = { current: 0, limit: 200 },
-    videoProjects = { current: 0, limit: 1 },
-    emails = { current: 0, limit: 10 },
-    series = { current: 0, limit: 2 }
-  } = usageData;
-
-  return (
-    <div className={`space-y-4 ${className}`}>
-      {/* Primary Metric - Monthly Tokens */}
-      <UsageMeter
-        current={monthlyTokens.current}
-        limit={monthlyTokens.limit}
-        label="Monthly Tokens"
-        tier={userTier}
-        size="large"
-      />
-
-      {/* Secondary Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <UsageMeter
-          current={dailyTokens.current}
-          limit={dailyTokens.limit}
-          label="Daily Tokens"
-          tier={userTier}
-          size="small"
-        />
-        
-        <UsageMeter
-          current={videoProjects.current}
-          limit={videoProjects.limit}
-          label="Video Projects"
-          tier={userTier}
-          size="small"
-        />
-        
-        <UsageMeter
-          current={emails.current}
-          limit={emails.limit}
-          label="Emails Generated"
-          tier={userTier}
-          size="small"
-        />
-        
-        <UsageMeter
-          current={series.current}
-          limit={series.limit}
-          label="Email Series"
-          tier={userTier}
-          size="small"
-        />
-      </div>
-    </div>
-  );
-};
+export default UsageMeter;

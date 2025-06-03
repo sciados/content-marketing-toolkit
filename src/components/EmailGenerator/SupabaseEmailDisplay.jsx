@@ -1,8 +1,12 @@
 // src/components/EmailGenerator/SupabaseEmailDisplay.jsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { createSeriesNameFromDomain } from '../../services/emailGenerator';
 import { supabase } from '../../services/supabase/supabaseClient';
 import useSupabase from '../../hooks/useSupabase';
+
+// Helper functions moved from legacy emailGenerator
+const createSeriesNameFromDomain = (domain) => {
+  return `${domain.charAt(0).toUpperCase() + domain.slice(1)} Email Series`;
+};
 
 /**
  * Component for displaying emails from Supabase
@@ -567,35 +571,179 @@ const SupabaseEmailDisplay = ({
         </div>
       )}
       
-      {/* Add additional CSS for styling the new components */}
+      {/* Styling */}
       <style jsx>{`
+        .saved-emails-container {
+          max-width: 100%;
+          margin: 0 auto;
+          padding: 1rem;
+        }
+        
+        .saved-emails-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1.5rem;
+          flex-wrap: wrap;
+          gap: 1rem;
+        }
+        
+        .saved-emails-title {
+          font-size: 1.5rem;
+          font-weight: 600;
+          margin: 0;
+          color: #1a202c;
+        }
+        
+        .saved-emails-actions {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          flex-wrap: wrap;
+        }
+        
+        .search-container {
+          position: relative;
+        }
+        
+        .search-input {
+          padding: 0.5rem 2rem 0.5rem 0.75rem;
+          border: 1px solid #d1d5db;
+          border-radius: 0.375rem;
+          font-size: 0.875rem;
+          min-width: 200px;
+        }
+        
+        .search-input:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 1px #3b82f6;
+        }
+        
+        .clear-search-button {
+          position: absolute;
+          right: 0.5rem;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          font-size: 1.25rem;
+          color: #6b7280;
+          cursor: pointer;
+        }
+        
+        .view-controls {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+        
+        .sort-select {
+          padding: 0.5rem;
+          border: 1px solid #d1d5db;
+          border-radius: 0.375rem;
+          font-size: 0.875rem;
+          background: white;
+        }
+        
+        .view-toggle {
+          display: flex;
+          border: 1px solid #d1d5db;
+          border-radius: 0.375rem;
+          overflow: hidden;
+        }
+        
+        .view-toggle-button {
+          padding: 0.5rem;
+          background: white;
+          border: none;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: background-color 0.2s;
+        }
+        
+        .view-toggle-button:hover {
+          background-color: #f3f4f6;
+        }
+        
+        .view-toggle-button.active {
+          background-color: #3b82f6;
+          color: white;
+        }
+        
+        .refresh-button {
+          padding: 0.5rem;
+          background: white;
+          border: 1px solid #d1d5db;
+          border-radius: 0.375rem;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: background-color 0.2s;
+        }
+        
+        .refresh-button:hover {
+          background-color: #f3f4f6;
+        }
+        
+        .no-emails-state {
+          text-align: center;
+          padding: 3rem 1rem;
+          color: #6b7280;
+        }
+        
+        .no-emails-icon {
+          margin-bottom: 1rem;
+        }
+        
+        .no-emails-title {
+          font-size: 1.25rem;
+          font-weight: 600;
+          margin-bottom: 0.5rem;
+          color: #374151;
+        }
+        
+        .no-emails-description {
+          font-size: 0.875rem;
+        }
+        
         .domain-collection {
           margin-bottom: 1.5rem;
-          border: 1px solid #e2e8f0;
+          border: 1px solid #e5e7eb;
           border-radius: 0.5rem;
           overflow: hidden;
+          background: white;
         }
         
         .domain-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 0.75rem 1rem;
-          background-color: #f7fafc;
+          padding: 1rem;
+          background-color: #f9fafb;
           cursor: pointer;
           transition: background-color 0.2s;
         }
         
         .domain-header:hover {
-          background-color: #edf2f7;
+          background-color: #f3f4f6;
         }
         
         .domain-name {
-          font-size: 1.1rem;
+          font-size: 1.125rem;
           font-weight: 600;
           margin: 0;
           display: flex;
           align-items: center;
+          color: #1f2937;
+        }
+        
+        .domain-date {
+          font-size: 0.75rem;
+          color: #6b7280;
         }
         
         .domain-emails {
@@ -604,10 +752,10 @@ const SupabaseEmailDisplay = ({
         
         .email-item {
           margin-bottom: 0.75rem;
-          border: 1px solid #e2e8f0;
+          border: 1px solid #e5e7eb;
           border-radius: 0.375rem;
           overflow: hidden;
-          background-color: #fff;
+          background: white;
         }
         
         .email-header {
@@ -617,11 +765,10 @@ const SupabaseEmailDisplay = ({
           justify-content: space-between;
           align-items: center;
           transition: background-color 0.2s;
-          border-bottom: 1px solid #e2e8f0;
         }
         
         .email-header:hover {
-          background-color: #f7fafc;
+          background-color: #f9fafb;
         }
         
         .email-subject {
@@ -630,32 +777,59 @@ const SupabaseEmailDisplay = ({
           font-weight: 500;
           display: flex;
           align-items: center;
+          color: #1f2937;
+        }
+        
+        .email-meta {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          font-size: 0.75rem;
+          color: #6b7280;
+        }
+        
+        .email-number {
+          background-color: #dbeafe;
+          color: #1e40af;
+          padding: 0.25rem 0.5rem;
+          border-radius: 0.25rem;
+          font-weight: 500;
         }
         
         .email-preview {
           padding: 0.75rem 1rem;
-          color: #4a5568;
+          color: #4b5563;
           font-size: 0.875rem;
+          border-top: 1px solid #f3f4f6;
+          background-color: #fafafa;
         }
         
         .email-editor {
           padding: 1rem;
+          border-top: 1px solid #e5e7eb;
         }
         
         .email-edit-textarea {
           width: 100%;
           padding: 0.75rem;
-          border: 1px solid #cbd5e0;
+          border: 1px solid #d1d5db;
           border-radius: 0.375rem;
           font-family: inherit;
           font-size: 0.875rem;
           resize: vertical;
+          line-height: 1.5;
+        }
+        
+        .email-edit-textarea:focus {
+          outline: none;
+          border-color: #3b82f6;
+          box-shadow: 0 0 0 1px #3b82f6;
         }
         
         .email-edit-actions {
           margin-top: 1rem;
           display: flex;
-          gap: 0.5rem;
+          gap: 0.75rem;
         }
         
         .email-edit-save,
@@ -664,36 +838,73 @@ const SupabaseEmailDisplay = ({
           border: none;
           border-radius: 0.375rem;
           font-size: 0.875rem;
+          font-weight: 500;
           cursor: pointer;
           transition: background-color 0.2s;
         }
         
         .email-edit-save {
-          background-color: #4299e1;
+          background-color: #3b82f6;
           color: white;
         }
         
-        .email-edit-save:hover {
-          background-color: #3182ce;
+        .email-edit-save:hover:not(:disabled) {
+          background-color: #2563eb;
         }
         
         .email-edit-save:disabled {
-          background-color: #a0aec0;
+          background-color: #9ca3af;
           cursor: not-allowed;
         }
         
         .email-edit-cancel {
-          background-color: #e2e8f0;
-          color: #4a5568;
+          background-color: #f3f4f6;
+          color: #374151;
         }
         
-        .email-edit-cancel:hover {
-          background-color: #cbd5e0;
+        .email-edit-cancel:hover:not(:disabled) {
+          background-color: #e5e7eb;
+        }
+        
+        .email-actions {
+          display: flex;
+          justify-content: flex-end;
+          gap: 0.5rem;
+          padding: 0.75rem 1rem;
+          border-top: 1px solid #f3f4f6;
+          background-color: #fafafa;
+        }
+        
+        .email-action-button {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          padding: 0.5rem 0.75rem;
+          background: white;
+          border: 1px solid #d1d5db;
+          border-radius: 0.375rem;
+          font-size: 0.875rem;
+          cursor: pointer;
+          transition: background-color 0.2s;
+        }
+        
+        .email-action-button:hover {
+          background-color: #f3f4f6;
+        }
+        
+        .email-action-button.delete {
+          color: #dc2626;
+          border-color: #fecaca;
+        }
+        
+        .email-action-button.delete:hover {
+          background-color: #fef2f2;
         }
         
         .chevron {
           margin-right: 0.5rem;
           transition: transform 0.2s;
+          flex-shrink: 0;
         }
         
         .chevron.down {
@@ -701,14 +912,29 @@ const SupabaseEmailDisplay = ({
         }
         
         .chevron.right {
-          transform: rotate(0);
+          transform: rotate(0deg);
+        }
+        
+        .list-view {
+          space-y: 0.5rem;
+        }
+        
+        .search-results-info {
+          padding: 0.75rem 1rem;
+          background-color: #eff6ff;
+          border: 1px solid #bfdbfe;
+          border-radius: 0.375rem;
+          font-size: 0.875rem;
+          color: #1e40af;
+          margin-bottom: 1rem;
         }
         
         .list-email-item {
-          margin-bottom: 0.5rem;
-          border: 1px solid #e2e8f0;
+          margin-bottom: 0.75rem;
+          border: 1px solid #e5e7eb;
           border-radius: 0.375rem;
           overflow: hidden;
+          background: white;
         }
         
         .list-email-header {
@@ -716,48 +942,77 @@ const SupabaseEmailDisplay = ({
           justify-content: space-between;
           align-items: center;
           padding: 0.75rem 1rem;
-          background-color: #f7fafc;
+          background-color: #f9fafb;
           cursor: pointer;
           transition: background-color 0.2s;
         }
         
         .list-email-header:hover {
-          background-color: #edf2f7;
+          background-color: #f3f4f6;
         }
         
         .list-email-subject {
           font-weight: 500;
           display: flex;
           align-items: center;
+          color: #1f2937;
         }
         
         .list-email-meta {
           display: flex;
           align-items: center;
-          gap: 1rem;
+          gap: 0.75rem;
           font-size: 0.75rem;
-          color: #718096;
+          color: #6b7280;
         }
         
         .list-email-domain {
-          background-color: #e2e8f0;
+          background-color: #e5e7eb;
           padding: 0.25rem 0.5rem;
           border-radius: 0.25rem;
+          font-weight: 500;
         }
         
         .list-email-preview {
           padding: 0.75rem 1rem;
-          color: #4a5568;
+          color: #4b5563;
           font-size: 0.875rem;
-          border-top: 1px solid #e2e8f0;
+          border-top: 1px solid #f3f4f6;
+          background-color: #fafafa;
         }
         
         .list-email-actions {
           display: flex;
-          padding: 0.5rem;
-          border-top: 1px solid #e2e8f0;
           justify-content: flex-end;
           gap: 0.5rem;
+          padding: 0.75rem 1rem;
+          border-top: 1px solid #f3f4f6;
+          background-color: #fafafa;
+        }
+        
+        .list-email-action-button {
+          padding: 0.375rem;
+          background: white;
+          border: 1px solid #d1d5db;
+          border-radius: 0.375rem;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: background-color 0.2s;
+        }
+        
+        .list-email-action-button:hover {
+          background-color: #f3f4f6;
+        }
+        
+        .list-email-action-button.delete {
+          color: #dc2626;
+          border-color: #fecaca;
+        }
+        
+        .list-email-action-button.delete:hover {
+          background-color: #fef2f2;
         }
       `}</style>
     </div>

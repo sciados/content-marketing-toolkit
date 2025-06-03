@@ -1,35 +1,43 @@
-// src/components/EmailGenerator/EnhancedSalesEmailGenerator - FIXED VERSION
-import React, { useState } from 'react';
-import useSupabase from '../../hooks/useSupabase'; // CHANGED: Use the provider-based hook
+// src/components/EmailGenerator/EnhancedSalesEmailGenerator.jsx - UPDATED VERSION
+import React, { useState, useEffect } from 'react';
+import useSupabase from '../../hooks/useSupabase';
 import { useEmailGenerator } from '../../hooks/useEmailGenerator';
 import { useEmailSeries } from '../../hooks/useEmailSeries';
 import { useSavedEmails } from '../../hooks/useSavedEmails';
 import { useToast } from '../../hooks/useToast';
+import { useContentLibrary } from '../../hooks/useContentLibrary';
+import { useUsageTracking } from '../../hooks/useUsageTracking';
 import ScanPageForm from './ScanPageForm';
 import SalesPageEmailPreview from './SalesPageEmailPreview';
 import ScanResultsPanel from './ScanResultsPanel';
 import Toast from '../Common/Toast';
+import LoadingSpinner from '../Common/LoadingSpinner';
 import '../../styles/salesEmailGenerator.css';
 
 /**
- * Enhanced Sales Email Generator with Supabase integration
- * FIXED: Using consistent auth system (SupabaseProvider)
+ * Enhanced Sales Email Generator with centralized API integration
+ * UPDATED: Now uses centralized API services and real-time usage tracking
  */
 const EnhancedSalesEmailGenerator = () => {
-
-  // FIXED: Use the provider-based auth hook instead of standalone
-  const { user } = useSupabase(); // This connects to your SupabaseProvider
+  const { user } = useSupabase();
   
-  // UI state - removed 'saved' and 'analytics' views
-  const [currentView, setCurrentView] = useState('input'); // 'input', 'benefits', 'preview'
-  const [emailLayout, setEmailLayout] = useState('standard'); // 'standard', 'minimal', 'featured'
-  const [exportFormat, setExportFormat] = useState('text'); // 'text', 'html', 'markdown'
+  // UI state
+  const [currentView, setCurrentView] = useState('input');
+  const [emailLayout, setEmailLayout] = useState('standard');
+  const [exportFormat, setExportFormat] = useState('text');
   const [currentEmailIndex, setCurrentEmailIndex] = useState(0);
   
-  // Custom hooks
+  // Hooks
   const { toast, showToast } = useToast();
+  const { addToLibrary } = useContentLibrary();
+  const { 
+    canPerformAction, 
+    getRemainingLimits,
+    isNearLimit,
+    isAtLimit 
+  } = useUsageTracking();
   
-  // Email generation hooks
+  // Email generation hooks (now use centralized API)
   const { 
     url, setUrl,
     keywords, setKeywords,
@@ -41,8 +49,12 @@ const EnhancedSalesEmailGenerator = () => {
     isScanning, scanProgress, scanStage,
     extractedBenefits, extractedFeatures, websiteData,
     selectedBenefits, toggleBenefit,
-    handleScanPage
-  } = useEmailGenerator({ showToast, onScanComplete: () => setCurrentView('benefits') });
+    handleScanPage,
+    error: scanError
+  } = useEmailGenerator({ 
+    showToast, 
+    onScanComplete: () => setCurrentView('benefits') 
+  });
   
   // Email series management
   const {
@@ -50,7 +62,8 @@ const EnhancedSalesEmailGenerator = () => {
     isGenerating,
     handleGenerateEmails,
     handleExportEmail,
-    copyEmailToClipboard
+    copyEmailToClipboard,
+    error: generationError
   } = useEmailSeries({
     extractedBenefits,
     selectedBenefits,
@@ -65,13 +78,31 @@ const EnhancedSalesEmailGenerator = () => {
     exportFormat,
     currentEmailIndex,
     showToast,
-    onGenerateComplete: () => {
+    onGenerateComplete: (result) => {
       setCurrentEmailIndex(0);
       setCurrentView('preview');
+      
+      // Auto-save to Content Library
+      if (result.emails && result.emails.length > 0) {
+        addToLibrary({
+          type: 'email_series',
+          title: `Email Series - ${websiteData?.title || url}`,
+          description: `Generated ${result.emails.length} emails from ${url}`,
+          tags: ['email', 'marketing', industry].filter(Boolean),
+          metadata: {
+            source_url: url,
+            emails_count: result.emails.length,
+            benefits_used: selectedBenefits.filter(Boolean).length,
+            tone: tone,
+            industry: industry,
+            generated_at: new Date().toISOString()
+          }
+        });
+      }
     }
   });
   
-  // Saved emails management - keeping for save functionality only
+  // Saved emails management
   const {
     handleSaveEmail,
     handleSaveSeries
@@ -88,6 +119,39 @@ const EnhancedSalesEmailGenerator = () => {
     showToast
   });
 
+  // Enhanced generation handler with usage tracking
+  const handleEnhancedGeneration = async () => {
+    const selectedCount = selectedBenefits.filter(Boolean).length;
+    const estimatedTokens = selectedCount * 400; // Rough estimate per email
+    
+    // Check if user can perform this action
+    if (!canPerformAction('ai_generation', estimatedTokens)) {
+      const remaining = getRemainingLimits();
+      showToast(
+        `Insufficient tokens. Need ~${estimatedTokens}, have ${remaining.daily_tokens} daily / ${remaining.monthly_tokens} monthly.`,
+        'error'
+      );
+      return;
+    }
+
+    try {
+      await handleGenerateEmails();
+    } catch (error) {
+      console.error('Email generation failed:', error);
+      showToast(`Generation failed: ${error.message}`, 'error');
+    }
+  };
+
+  // Show usage warnings
+  useEffect(() => {
+    if (isNearLimit && !isAtLimit) {
+      showToast('You\'re approaching your usage limit. Consider upgrading for unlimited access.', 'warning');
+    }
+    if (isAtLimit) {
+      showToast('You\'ve reached your usage limit. Please upgrade to continue using AI features.', 'error');
+    }
+  }, [isNearLimit, isAtLimit, showToast]);
+
   return (
     <div className="sales-email-container">
       <div className="sales-email-header">
@@ -95,9 +159,23 @@ const EnhancedSalesEmailGenerator = () => {
         <p className="sales-email-description">
           Generate professional sales email sequences from any product or landing page
         </p>
+        
+        {/* Usage indicator */}
+        <div className="flex items-center justify-between mt-2">
+          <div className="flex items-center space-x-4 text-sm text-gray-600">
+            <span>Daily tokens: {getRemainingLimits().daily_tokens.toLocaleString()}</span>
+            <span>Monthly: {getRemainingLimits().monthly_tokens.toLocaleString()}</span>
+            {isNearLimit && (
+              <span className="text-orange-600 font-medium">⚠️ Near limit</span>
+            )}
+            {isAtLimit && (
+              <span className="text-red-600 font-medium">🚫 Limit reached</span>
+            )}
+          </div>
+        </div>
       </div>
       
-      {/* Navigation Tabs - Cleaned up to show only main workflow */}
+      {/* Navigation Tabs */}
       <div className="email-tabs">
         <button 
           onClick={() => setCurrentView('input')}
@@ -130,6 +208,27 @@ const EnhancedSalesEmailGenerator = () => {
         </button>
       </div>
       
+      {/* Error display */}
+      {(scanError || generationError) && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">
+                {scanError ? 'Scan Error' : 'Generation Error'}
+              </h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>{scanError || generationError}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Toast notification */}
       {toast && <Toast message={toast.message} type={toast.type} />}
       
@@ -147,13 +246,13 @@ const EnhancedSalesEmailGenerator = () => {
             setTone={setTone}
             industry={industry}
             setIndustry={setIndustry}
-            isUsingAI={isUsingAI}
+            isUsingAI={isUsingAI && !isAtLimit}
             setIsUsingAI={setIsUsingAI}
-            aiAvailable={aiAvailable}
+            aiAvailable={aiAvailable && !isAtLimit}
             isScanning={isScanning}
             scanProgress={scanProgress}
             scanStage={scanStage}
-            handleScanPage={handleScanPage}            
+            handleScanPage={handleScanPage}
             user={user}
           />
         )}
@@ -167,15 +266,28 @@ const EnhancedSalesEmailGenerator = () => {
             extractedFeatures={Array.isArray(extractedFeatures) ? extractedFeatures : []}
             websiteData={websiteData || {}}
             onBack={() => setCurrentView('input')}
-            onGenerate={handleGenerateEmails}
+            onGenerate={handleEnhancedGeneration}
             isGenerating={isGenerating}
+            canGenerate={!isAtLimit && canPerformAction('ai_generation', 400)}
+            estimatedTokens={selectedBenefits.filter(Boolean).length * 400}
+            remainingTokens={getRemainingLimits().daily_tokens}
           />
+        )}
+        
+        {/* Loading state for generation */}
+        {isGenerating && (
+          <div className="flex flex-col items-center justify-center py-12">
+            <LoadingSpinner size="large" message="Generating emails..." />
+            <p className="mt-4 text-sm text-gray-600">
+              This may take 30-60 seconds depending on the number of emails being generated.
+            </p>
+          </div>
         )}
         
         {/* STEP 3: EMAIL PREVIEW */}
         {currentView === 'preview' && emailSeries.length > 0 && (
           <div className="bg-white rounded-lg p-6">
-            {/* Horizontal numbered tabs for emails - numbers only */}
+            {/* Email navigation tabs */}
             <div className="mb-6 border-b border-gray-200">
               <div className="flex">
                 {emailSeries.map((email, index) => (
@@ -195,7 +307,7 @@ const EnhancedSalesEmailGenerator = () => {
               </div>
             </div>
             
-            {/* Email info showing current position and benefit focus */}
+            {/* Email info */}
             <div className="mb-4 flex flex-wrap items-center gap-2">
               <span className="text-sm text-gray-500">
                 Email {currentEmailIndex + 1} of {emailSeries.length}
@@ -205,9 +317,8 @@ const EnhancedSalesEmailGenerator = () => {
               </span>
             </div>
             
-            {/* Controls row with layout and export options */}
+            {/* Layout and export controls */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-6">
-              {/* Layout selector */}
               <div className="w-full md:w-auto">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email Layout:</label>
                 <div className="flex flex-wrap gap-2">
@@ -226,7 +337,6 @@ const EnhancedSalesEmailGenerator = () => {
                 </div>
               </div>
               
-              {/* Export options with export button */}
               <div className="flex flex-col md:flex-row items-start md:items-end gap-4 w-full md:w-auto">
                 <div className="w-full md:w-auto">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Export Format:</label>
@@ -256,7 +366,7 @@ const EnhancedSalesEmailGenerator = () => {
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                     <polyline points="7 10 12 15 17 10"></polyline>
                     <line x1="12" y1="15" x2="12" y2="3"></line>
-                    </svg>
+                  </svg>
                   Export
                 </button>
               </div>
@@ -269,7 +379,7 @@ const EnhancedSalesEmailGenerator = () => {
               layout={emailLayout}
             />
             
-            {/* Action buttons with helpful links */}
+            {/* Action buttons */}
             <div className="flex flex-col md:flex-row justify-between items-center mt-6 gap-4">
               <div className="flex flex-col md:flex-row items-center gap-4">
                 <button
@@ -280,13 +390,12 @@ const EnhancedSalesEmailGenerator = () => {
                   Back to Benefits
                 </button>
                 
-                {/* Quick links to saved emails and analytics */}
                 <div className="flex gap-2 text-sm">
                   <a 
-                    href="/tools/email-series" 
+                    href="/tools/content-library" 
                     className="text-indigo-600 hover:text-indigo-700 underline"
                   >
-                    View Saved Emails
+                    View Content Library
                   </a>
                   <span className="text-gray-400">•</span>
                   <a 
@@ -345,6 +454,7 @@ const EnhancedSalesEmailGenerator = () => {
         )}
       </div>
       
+      {/* Enhanced info card with usage info */}
       <div className="info-card">
         <div className="info-header">
           <span className="badge">PRO</span>
@@ -353,12 +463,26 @@ const EnhancedSalesEmailGenerator = () => {
         <p className="info-text">
           This tool scans sales pages, identifies key benefits and features, and generates a series of 
           promotional emails. Each email focuses on a specific benefit to create a compelling
-          email sequence for your marketing campaigns. AI-powered generation creates more personalized 
-          and high-converting emails.
+          email sequence for your marketing campaigns. All generated content is automatically saved to your Content Library.
         </p>
+        <div className="mt-3 text-sm text-gray-600">
+          <div className="flex items-center justify-between">
+            <span>Daily tokens remaining:</span>
+            <span className="font-medium">{getRemainingLimits().daily_tokens.toLocaleString()}</span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span>Monthly tokens remaining:</span>
+            <span className="font-medium">{getRemainingLimits().monthly_tokens.toLocaleString()}</span>
+          </div>
+        </div>
         {!aiAvailable && (
           <div className="warning-text">
             <strong>Note:</strong> AI generation is currently unavailable. Using template-based generation.
+          </div>
+        )}
+        {isAtLimit && (
+          <div className="warning-text">
+            <strong>Limit Reached:</strong> You've used all your tokens. Please upgrade for unlimited AI access.
           </div>
         )}
       </div>
