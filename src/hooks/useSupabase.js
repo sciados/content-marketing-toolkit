@@ -1,4 +1,4 @@
-// src/hooks/useSupabase.js - Simple solution with tier override
+// src/hooks/useSupabase.js - FIXED: No more temporary override needed
 import { useContext } from 'react';
 import SupabaseContext from '../context/SupabaseContext';
 
@@ -15,10 +15,8 @@ const useSupabase = () => {
     throw new Error('useSupabase must be used within a SupabaseProvider');
   }
   
-  // TEMP: Override tier for testing (until Supabase profile is fixed)
-  if (context.user) {
-    context.user.subscription_tier = 'gold';
-  }
+  // REMOVED: No more temporary override needed
+  // The backend now handles subscription_tier separately from the Supabase user object
   
   return context;
 };
