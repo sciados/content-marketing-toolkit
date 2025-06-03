@@ -1,8 +1,9 @@
-// src/pages/Dashboard.jsx - TEST VERSION: Adding useUsageTracking
+// src/pages/Dashboard.jsx - TEST VERSION: Adding useProfile
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase/supabaseClient';
 import { useUsageTracking } from '../hooks/useUsageTracking';
+import { useProfile } from '../hooks/useProfile';
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
@@ -14,6 +15,11 @@ const Dashboard = () => {
   console.log("🔍 About to call useUsageTracking...");
   const usageTrackingResult = useUsageTracking();
   console.log("🔍 useUsageTracking result:", usageTrackingResult);
+
+  // TEST: Add useProfile hook
+  console.log("🔍 About to call useProfile...");
+  const profileResult = useProfile();
+  console.log("🔍 useProfile result:", profileResult);
   
   // Check user auth status on mount
   useEffect(() => {
