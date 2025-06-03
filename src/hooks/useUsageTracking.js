@@ -1,5 +1,4 @@
-
-// src/hooks/useUsageTracking.js - ENHANCED with real-time updates
+// src/hooks/useUsageTracking.js - FIXED data mapping
 import { useState, useEffect, useCallback } from 'react';
 import { usageApi } from '../services/api';
 
@@ -18,31 +17,52 @@ export const useUsageTracking = () => {
 
   // Fetch current usage limits
   const fetchLimits = useCallback(async () => {
+    console.log('🔍 fetchLimits called')
     setLoading(true);
     setError(null);
     
     try {
+      console.log('🔍 About to call usageApi.getLimits()')
       const result = await usageApi.getLimits();
+      console.log('🔍 usageApi.getLimits() result:', result)
       
       if (result.success) {
-        setLimits(result.limits);
-        console.log('✅ Usage limits loaded:', result.limits);
+        // FIXED: Map API response to expected format
+        const mappedLimits = {
+          // Map API field names to expected field names
+          monthly_token_limit: result.limits?.monthly_tokens || result.data?.limits?.monthly_tokens || 10000,
+          daily_token_limit: result.limits?.daily_tokens || result.data?.limits?.daily_tokens || 500,
+          daily_video_limit: result.limits?.videos_per_day || result.data?.limits?.videos_per_day || 5,
+          
+          // Current usage from API
+          monthly_tokens_used: result.current_usage?.monthly_tokens_used || result.data?.current_usage?.monthly_tokens_used || 0,
+          daily_tokens_used: result.current_usage?.daily_tokens_used || result.data?.current_usage?.daily_tokens_used || 0,
+          daily_videos_processed: result.current_usage?.videos_today || result.data?.current_usage?.videos_today || 0,
+          
+          // Additional fields
+          tier: result.user_info?.subscription_tier || result.data?.user_info?.subscription_tier || 'gold'
+        };
+        
+        console.log('🔍 Mapped limits:', mappedLimits);
+        setLimits(mappedLimits);
+        console.log('✅ Usage limits loaded and mapped correctly');
       } else {
+        console.error('❌ Usage API returned error:', result)
         throw new Error(result.error || 'Failed to fetch usage limits');
       }
     } catch (err) {
       console.error('❌ Failed to fetch usage limits:', err);
       setError(err.message);
       
-      // Use fallback limits
+      // Use fallback limits with correct field names
       setLimits({
-        monthly_token_limit: 2000,
-        daily_token_limit: 200,
+        monthly_token_limit: 10000,
+        daily_token_limit: 500,
         monthly_tokens_used: 0,
         daily_tokens_used: 0,
-        daily_video_limit: 10,
+        daily_video_limit: 5,
         daily_videos_processed: 0,
-        tier: 'free'
+        tier: 'gold'
       });
     } finally {
       setLoading(false);
@@ -53,17 +73,19 @@ export const useUsageTracking = () => {
   const trackAITokenUsage = useCallback(async (tokens, feature = 'general') => {
     try {
       const result = await usageApi.trackUsage({
-        tokens,
-        feature,
-        timestamp: new Date().toISOString()
+        feature: feature,
+        tokensUsed: tokens, // FIXED: Use correct field name
+        metadata: {
+          timestamp: new Date().toISOString()
+        }
       });
 
       if (result.success) {
-        // Update local state
+        // Update local state with correct field mapping
         setLimits(prev => ({
           ...prev,
-          monthly_tokens_used: result.usage.monthly_tokens_used,
-          daily_tokens_used: result.usage.daily_tokens_used
+          monthly_tokens_used: result.data?.usage?.monthly_tokens_used || prev.monthly_tokens_used,
+          daily_tokens_used: result.data?.usage?.daily_tokens_used || prev.daily_tokens_used
         }));
 
         console.log(`✅ Tracked ${tokens} tokens for ${feature}`);
@@ -82,17 +104,18 @@ export const useUsageTracking = () => {
     try {
       const result = await usageApi.trackUsage({
         feature: 'video_processing',
+        tokensUsed: 0, // Video processing doesn't use tokens
         metadata: {
           video_id: videoId,
-          extraction_method: extractionMethod
-        },
-        timestamp: new Date().toISOString()
+          extraction_method: extractionMethod,
+          timestamp: new Date().toISOString()
+        }
       });
 
       if (result.success) {
         setLimits(prev => ({
           ...prev,
-          daily_videos_processed: result.usage.daily_videos_processed
+          daily_videos_processed: result.data?.usage?.videos_today || prev.daily_videos_processed + 1
         }));
 
         console.log(`✅ Tracked video processing: ${videoId}`);
@@ -121,7 +144,6 @@ export const useUsageTracking = () => {
 
   // trackUsage method with metadata parameter (kept for API compatibility)
   const trackUsage = useCallback((tokens, feature, _metadata = {}) => { // eslint-disable-line no-unused-vars
-    // Note: _metadata parameter kept for API compatibility but not used in current implementation
     return trackAITokenUsage(tokens, feature);
   }, [trackAITokenUsage]);
 
