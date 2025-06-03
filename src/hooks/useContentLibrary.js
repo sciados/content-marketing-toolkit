@@ -1,10 +1,13 @@
-// src/hooks/useContentLibrary.js - FIXED VERSION
+// src/hooks/useContentLibrary.js - UPDATED to use centralized API
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { contentLibraryApi } from '../services/api';
+import { useErrorHandler } from './useErrorHandler';
 
 export const useContentLibrary = () => {
   const navigate = useNavigate();
+  const { withErrorHandling } = useErrorHandler();
+  
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -17,20 +20,22 @@ export const useContentLibrary = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [backendAvailable, setBackendAvailable] = useState(true);
 
-  // Check if backend APIs are available
+  // Check if backend APIs are available using centralized API
   const checkBackendAvailability = useCallback(async () => {
     try {
-      await contentLibraryApi.getHealth();
-      setBackendAvailable(true);
-      return true;
+      const result = await contentLibraryApi.getHealth();
+      const available = result.success;
+      setBackendAvailable(available);
+      console.log('✅ Content Library API health:', { available });
+      return available;
     } catch (error) {
-      console.warn('Content Library backend unavailable:', error);
+      console.warn('⚠️ Content Library backend unavailable:', error);
       setBackendAvailable(false);
       return false;
     }
   }, []);
 
-  // Demo data for fallback
+  // Demo data for fallback (unchanged)
   const getDemoData = () => [
     {
       id: 'demo-1',
@@ -66,14 +71,15 @@ export const useContentLibrary = () => {
       const isAvailable = await checkBackendAvailability();
       
       if (!isAvailable) {
-        console.warn('Backend not available, using demo data');
+        console.warn('⚠️ Backend not available, using demo data');
         setItems(getDemoData());
         setLoading(false);
         return;
       }
 
-      // Use centralized API service
-      const data = await contentLibraryApi.getItems({
+      // Use centralized API service with error handling
+      const safeApiCall = withErrorHandling(contentLibraryApi.getItems);
+      const result = await safeApiCall({
         type: filters.content_type || 'all',
         search: searchTerm || '',
         favorited: (filters.favorited || false).toString(),
@@ -82,23 +88,27 @@ export const useContentLibrary = () => {
         limit: '50'
       });
 
-      if (data.success) {
-        setItems(data.items || []);
-        console.log(`✅ Fetched ${data.items?.length || 0} Content Library items`);
+      if (result.success) {
+        setItems(result.items || []);
+        console.log(`✅ Fetched ${result.items?.length || 0} Content Library items`);
       } else {
-        throw new Error(data.error || 'API returned unsuccessful response');
+        throw new Error(result.message || result.error || 'API returned unsuccessful response');
       }
     } catch (error) {
-      console.error('Failed to fetch content library:', error);
-      setError(error.message);
+      console.error('❌ Failed to fetch content library:', error);
+      
+      // Don't set error state if withErrorHandling already handled it
+      if (!error.errorInfo) {
+        setError(error.message);
+      }
       
       // Fallback to demo data
-      console.warn('Using demo data as fallback');
+      console.warn('⚠️ Using demo data as fallback');
       setItems(getDemoData());
     } finally {
       setLoading(false);
     }
-  }, [filters, searchTerm, checkBackendAvailability]);
+  }, [filters, searchTerm, checkBackendAvailability, withErrorHandling]);
 
   // Initial load
   useEffect(() => {
@@ -116,12 +126,13 @@ export const useContentLibrary = () => {
       ));
 
       if (!backendAvailable) {
-        console.log('Backend not available - favorite change stored locally only');
+        console.log('⚠️ Backend not available - favorite change stored locally only');
         return;
       }
 
-      // Use centralized API service
-      const result = await contentLibraryApi.toggleFavorite(itemId, !currentFavorited);
+      // Use centralized API service with error handling
+      const safeApiCall = withErrorHandling(contentLibraryApi.toggleFavorite);
+      const result = await safeApiCall(itemId, !currentFavorited);
 
       if (!result.success) {
         // Revert optimistic update on failure
@@ -132,7 +143,7 @@ export const useContentLibrary = () => {
         ));
       }
     } catch (error) {
-      console.error('Failed to toggle favorite:', error);
+      console.error('❌ Failed to toggle favorite:', error);
       // Revert optimistic update
       setItems(prev => prev.map(item => 
         item.id === itemId 
@@ -140,7 +151,7 @@ export const useContentLibrary = () => {
           : item
       ));
     }
-  }, [backendAvailable]);
+  }, [backendAvailable, withErrorHandling]);
 
   // Use content item with centralized API
   const useContentItem = useCallback(async (item) => {
@@ -161,9 +172,10 @@ export const useContentLibrary = () => {
       // Track usage using centralized API
       if (backendAvailable) {
         try {
-          await contentLibraryApi.trackUsage(item.id, item.content_type);
+          const safeApiCall = withErrorHandling(contentLibraryApi.trackUsage);
+          await safeApiCall(item.id, item.content_type);
         } catch (trackingError) {
-          console.warn('Usage tracking failed:', trackingError);
+          console.warn('⚠️ Usage tracking failed:', trackingError);
         }
       }
 
@@ -183,7 +195,7 @@ export const useContentLibrary = () => {
             await navigator.clipboard.writeText(item.metadata.content);
             console.log('✅ Content copied to clipboard');
           } catch (clipboardError) {
-            console.warn('Failed to copy to clipboard:', clipboardError);
+            console.warn('⚠️ Failed to copy to clipboard:', clipboardError);
           }
         }
         
@@ -193,9 +205,9 @@ export const useContentLibrary = () => {
       console.error('❌ Failed to use content item:', error);
       setError('Failed to use content item');
     }
-  }, [backendAvailable, navigate]);
+  }, [backendAvailable, navigate, withErrorHandling]);
 
-  // Delete item using centralized API - FIXED VERSION
+  // Delete item using centralized API
   const deleteItem = useCallback(async (itemId) => {
     if (!confirm('Are you sure you want to delete this item?')) {
       return;
@@ -205,7 +217,7 @@ export const useContentLibrary = () => {
     const itemToDelete = items.find(item => item.id === itemId);
     
     if (!itemToDelete) {
-      console.warn('Item not found for deletion:', itemId);
+      console.warn('⚠️ Item not found for deletion:', itemId);
       return;
     }
 
@@ -214,28 +226,39 @@ export const useContentLibrary = () => {
       setItems(prev => prev.filter(item => item.id !== itemId));
 
       if (!backendAvailable) {
-        console.log('Backend not available - item removed locally only');
+        console.log('⚠️ Backend not available - item removed locally only');
         return;
       }
 
-      // Use centralized API service
-      await contentLibraryApi.deleteItem(itemId);
-      console.log('✅ Item deleted successfully:', itemId);
+      // Use centralized API service with error handling
+      const safeApiCall = withErrorHandling(contentLibraryApi.deleteItem);
+      const result = await safeApiCall(itemId);
+      
+      if (result.success) {
+        console.log('✅ Item deleted successfully:', itemId);
+      } else {
+        // Restore item on API failure
+        setItems(prev => [itemToDelete, ...prev]);
+      }
 
     } catch (error) {
-      console.error('Failed to delete item:', error);
-      setError('Failed to delete item');
+      console.error('❌ Failed to delete item:', error);
+      
+      // Don't set error state if withErrorHandling already handled it
+      if (!error.errorInfo) {
+        setError('Failed to delete item');
+      }
       
       // Restore item on error using the stored reference
       setItems(prev => [itemToDelete, ...prev]);
     }
-  }, [items, backendAvailable]);
+  }, [items, backendAvailable, withErrorHandling]);
 
   // Add to library using centralized API
   const addToLibrary = useCallback(async (contentData) => {
     try {
       if (!backendAvailable) {
-        console.warn('Backend not available - cannot add to library');
+        console.warn('⚠️ Backend not available - cannot add to library');
         setError('Backend not available. Cannot save to Content Library.');
         return null;
       }
@@ -245,30 +268,100 @@ export const useContentLibrary = () => {
         title: contentData.title,
         description: contentData.description || '',
         tags: contentData.tags || [],
+        source_url: contentData.source_url,
         metadata: {
           ...contentData.metadata,
-          source_url: contentData.source_url,
           cost_saved: contentData.cost_saved || 0,
           word_count: contentData.word_count || 0
         }
       };
 
-      // Use centralized API service
-      const result = await contentLibraryApi.createItem(mappedData);
+      // Use centralized API service with error handling
+      const safeApiCall = withErrorHandling(contentLibraryApi.createItem);
+      const result = await safeApiCall(mappedData);
 
       if (result.success && result.item) {
         setItems(prev => [result.item, ...prev]);
         console.log(`✅ Added to Content Library: ${contentData.title}`);
         return result.item;
       } else {
-        throw new Error(result.error || 'Failed to add item');
+        throw new Error(result.message || result.error || 'Failed to add item');
       }
     } catch (error) {
-      console.error('Failed to add to library:', error);
-      setError(`Failed to add to library: ${error.message}`);
+      console.error('❌ Failed to add to library:', error);
+      
+      // Don't set error state if withErrorHandling already handled it
+      if (!error.errorInfo) {
+        setError(`Failed to add to library: ${error.message}`);
+      }
       return null;
     }
-  }, [backendAvailable]);
+  }, [backendAvailable, withErrorHandling]);
+
+  // Search items using centralized API
+  const searchItems = useCallback(async (query) => {
+    if (!backendAvailable) {
+      console.warn('⚠️ Backend not available - using local search');
+      // Local search fallback
+      const filtered = items.filter(item => 
+        item.title.toLowerCase().includes(query.toLowerCase()) ||
+        item.description.toLowerCase().includes(query.toLowerCase())
+      );
+      return filtered;
+    }
+
+    try {
+      const safeApiCall = withErrorHandling(contentLibraryApi.search);
+      const result = await safeApiCall({
+        query: query,
+        type: filters.content_type || 'all',
+        limit: '20'
+      });
+
+      if (result.success) {
+        return result.items || [];
+      } else {
+        throw new Error(result.message || 'Search failed');
+      }
+    } catch (error) {
+      console.error('❌ Search failed:', error);
+      return [];
+    }
+  }, [backendAvailable, items, filters.content_type, withErrorHandling]);
+
+  // Get library stats using centralized API
+  const getLibraryStats = useCallback(async () => {
+    if (!backendAvailable) {
+      // Return local stats
+      return {
+        total_items: items.length,
+        favorites_count: items.filter(item => item.is_favorited).length,
+        recent_items_week: items.filter(item => {
+          const weekAgo = new Date();
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          return new Date(item.created_at) > weekAgo;
+        }).length,
+        items_by_type: items.reduce((acc, item) => {
+          acc[item.content_type] = (acc[item.content_type] || 0) + 1;
+          return acc;
+        }, {})
+      };
+    }
+
+    try {
+      const safeApiCall = withErrorHandling(contentLibraryApi.getStats);
+      const result = await safeApiCall();
+
+      if (result.success) {
+        return result.data || {};
+      } else {
+        throw new Error(result.message || 'Failed to get stats');
+      }
+    } catch (error) {
+      console.error('❌ Failed to get library stats:', error);
+      return {};
+    }
+  }, [backendAvailable, items, withErrorHandling]);
 
   // Helper functions
   const getItemsByType = useCallback((contentType) => {
@@ -311,6 +404,10 @@ export const useContentLibrary = () => {
     addToLibrary,
     refetch,
     clearError,
+    
+    // Advanced functions
+    searchItems,
+    getLibraryStats,
     
     // Computed values
     totalItems: items.length,

@@ -1,243 +1,410 @@
-// src/context/AuthContext.js
-import React, { createContext, useContext, useState, useEffect } from 'react';
+// src/context/AuthContext.js - ENHANCED Authentication Context (Provider Only)
+import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../services/supabase/supabaseClient';
+import { authApi } from '../services/api';
 
 const AuthContext = createContext();
 
-export const useAuth = () => useContext(AuthContext);
-
 export const AuthProvider = ({ children }) => {
+  // Core auth state
   const [user, setUser] = useState(null);
+  const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  
+  // Additional state
+  const [backendConnected, setBackendConnected] = useState(false);
+  const [subscription, setSubscription] = useState(null);
 
+  console.log('🔧 Enhanced AuthProvider initializing...');
+
+  /**
+   * Check backend connectivity
+   */
+  const checkBackendConnection = useCallback(async () => {
+    try {
+      const result = await authApi.checkBackend();
+      setBackendConnected(result.available);
+      
+      if (!result.available) {
+        console.warn('⚠️ Backend is not available:', result.message);
+      } else {
+        console.log('✅ Backend connection verified');
+      }
+      
+      return result.available;
+    } catch (error) {
+      console.error('❌ Backend check failed:', error);
+      setBackendConnected(false);
+      return false;
+    }
+  }, []);
+
+  /**
+   * Test authentication with backend
+   */
+  const testBackendAuth = useCallback(async () => {
+    if (!session?.access_token) {
+      return { success: false, error: 'No session token' };
+    }
+
+    try {
+      const result = await authApi.testAuth();
+      console.log('🔐 Backend auth test:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Backend auth test failed:', error);
+      return { success: false, error: error.message };
+    }
+  }, [session]);
+
+  /**
+   * Update user session and related data
+   */
+  const updateSession = useCallback(async (newSession) => {
+    setSession(newSession);
+    setUser(newSession?.user || null);
+
+    if (newSession?.user) {
+      console.log('✅ Session updated for user:', newSession.user.email);
+      
+      // Test backend authentication
+      if (backendConnected) {
+        const authTest = await testBackendAuth();
+        if (!authTest.success) {
+          console.warn('⚠️ Backend auth test failed:', authTest.error);
+        }
+      }
+    } else {
+      console.log('🔓 Session cleared');
+      setSubscription(null);
+    }
+  }, [backendConnected, testBackendAuth]);
+
+  /**
+   * Initialize auth state
+   */
   useEffect(() => {
-    // Check for existing session
-    const getInitialSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      setUser(data?.session?.user || null);
-      setLoading(false);
+    let mounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        console.log('🔧 Initializing authentication...');
+        setLoading(true);
+        setError(null);
+
+        // Check backend first
+        await checkBackendConnection();
+
+        // Get current session
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('❌ Session error:', sessionError);
+          throw sessionError;
+        }
+
+        if (mounted) {
+          if (sessionData.session) {
+            await updateSession(sessionData.session);
+          } else {
+            await updateSession(null);
+          }
+        }
+
+      } catch (err) {
+        console.error('❌ Auth initialization error:', err);
+        if (mounted) {
+          setError(err);
+          setUser(null);
+          setSession(null);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
     };
 
-    getInitialSession();
+    initializeAuth();
 
-    // Set up auth subscription
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user || null);
+    return () => {
+      mounted = false;
+    };
+  }, [checkBackendConnection, updateSession]);
+
+  /**
+   * Set up auth state listener
+   */
+  useEffect(() => {
+    console.log('🔧 Setting up auth state listener...');
+    
+    const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('🔐 Auth state changed:', event, session ? 'with session' : 'no session');
+        
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          await updateSession(session);
+        } else if (event === 'SIGNED_OUT') {
+          await updateSession(null);
+        }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('🔧 Cleaning up auth listener');
+      authSubscription.unsubscribe();
+    };
+  }, [updateSession]);
+
+  /**
+   * Login function
+   */
+  const login = useCallback(async (email, password) => {
+    console.log('🔐 Login attempt for:', email);
+    
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        console.error('❌ Login error:', error);
+        throw error;
+      }
+
+      console.log('✅ Login successful for:', email);
+      return { data, error: null };
+
+    } catch (error) {
+      console.error('❌ Login failed:', error);
+      setError(error);
+      return { data: null, error };
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Auth methods
-  const login = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+  /**
+   * Signup function
+   */
+  const signup = useCallback(async (email, password, userData = {}) => {
+    console.log('📝 Signup attempt for:', email);
     
-    if (error) throw error;
-    return data;
-  };
+    try {
+      setLoading(true);
+      setError(null);
 
-  const register = async (email, password, userData = {}) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: userData,
-      },
-    });
-    
-    if (error) throw error;
-    return data;
-  };
-
-  const logout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-  };
-
-  const resetPassword = async (email) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email);
-    if (error) throw error;
-  };
-
-  // Email methods
-  const saveEmail = async (emailData) => {
-    if (!user) throw new Error('You must be logged in to save emails');
-    
-    // Check if this is part of a series
-    if (emailData.seriesName) {
-      let seriesId = emailData.seriesId;
-      
-      // If no series ID provided, create or find the series
-      if (!seriesId) {
-        // Check if series with this name exists
-        let { data: existingSeries } = await supabase
-          .from('email_series')
-          .select('id')
-          .eq('user_id', user.id)
-          .eq('name', emailData.seriesName)
-          .single();
-        
-        if (existingSeries) {
-          seriesId = existingSeries.id;
-        } else {
-          // Create new series
-          const { data, error } = await supabase
-            .from('email_series')
-            .insert({
-              user_id: user.id,
-              name: emailData.seriesName,
-              domain: emailData.domain || ''
-            })
-            .select()
-            .single();
-          
-          if (error) throw error;
-          seriesId = data.id;
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: userData
         }
+      });
+
+      if (error) {
+        console.error('❌ Signup error:', error);
+        throw error;
       }
-      
-      // Now save the email with the series ID
-      const { data, error } = await supabase
-        .from('emails')
-        .insert({
-          user_id: user.id,
-          series_id: seriesId,
-          subject: emailData.subject || 'No Subject',
-          body: emailData.body || '',
-          benefit: emailData.benefit || '',
-          email_number: emailData.emailNumber || null,
-          layout: emailData.layout || 'standard'
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data.id;
-    } else {
-      // Save standalone email
-      const { data, error } = await supabase
-        .from('emails')
-        .insert({
-          user_id: user.id,
-          subject: emailData.subject || 'No Subject',
-          body: emailData.body || '',
-          benefit: emailData.benefit || '',
-          layout: emailData.layout || 'standard'
-        })
-        .select()
-        .single();
-      
-      if (error) throw error;
-      return data.id;
+
+      console.log('✅ Signup successful for:', email);
+      return { data, error: null };
+
+    } catch (error) {
+      console.error('❌ Signup failed:', error);
+      setError(error);
+      return { data: null, error };
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
-  const getSavedEmails = async () => {
-    if (!user) return [];
+  /**
+   * Logout function
+   */
+  const logout = useCallback(async () => {
+    console.log('🔓 Logout initiated');
     
-    // Get all emails with their series information
-    const { data, error } = await supabase
-      .from('emails')
-      .select(`
-        *,
-        email_series (
-          id,
-          name,
-          domain
-        )
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    
-    // Transform to match your expected format
-    return data.map(email => ({
-      id: email.id,
-      subject: email.subject,
-      body: email.body,
-      benefit: email.benefit,
-      emailNumber: email.email_number,
-      layout: email.layout,
-      createdAt: email.created_at,
-      updatedAt: email.updated_at,
-      seriesId: email.series_id,
-      seriesName: email.email_series?.name || 'Unsorted Emails',
-      domain: email.email_series?.domain || ''
-    }));
-  };
+    try {
+      setLoading(true);
+      setError(null);
 
-  // Method to get all email series
-  const getEmailSeries = async () => {
-    if (!user) return [];
-    
-    const { data, error } = await supabase
-      .from('email_series')
-      .select(`
-        *,
-        emails (count)
-      `)
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    
-    return data.map(series => ({
-      id: series.id,
-      name: series.name,
-      domain: series.domain,
-      createdAt: series.created_at,
-      updatedAt: series.updated_at,
-      emailCount: series.emails?.[0]?.count || 0
-    }));
-  };
+      const { error } = await supabase.auth.signOut();
 
-  // Delete an email
-  const deleteEmail = async (emailId) => {
-    if (!user) throw new Error('You must be logged in to delete emails');
-    
-    const { error } = await supabase
-      .from('emails')
-      .delete()
-      .eq('id', emailId)
-      .eq('user_id', user.id);
-    
-    if (error) throw error;
-    return true;
-  };
+      if (error) {
+        console.error('❌ Logout error:', error);
+        throw error;
+      }
 
-  // Delete a series and all its emails
-  const deleteEmailSeries = async (seriesId) => {
-    if (!user) throw new Error('You must be logged in to delete series');
+      console.log('✅ Logout successful');
+      return { error: null };
+
+    } catch (error) {
+      console.error('❌ Logout failed:', error);
+      setError(error);
+      return { error };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Reset password function
+   */
+  const resetPassword = useCallback(async (email) => {
+    console.log('🔑 Password reset requested for:', email);
     
-    // Supabase will handle cascading deletes based on foreign key constraints
-    const { error } = await supabase
-      .from('email_series')
-      .delete()
-      .eq('id', seriesId)
-      .eq('user_id', user.id);
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`
+      });
+
+      if (error) {
+        console.error('❌ Password reset error:', error);
+        throw error;
+      }
+
+      console.log('✅ Password reset email sent');
+      return { error: null };
+
+    } catch (error) {
+      console.error('❌ Password reset failed:', error);
+      setError(error);
+      return { error };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Update password function
+   */
+  const updatePassword = useCallback(async (password) => {
+    console.log('🔑 Password update initiated');
     
-    if (error) throw error;
-    return true;
-  };
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { error } = await supabase.auth.updateUser({
+        password
+      });
+
+      if (error) {
+        console.error('❌ Password update error:', error);
+        throw error;
+      }
+
+      console.log('✅ Password updated successfully');
+      return { error: null };
+
+    } catch (error) {
+      console.error('❌ Password update failed:', error);
+      setError(error);
+      return { error };
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
+   * Get current auth token
+   */
+  const getToken = useCallback(async () => {
+    try {
+      if (!session?.access_token) {
+        const { data } = await supabase.auth.getSession();
+        return data.session?.access_token || null;
+      }
+      return session.access_token;
+    } catch (error) {
+      console.error('❌ Failed to get token:', error);
+      return null;
+    }
+  }, [session]);
+
+  /**
+   * Refresh session
+   */
+  const refreshSession = useCallback(async () => {
+    console.log('🔄 Refreshing session...');
+    
+    try {
+      const { data, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        console.error('❌ Session refresh error:', error);
+        throw error;
+      }
+
+      if (data.session) {
+        await updateSession(data.session);
+        console.log('✅ Session refreshed');
+      }
+
+      return { data, error: null };
+
+    } catch (error) {
+      console.error('❌ Session refresh failed:', error);
+      return { data: null, error };
+    }
+  }, [updateSession]);
+
+  // Enhanced state logging
+  console.log('🔧 Auth Context State:', {
+    hasUser: !!user,
+    userEmail: user?.email,
+    hasSession: !!session,
+    hasToken: !!(session?.access_token),
+    loading,
+    backendConnected,
+    hasError: !!error
+  });
 
   const value = {
+    // Core state
     user,
+    session,
     loading,
+    error,
+    
+    // Additional state
+    backendConnected,
+    subscription,
+    
+    // Auth methods
     login,
-    register,
+    signup,
     logout,
     resetPassword,
-    saveEmail,
-    getSavedEmails,
-    getEmailSeries,
-    deleteEmail,
-    deleteEmailSeries
+    updatePassword,
+    
+    // Legacy method names for compatibility
+    signIn: login,
+    signUp: signup,
+    signOut: logout,
+    
+    // Utility methods
+    getToken,
+    refreshSession,
+    checkBackendConnection,
+    testBackendAuth,
+    
+    // Computed properties
+    isAuthenticated: !!user && !!session,
+    isLoading: loading,
+    hasError: !!error,
+    
+    // Supabase client (for advanced usage)
+    supabase
   };
 
   return (

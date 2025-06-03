@@ -1,447 +1,349 @@
+// src/services/api/apiClient.js - CRITICAL Centralized API Client
 import { supabase } from '../supabase/supabaseClient';
 
-// Backend API URL
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://aiworkers.onrender.com';
-
 /**
- * Centralized API client with consistent auth and error handling
+ * Centralized API client with robust authentication, error handling, and retry logic
+ * Handles all communication with the Python Flask backend
  */
-class ApiClient {
+class APIClient {
   constructor() {
-    this.baseURL = API_BASE;
+    this.baseURL = import.meta.env.VITE_API_BASE_URL || 'https://aiworkers.onrender.com';
+    this.timeout = 30000; // 30 seconds
+    this.retryAttempts = 3;
+    this.retryDelay = 1000; // 1 second
+    
+    console.log('🔧 APIClient initialized with base URL:', this.baseURL);
   }
 
   /**
-   * Get consistent auth headers using Supabase session
+   * Get current authentication token from Supabase session
    */
-  async getAuthHeaders() {
+  async getAuthToken() {
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
-
-      if (error || !session?.access_token) {
-        console.warn('No valid session for API calls');
-        return {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Origin': window.location.origin
-        };
+      
+      if (error) {
+        console.error('❌ Error getting session:', error);
+        throw new Error(`Session error: ${error.message}`);
       }
-
-      return {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': `Bearer ${session.access_token}`,
-        'Origin': window.location.origin
-      };
+      
+      if (!session?.access_token) {
+        throw new Error('No active session found');
+      }
+      
+      return session.access_token;
     } catch (error) {
-      console.error('Failed to get auth headers:', error);
-      return {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Origin': window.location.origin
-      };
+      console.error('❌ Failed to get auth token:', error);
+      throw error;
     }
   }
 
   /**
-   * Generic request method with error handling and timeout
+   * Build request headers with authentication
    */
-  async request(endpoint, options = {}) {
-    const url = `${this.baseURL}${endpoint}`;
-    const headers = await this.getAuthHeaders();
-    
-    const config = {
-      headers: {
-        ...headers,
-        ...options.headers,
-      },
-      timeout: options.timeout || 30000,
-      ...options,
+  async buildHeaders(includeAuth = true, additionalHeaders = {}) {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      ...additionalHeaders
     };
 
+    if (includeAuth) {
+      try {
+        const token = await this.getAuthToken();
+        headers['Authorization'] = `Bearer ${token}`;
+      } catch (error) {
+        console.warn('⚠️ Could not add auth token to headers:', error.message);
+        // Don't throw here - let the endpoint handle auth errors
+      }
+    }
+
+    return headers;
+  }
+
+  /**
+   * Sleep function for retry delays
+   */
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Enhanced fetch with timeout, retries, and error handling
+   */
+  async fetchWithRetry(url, options, attempt = 1) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), config.timeout);
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
     try {
+      console.log(`🚀 API Request (attempt ${attempt}):`, options.method || 'GET', url);
+      
       const response = await fetch(url, {
-        ...config,
-        signal: controller.signal,
+        ...options,
+        signal: controller.signal
       });
 
       clearTimeout(timeoutId);
 
-      // Get response text first to handle both JSON and text responses
-      const responseText = await response.text();
-      
-      // Try to parse as JSON
-      let responseData;
-      try {
-        responseData = responseText ? JSON.parse(responseText) : {};
-      // eslint-disable-next-line no-unused-vars
-      } catch (parseError) {
-        // If not JSON, treat as text
-        responseData = { message: responseText };
-      }
-
+      // Handle different response types
       if (!response.ok) {
-        // Handle specific error status codes
-        if (response.status === 401) {
-          throw new Error('Authentication expired. Please refresh the page and log in again.');
-        } else if (response.status === 403) {
-          throw new Error('Access denied. Please check your subscription tier or usage limits.');
-        } else if (response.status === 404) {
-          throw new Error(responseData.error || responseData.message || 'Resource not found');
-        } else if (response.status >= 500) {
-          throw new Error('Backend server error. Please try again in a few minutes.');
-        } else {
-          throw new Error(responseData.error || responseData.message || `API error: ${response.status}`);
+        const errorText = await response.text();
+        let errorData;
+        
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText || 'Unknown error' };
         }
+        
+        const error = new Error(errorData.message || `HTTP ${response.status}`);
+        error.status = response.status;
+        error.data = errorData;
+        
+        // Log error details
+        console.error(`❌ API Error (${response.status}):`, {
+          url,
+          method: options.method || 'GET',
+          status: response.status,
+          error: errorData
+        });
+        
+        throw error;
       }
 
-      return responseData;
+      // Parse response
+      const responseText = await response.text();
+      let data;
+      
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        data = { message: responseText };
+      }
+
+      console.log(`✅ API Success:`, {
+        url,
+        method: options.method || 'GET',
+        status: response.status,
+        dataKeys: Object.keys(data || {})
+      });
+
+      return data;
 
     } catch (error) {
       clearTimeout(timeoutId);
-      
+
+      // Handle abort/timeout
       if (error.name === 'AbortError') {
-        throw new Error('Request timed out. Please try again.');
+        const timeoutError = new Error(`Request timeout after ${this.timeout}ms`);
+        timeoutError.isTimeout = true;
+        throw timeoutError;
       }
-      
-      // Re-throw our custom errors
+
+      // Retry logic for network errors (not auth errors)
+      if (attempt < this.retryAttempts && this.shouldRetry(error)) {
+        console.warn(`⚠️ Retrying request (${attempt}/${this.retryAttempts}) after error:`, error.message);
+        await this.sleep(this.retryDelay * attempt);
+        return this.fetchWithRetry(url, options, attempt + 1);
+      }
+
       throw error;
     }
   }
 
   /**
-   * GET request helper
+   * Determine if an error should trigger a retry
    */
-  async get(endpoint, options = {}) {
-    return this.request(endpoint, {
+  shouldRetry(error) {
+    // Don't retry auth errors (401, 403) or client errors (4xx)
+    if (error.status >= 400 && error.status < 500) {
+      return false;
+    }
+    
+    // Retry network errors and server errors (5xx)
+    return (
+      error.isTimeout ||
+      !error.status || 
+      error.status >= 500 ||
+      error.message.includes('fetch')
+    );
+  }
+
+  /**
+   * GET request
+   */
+  async get(endpoint, params = {}, options = {}) {
+    const url = new URL(`${this.baseURL}${endpoint}`);
+    
+    // Add query parameters
+    Object.keys(params).forEach(key => {
+      if (params[key] !== undefined && params[key] !== null) {
+        url.searchParams.append(key, params[key]);
+      }
+    });
+
+    const headers = await this.buildHeaders(options.auth !== false, options.headers);
+
+    return this.fetchWithRetry(url.toString(), {
       method: 'GET',
-      ...options,
+      headers,
+      ...options
     });
   }
 
   /**
-   * POST request helper
+   * POST request
    */
-  async post(endpoint, data = null, options = {}) {
-    return this.request(endpoint, {
+  async post(endpoint, data = {}, options = {}) {
+    const url = `${this.baseURL}${endpoint}`;
+    const headers = await this.buildHeaders(options.auth !== false, options.headers);
+
+    return this.fetchWithRetry(url, {
       method: 'POST',
-      body: data ? JSON.stringify(data) : null,
-      ...options,
+      headers,
+      body: JSON.stringify(data),
+      ...options
     });
   }
 
   /**
-   * PUT request helper
+   * PUT request
    */
-  async put(endpoint, data = null, options = {}) {
-    return this.request(endpoint, {
+  async put(endpoint, data = {}, options = {}) {
+    const url = `${this.baseURL}${endpoint}`;
+    const headers = await this.buildHeaders(options.auth !== false, options.headers);
+
+    return this.fetchWithRetry(url, {
       method: 'PUT',
-      body: data ? JSON.stringify(data) : null,
-      ...options,
+      headers,
+      body: JSON.stringify(data),
+      ...options
     });
   }
 
   /**
-   * DELETE request helper
+   * DELETE request
    */
   async delete(endpoint, options = {}) {
-    return this.request(endpoint, {
+    const url = `${this.baseURL}${endpoint}`;
+    const headers = await this.buildHeaders(options.auth !== false, options.headers);
+
+    return this.fetchWithRetry(url, {
       method: 'DELETE',
-      ...options,
+      headers,
+      ...options
     });
   }
 
-  // ==========================================
-  // HEALTH & SYSTEM ENDPOINTS
-  // ==========================================
+  /**
+   * Health check endpoint (no auth required)
+   */
+  async healthCheck() {
+    try {
+      return await this.get('/', {}, { auth: false });
+    } catch (error) {
+      console.error('❌ Health check failed:', error);
+      return {
+        success: false,
+        error: 'Backend unavailable',
+        message: error.message
+      };
+    }
+  }
 
   /**
-   * Main health check - matches the backend '/health' endpoint
+   * Test authentication
    */
-  async getHealth() {
+  async testAuth() {
     try {
-      const response = await this.get('/');
+      const token = await this.getAuthToken();
       return {
-        connected: true,
-        message: response.message || 'Backend connected',
-        version: response.version || '4.0',
-        services: response.services || {},
-        cache_status: response.cache_status || {},
-        proxy_status: response.proxy_status || {},
-        ...response
+        success: true,
+        hasToken: !!token,
+        tokenPreview: token ? `${token.substring(0, 10)}...` : null
       };
     } catch (error) {
-      console.error('Health check failed:', error);
-      throw error;
+      return {
+        success: false,
+        error: error.message
+      };
     }
   }
 
   /**
-   * Get cache statistics
+   * Handle authentication errors gracefully
    */
-  async getCacheStats() {
-    try {
-      return await this.get('/cache/stats');
-    } catch (error) {
-      console.error('Cache stats failed:', error);
-      throw error;
+  handleAuthError(error) {
+    if (error.status === 401) {
+      console.warn('🔐 Authentication required - redirecting to login');
+      // The auth context will handle this automatically
+      supabase.auth.signOut();
+      return {
+        success: false,
+        error: 'authentication_required',
+        message: 'Please log in to continue'
+      };
     }
+    
+    if (error.status === 403) {
+      return {
+        success: false,
+        error: 'access_denied',
+        message: 'You do not have permission to perform this action'
+      };
+    }
+    
+    return {
+      success: false,
+      error: 'api_error',
+      message: error.message || 'An unexpected error occurred'
+    };
   }
 
   /**
-   * Get detailed system status
+   * Wrapper for API calls with standardized error handling
    */
-  async getSystemStatus() {
+  async safeApiCall(apiMethod, ...args) {
     try {
-      return await this.get('/system/status');
+      const result = await apiMethod.apply(this, args);
+      
+      // Ensure consistent response format
+      if (typeof result === 'object' && result !== null) {
+        return {
+          success: result.success !== false,
+          ...result
+        };
+      }
+      
+      return {
+        success: true,
+        data: result
+      };
+      
     } catch (error) {
-      console.error('System status failed:', error);
-      throw error;
-    }
-  }
-
-  // ==========================================
-  // VIDEO PROCESSING ENDPOINTS
-  // ==========================================
-
-  /**
-   * Extract YouTube video transcript
-   */
-  async extractTranscript(data) {
-    try {
-      return await this.post('/api/video2promo/extract-transcript', data);
-    } catch (error) {
-      console.error('Transcript extraction failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Analyze transcript for benefits and insights
-   */
-  async analyzeBenefits(data) {
-    try {
-      return await this.post('/api/video2promo/analyze-benefits', data);
-    } catch (error) {
-      console.error('Benefit analysis failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Generate promotional assets
-   */
-  async generateAssets(data) {
-    try {
-      return await this.post('/api/video2promo/generate-assets', data);
-    } catch (error) {
-      console.error('Asset generation failed:', error);
-      throw error;
-    }
-  }
-
-  // ==========================================
-  // EMAIL GENERATION ENDPOINTS (when implemented)
-  // ==========================================
-
-  /**
-   * Scan and analyze sales page
-   */
-  async scanPage(data) {
-    try {
-      return await this.post('/api/email-generator/scan-page', data);
-    } catch (error) {
-      console.error('Page scan failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Generate email series
-   */
-  async generateEmails(data) {
-    try {
-      return await this.post('/api/email-generator/generate', data);
-    } catch (error) {
-      console.error('Email generation failed:', error);
-      throw error;
-    }
-  }
-
-  // ==========================================
-  // USAGE TRACKING ENDPOINTS (when implemented)
-  // ==========================================
-
-  /**
-   * Get usage limits and current consumption
-   */
-  async getUsageLimits() {
-    try {
-      return await this.get('/api/usage/limits');
-    } catch (error) {
-      console.error('Usage limits check failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Track token usage
-   */
-  async trackUsage(data) {
-    try {
-      return await this.post('/api/usage/track', data);
-    } catch (error) {
-      console.error('Usage tracking failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get usage history
-   */
-  async getUsageHistory(params = {}) {
-    try {
-      const queryString = new URLSearchParams(params).toString();
-      const endpoint = queryString ? `/api/usage/history?${queryString}` : '/api/usage/history';
-      return await this.get(endpoint);
-    } catch (error) {
-      console.error('Usage history failed:', error);
-      throw error;
-    }
-  }
-
-  // ==========================================
-  // CONTENT LIBRARY ENDPOINTS (when implemented)
-  // ==========================================
-
-  /**
-   * Get content library items
-   */
-  async getContentLibraryItems(params = {}) {
-    try {
-      const queryString = new URLSearchParams(params).toString();
-      const endpoint = queryString ? `/api/content-library/items?${queryString}` : '/api/content-library/items';
-      return await this.get(endpoint);
-    } catch (error) {
-      console.error('Content library fetch failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Create content library item
-   */
-  async createContentLibraryItem(data) {
-    try {
-      return await this.post('/api/content-library/items', data);
-    } catch (error) {
-      console.error('Content library creation failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get specific content library item
-   */
-  async getContentLibraryItem(id) {
-    try {
-      return await this.get(`/api/content-library/item/${id}`);
-    } catch (error) {
-      console.error('Content library item fetch failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Update content library item
-   */
-  async updateContentLibraryItem(id, data) {
-    try {
-      return await this.put(`/api/content-library/item/${id}`, data);
-    } catch (error) {
-      console.error('Content library update failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Delete content library item
-   */
-  async deleteContentLibraryItem(id) {
-    try {
-      return await this.delete(`/api/content-library/item/${id}`);
-    } catch (error) {
-      console.error('Content library deletion failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Toggle favorite status
-   */
-  async toggleContentLibraryFavorite(id) {
-    try {
-      return await this.post(`/api/content-library/item/${id}/favorite`);
-    } catch (error) {
-      console.error('Content library favorite toggle failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Increment usage count
-   */
-  async incrementContentLibraryUsage(id) {
-    try {
-      return await this.post(`/api/content-library/item/${id}/use`);
-    } catch (error) {
-      console.error('Content library usage increment failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get content library statistics
-   */
-  async getContentLibraryStats() {
-    try {
-      return await this.get('/api/content-library/stats');
-    } catch (error) {
-      console.error('Content library stats failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Search content library
-   */
-  async searchContentLibrary(params = {}) {
-    try {
-      const queryString = new URLSearchParams(params).toString();
-      const endpoint = queryString ? `/api/content-library/search?${queryString}` : '/api/content-library/search';
-      return await this.get(endpoint);
-    } catch (error) {
-      console.error('Content library search failed:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get available content types
-   */
-  async getContentLibraryTypes() {
-    try {
-      return await this.get('/api/content-library/types');
-    } catch (error) {
-      console.error('Content library types fetch failed:', error);
-      throw error;
+      console.error('❌ API call failed:', error);
+      
+      // Handle auth errors specially
+      if (error.status === 401 || error.status === 403) {
+        return this.handleAuthError(error);
+      }
+      
+      // Handle other errors
+      return {
+        success: false,
+        error: error.status ? `http_${error.status}` : 'network_error',
+        message: error.message || 'Request failed',
+        details: error.data || null
+      };
     }
   }
 }
 
-// Create singleton instance
-export const apiClient = new ApiClient();
+// Create and export singleton instance
+export const apiClient = new APIClient();
+
+// Export class for testing
+export { APIClient };
+
+// Default export
 export default apiClient;

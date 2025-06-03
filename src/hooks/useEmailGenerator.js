@@ -1,11 +1,14 @@
-// src/hooks/useEmailGenerator.js - UPDATED VERSION
+// src/hooks/useEmailGenerator.js - UPDATED to use centralized API
 import { useState, useEffect, useCallback } from 'react';
 import { emailApi } from '../services/api';
+import { useErrorHandler } from './useErrorHandler';
 
 /**
- * Updated hook using centralized API service
+ * Enhanced email generator hook using centralized API service
  */
 export const useEmailGenerator = ({ showToast, onScanComplete }) => {
+  const { withErrorHandling } = useErrorHandler();
+  
   // Form inputs
   const [url, setUrl] = useState('');
   const [keywords, setKeywords] = useState('');
@@ -32,7 +35,7 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
   const [generatedEmails, setGeneratedEmails] = useState([]);
   const [isGeneratingEmails, setIsGeneratingEmails] = useState(false);
 
-  // Check AI availability
+  // Check AI availability using centralized API
   useEffect(() => {
     const checkBackendAvailability = async () => {
       try {
@@ -40,9 +43,9 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
         const backendAiAvailable = health.services?.claude || health.services?.openai || false;
         setAiAvailable(backendAiAvailable);
         setIsUsingAI(backendAiAvailable);
-        console.log('Backend AI services available:', backendAiAvailable);
+        console.log('✅ Email API health check:', { available: health.success, ai: backendAiAvailable });
       } catch (error) {
-        console.error('Error checking backend availability:', error);
+        console.error('❌ Email API health check failed:', error);
         setAiAvailable(false);
         setIsUsingAI(false);
       }
@@ -71,7 +74,7 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     });
   }, []);
   
-  // Handle scanning a sales page
+  // Handle scanning a sales page using centralized API
   const handleScanPage = useCallback(async (e) => {
     if (e) e.preventDefault();
     
@@ -96,9 +99,9 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     setWebsiteData(null);
     
     try {
-      console.log('\n🚀 === SCAN PAGE REQUEST START ===');
+      console.log('🚀 Starting page scan with centralized API...');
       
-      // Update progress in stages
+      // Progress updates
       const updateProgress = (stage, progress) => {
         setScanStage(stage);
         setScanProgress(progress);
@@ -112,17 +115,18 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
       
       updateProgress('Extracting content with AI...', 60);
       
-      // Use centralized API service
-      const result = await emailApi.scanPage({
+      // Use centralized API with error handling
+      const safeApiCall = withErrorHandling(emailApi.scanPage);
+      const result = await safeApiCall({
         url: url.trim(),
-        keywords: keywords.trim(),
+        keywords: keywords.split(',').map(k => k.trim()).filter(k => k),
         industry
       });
 
-      console.log('🚀 SCAN: Success response:', result);
+      console.log('✅ Scan API response:', result);
 
       if (!result.success) {
-        throw new Error(result.error || 'Page scanning failed');
+        throw new Error(result.message || result.error || 'Page scanning failed');
       }
 
       updateProgress('Processing results...', 90);
@@ -150,7 +154,7 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
       updateProgress('Scan completed!', 100);
       showToast(result.message || 'Scan completed successfully!', 'success');
       
-      console.log('✅ SCAN: Page scan successful:', {
+      console.log('✅ Page scan successful:', {
         benefits: benefits.length,
         features: features.length,
         websiteData: websiteInfo
@@ -160,24 +164,28 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
         onScanComplete();
       }
     } catch (error) {
-      console.error('❌ SCAN: Page scanning error:', error);
+      console.error('❌ Page scanning error:', error);
       setScanStage('Scan failed');
       setScanProgress(0);
-      showToast(`Failed to scan the page: ${error.message}`, 'error');
       
-      // Set fallback benefits
+      // Error is already handled by withErrorHandling, but we need fallback UI state
       const fallbackBenefits = [
         "Could not extract benefits from this page",
         "Try a different URL or check if the page is accessible",
         "Manual benefit entry may be required"
       ];
       setExtractedBenefits(fallbackBenefits);
+      
+      // Don't show duplicate error toast if withErrorHandling already showed one
+      if (!error.errorInfo) {
+        showToast(`Failed to scan the page: ${error.message}`, 'error');
+      }
     } finally {
       setIsScanning(false);
     }
-  }, [url, keywords, industry, showToast, onScanComplete]);
+  }, [url, keywords, industry, showToast, onScanComplete, withErrorHandling]);
 
-  // Generate emails
+  // Generate emails using centralized API
   const generateEmails = useCallback(async () => {
     if (!extractedBenefits.length || !selectedBenefits.some(Boolean)) {
       showToast('Please select at least one benefit to generate emails', 'error');
@@ -187,10 +195,11 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     setIsGeneratingEmails(true);
     
     try {
-      console.log('\n📧 === EMAIL GENERATION REQUEST START ===');
+      console.log('📧 Starting email generation with centralized API...');
       
-      // Use centralized API service
-      const result = await emailApi.generateEmails({
+      // Use centralized API with error handling
+      const safeApiCall = withErrorHandling(emailApi.generateEmails);
+      const result = await safeApiCall({
         benefits: extractedBenefits,
         selectedBenefits,
         websiteData,
@@ -201,10 +210,10 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
         aiAvailable
       });
 
-      console.log('📧 EMAIL: Success response:', result);
+      console.log('✅ Email generation API response:', result);
 
       if (!result.success) {
-        throw new Error(result.error || 'Email generation failed');
+        throw new Error(result.message || result.error || 'Email generation failed');
       }
 
       const emails = result.emails || [];
@@ -212,7 +221,7 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
 
       showToast(result.message || `Generated ${emails.length} emails successfully!`, 'success');
       
-      console.log('✅ EMAIL: Email generation successful:', {
+      console.log('✅ Email generation successful:', {
         emailsGenerated: emails.length,
         totalTokens: result.total_tokens
       });
@@ -220,13 +229,17 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
       return emails;
 
     } catch (error) {
-      console.error('❌ EMAIL: Email generation error:', error);
-      showToast(`Failed to generate emails: ${error.message}`, 'error');
+      console.error('❌ Email generation error:', error);
+      
+      // Don't show duplicate error toast if withErrorHandling already showed one
+      if (!error.errorInfo) {
+        showToast(`Failed to generate emails: ${error.message}`, 'error');
+      }
       throw error;
     } finally {
       setIsGeneratingEmails(false);
     }
-  }, [extractedBenefits, selectedBenefits, websiteData, tone, industry, affiliateLink, showToast, isUsingAI, aiAvailable]);
+  }, [extractedBenefits, selectedBenefits, websiteData, tone, industry, affiliateLink, showToast, isUsingAI, aiAvailable, withErrorHandling]);
 
   // Clear all data
   const clearData = useCallback(() => {
