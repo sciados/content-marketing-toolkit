@@ -243,6 +243,11 @@ export const checkAllServices = async () => {
 };
 
 /**
+ * Export individual services and client for direct import
+ */
+export { apiClient } from './apiClient';
+
+/**
  * Default export - complete API object
  */
 export default api;
