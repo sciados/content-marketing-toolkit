@@ -1,9 +1,10 @@
-// src/pages/Dashboard.jsx - TEST VERSION: Adding useProfile
+// src/pages/Dashboard.jsx - TEST VERSION: Adding useContentLibrary
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase/supabaseClient';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { useProfile } from '../hooks/useProfile';
+import { useContentLibrary } from '../hooks/useContentLibrary';
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
@@ -20,6 +21,11 @@ const Dashboard = () => {
   console.log("🔍 About to call useProfile...");
   const profileResult = useProfile();
   console.log("🔍 useProfile result:", profileResult);
+
+  // TEST: Add useContentLibrary hook
+  console.log("🔍 About to call useContentLibrary...");
+  const contentLibraryResult = useContentLibrary();
+  console.log("🔍 useContentLibrary result:", contentLibraryResult);
   
   // Check user auth status on mount
   useEffect(() => {
