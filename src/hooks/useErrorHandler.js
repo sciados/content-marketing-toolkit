@@ -1,11 +1,11 @@
-// src/hooks/useErrorHandler.js - ENHANCED version building on your existing code
+// src/hooks/useErrorHandler.js - FIXED to use useSupabase instead of useAuth
 import { useCallback } from 'react';
 import { useToast } from './useToast';
-import { useAuth } from './useAuth';
+import useSupabase from './useSupabase';  // Changed from useAuth
 
 export const useErrorHandler = () => {
   const { showToast } = useToast();
-  const { logout } = useAuth();
+  const { signOut } = useSupabase();  // Changed from { logout } to { signOut }
 
   /**
    * Categorize error for analytics/logging
@@ -92,7 +92,7 @@ export const useErrorHandler = () => {
     if (shouldLogout) {
       setTimeout(async () => {
         try {
-          await logout();
+          await signOut();  // Changed from logout() to signOut()
           console.log('✅ User logged out due to auth error');
         } catch (logoutError) {
           console.error('❌ Error during automatic logout:', logoutError);
@@ -110,7 +110,7 @@ export const useErrorHandler = () => {
       shouldLogout,
       category: getErrorCategory(error)
     };
-  }, [showToast, logout, getErrorCategory]);
+  }, [showToast, signOut, getErrorCategory]);  // Changed from logout to signOut
 
   /**
    * Enhanced async error handler with retry support

@@ -1,12 +1,12 @@
-// src/hooks/useContentLibrary.js - UPDATED to use centralized API
+// src/hooks/useContentLibrary.js - RESTORED useErrorHandler with fix
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { contentLibraryApi } from '../services/api';
-import { useErrorHandler } from './useErrorHandler';
+import { useErrorHandler } from './useErrorHandler';  // RESTORED
 
 export const useContentLibrary = () => {
   const navigate = useNavigate();
-  const { withErrorHandling } = useErrorHandler();
+  const { withErrorHandling } = useErrorHandler();  // RESTORED
   
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -19,6 +19,8 @@ export const useContentLibrary = () => {
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [backendAvailable, setBackendAvailable] = useState(true);
+
+  // Remove the simple error handling wrapper since we're using useErrorHandler again
 
   // Check if backend APIs are available using centralized API
   const checkBackendAvailability = useCallback(async () => {
@@ -96,11 +98,7 @@ export const useContentLibrary = () => {
       }
     } catch (error) {
       console.error('❌ Failed to fetch content library:', error);
-      
-      // Don't set error state if withErrorHandling already handled it
-      if (!error.errorInfo) {
-        setError(error.message);
-      }
+      setError(error.message);
       
       // Fallback to demo data
       console.warn('⚠️ Using demo data as fallback');
@@ -243,11 +241,7 @@ export const useContentLibrary = () => {
 
     } catch (error) {
       console.error('❌ Failed to delete item:', error);
-      
-      // Don't set error state if withErrorHandling already handled it
-      if (!error.errorInfo) {
-        setError('Failed to delete item');
-      }
+      setError('Failed to delete item');
       
       // Restore item on error using the stored reference
       setItems(prev => [itemToDelete, ...prev]);
@@ -289,11 +283,7 @@ export const useContentLibrary = () => {
       }
     } catch (error) {
       console.error('❌ Failed to add to library:', error);
-      
-      // Don't set error state if withErrorHandling already handled it
-      if (!error.errorInfo) {
-        setError(`Failed to add to library: ${error.message}`);
-      }
+      setError(`Failed to add to library: ${error.message}`);
       return null;
     }
   }, [backendAvailable, withErrorHandling]);
