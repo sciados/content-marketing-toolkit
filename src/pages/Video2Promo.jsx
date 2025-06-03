@@ -1,4 +1,4 @@
-// src/pages/Video2Promo.jsx - UPDATED with Backend Integration and Asset Generation
+// src/pages/Video2Promo.jsx - UPDATED with Centralized API
 
 import React, { useState } from 'react';
 import { VideoUrlForm } from '../components/Video2Promo/VideoUrlForm';
@@ -158,7 +158,7 @@ export default function Video2Promo() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
-        {/* Backend Status Banner */}
+        {/* Backend Status Banner - NOW WORKING! */}
         <BackendStatusBanner />
 
         {/* Header with Backend Integration Badge */}
@@ -599,7 +599,12 @@ export default function Video2Promo() {
               isGeneratingAssets,
               assetError,
               userTier,
-              remainingTokens
+              remainingTokens,
+              // NEW: Backend connection info
+              backendUrl: debug?.backendUrl,
+              backendStatus: debug?.backendStatus,
+              proxyStatus: debug?.proxyStatus,
+              apiClientUsed: true
             }}
           />
         </div>
@@ -617,11 +622,14 @@ export default function Video2Promo() {
                 <strong>User:</strong> {user?.email || 'Not logged in'}
               </div>
               <div>
-                <strong>Backend URL:</strong> {import.meta.env.VITE_API_BASE_URL}<br/>
+                <strong>Backend URL:</strong> {debug?.backendUrl}<br/>
+                <strong>Backend Status:</strong> {debug?.backendStatus}<br/>
+                <strong>Proxy Status:</strong> {debug?.proxyStatus}<br/>
                 <strong>User Tier:</strong> {userTier}<br/>
                 <strong>Assets Count:</strong> {generatedAssets.length}<br/>
                 <strong>Remaining Tokens:</strong> {remainingTokens}<br/>
-                <strong>Session:</strong> {session ? 'Active' : 'None'}
+                <strong>Session:</strong> {session ? 'Active' : 'None'}<br/>
+                <strong>API Client:</strong> ✅ Centralized
               </div>
             </div>
           </div>

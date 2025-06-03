@@ -1,4 +1,4 @@
-// src/components/Video2Promo/BackendStatusBanner.jsx - ENHANCED
+// src/components/Video2Promo/BackendStatusBanner.jsx - FIXED
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../../services/api';
 import { Badge } from '../Common/Badge';
@@ -20,13 +20,13 @@ export const BackendStatusBanner = ({ variant = 'compact' }) => {
 
   const checkBackendStatus = async () => {
     try {
-      // Use centralized API client for health check
+      // Use centralized apiClient for health check
       const data = await apiClient.getHealth();
       
       setBackendStatus({
         connected: true,
-        message: data.message,
-        version: data.version,
+        message: data.message || 'Backend connected',
+        version: data.version || '4.0',
         services: data.services || {},
         cache_status: data.cache_status || {}
       });
@@ -35,7 +35,7 @@ export const BackendStatusBanner = ({ variant = 'compact' }) => {
       console.warn('Backend health check failed:', error);
       setBackendStatus({
         connected: false,
-        error: error.message
+        error: error.message || 'Connection failed'
       });
       setLastChecked(new Date());
     } finally {
@@ -62,6 +62,17 @@ export const BackendStatusBanner = ({ variant = 'compact' }) => {
   if (!backendStatus) {
     return null;
   }
+
+  // Get backend base URL for display
+  const getBackendHost = () => {
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      return new URL(baseUrl).hostname;
+    // eslint-disable-next-line no-unused-vars
+    } catch (error) {
+      return 'Backend API';
+    }
+  };
 
   // Expanded variant with SystemStatus integration
   if (variant === 'expanded') {
@@ -94,7 +105,7 @@ export const BackendStatusBanner = ({ variant = 'compact' }) => {
                     <div className="flex items-center gap-1">
                       <span>🔗</span>
                       <span className="text-xs text-green-700">
-                        {new URL(apiClient.baseURL).hostname}
+                        {getBackendHost()}
                       </span>
                     </div>
                   </>
@@ -119,7 +130,7 @@ export const BackendStatusBanner = ({ variant = 'compact' }) => {
           </div>
 
           {/* Service status indicators */}
-          {backendStatus.connected && backendStatus.services && (
+          {backendStatus.connected && backendStatus.services && Object.keys(backendStatus.services).length > 0 && (
             <div className="mt-3 flex items-center gap-4 flex-wrap">
               <span className="text-xs text-green-700 font-medium">Services:</span>
               {Object.entries(backendStatus.services).map(([service, status]) => (
@@ -138,9 +149,9 @@ export const BackendStatusBanner = ({ variant = 'compact' }) => {
           )}
 
           {/* Cache status */}
-          {backendStatus.connected && backendStatus.cache_status && (
+          {backendStatus.connected && backendStatus.cache_status && backendStatus.cache_status.total_cached_videos && (
             <div className="mt-2 text-xs text-green-700">
-              <span>💾</span> Cache: {backendStatus.cache_status.total_cached_videos || 0} videos cached
+              <span>💾</span> Cache: {backendStatus.cache_status.total_cached_videos} videos cached
             </div>
           )}
 
@@ -192,7 +203,7 @@ export const BackendStatusBanner = ({ variant = 'compact' }) => {
         </div>
 
         <div className="flex items-center gap-2">
-          {backendStatus.connected && backendStatus.services && (
+          {backendStatus.connected && backendStatus.services && Object.keys(backendStatus.services).length > 0 && (
             <div className="flex items-center gap-1">
               {Object.entries(backendStatus.services).map(([service, status]) => (
                 <div
