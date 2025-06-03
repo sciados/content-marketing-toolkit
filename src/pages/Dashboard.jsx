@@ -1,13 +1,19 @@
-// src/pages/Dashboard.jsx - MINIMAL TEST VERSION
+// src/pages/Dashboard.jsx - TEST VERSION: Adding useUsageTracking
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase/supabaseClient';
+import { useUsageTracking } from '../hooks/useUsageTracking';
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   
   console.log("🔍 Dashboard component rendering");
+  
+  // TEST: Add useUsageTracking hook
+  console.log("🔍 About to call useUsageTracking...");
+  const usageTrackingResult = useUsageTracking();
+  console.log("🔍 useUsageTracking result:", usageTrackingResult);
   
   // Check user auth status on mount
   useEffect(() => {
