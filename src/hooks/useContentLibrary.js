@@ -1,12 +1,12 @@
-// src/hooks/useContentLibrary.js - RESTORED useErrorHandler with fix
+// src/hooks/useContentLibrary.js - TEMPORARY: Disable API calls, use demo data
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { contentLibraryApi } from '../services/api';
-import { useErrorHandler } from './useErrorHandler';  // RESTORED
+import { useErrorHandler } from './useErrorHandler';
 
 export const useContentLibrary = () => {
   const navigate = useNavigate();
-  const { withErrorHandling } = useErrorHandler();  // RESTORED
+  const { withErrorHandling } = useErrorHandler();
   
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -18,11 +18,9 @@ export const useContentLibrary = () => {
     sortBy: 'created_desc'
   });
   const [searchTerm, setSearchTerm] = useState('');
-  const [backendAvailable, setBackendAvailable] = useState(true);
+  const [backendAvailable, setBackendAvailable] = useState(true); // CHANGED: Re-enable API
 
-  // Remove the simple error handling wrapper since we're using useErrorHandler again
-
-  // Check if backend APIs are available using centralized API
+  // Check if backend APIs are available - RE-ENABLED
   const checkBackendAvailability = useCallback(async () => {
     try {
       const result = await contentLibraryApi.getHealth();
@@ -37,15 +35,15 @@ export const useContentLibrary = () => {
     }
   }, []);
 
-  // Demo data for fallback (unchanged)
+  // Demo data for fallback (enhanced with more items)
   const getDemoData = () => [
     {
       id: 'demo-1',
       content_type: 'video_transcript',
       title: 'Marketing Strategy Video Transcript',
-      description: 'Transcript from a 30-minute marketing strategy video.',
-      tags: ['marketing', 'strategy'],
-      metadata: { video_id: 'demo123', duration: '30:45', word_count: 4500 },
+      description: 'Transcript from a 30-minute marketing strategy video covering customer acquisition and retention strategies.',
+      tags: ['marketing', 'strategy', 'customer-acquisition'],
+      metadata: { video_id: 'demo123', duration: '30:45', word_count: 4500, source: 'YouTube' },
       is_favorited: true,
       usage_count: 3,
       created_at: '2025-05-20T10:00:00Z',
@@ -55,12 +53,41 @@ export const useContentLibrary = () => {
       id: 'demo-2',
       content_type: 'scanned_page',
       title: 'ConvertKit Sales Page Analysis',
-      description: 'Extracted benefits from ConvertKit landing page.',
-      tags: ['email marketing', 'saas'],
-      metadata: { url: 'https://convertkit.com/pricing', benefits_count: 8 },
+      description: 'Extracted benefits and features from ConvertKit pricing page for email marketing insights.',
+      tags: ['email-marketing', 'saas', 'pricing'],
+      metadata: { url: 'https://convertkit.com/pricing', benefits_count: 8, features_count: 12 },
       is_favorited: false,
       usage_count: 1,
-      created_at: '2025-05-19T15:30:00Z'
+      created_at: '2025-05-19T15:30:00Z',
+      last_used_at: '2025-05-19T16:00:00Z'
+    },
+    {
+      id: 'demo-3',
+      content_type: 'generated_asset',
+      title: 'Email Series: Product Launch',
+      description: 'Complete 5-email sequence for product launch campaign with subject lines and CTAs.',
+      tags: ['email-series', 'product-launch', 'campaigns'],
+      metadata: { 
+        email_count: 5, 
+        estimated_open_rate: '25%',
+        content: 'Email 1: Welcome to our new product...\nEmail 2: Key benefits you need to know...'
+      },
+      is_favorited: true,
+      usage_count: 5,
+      created_at: '2025-05-18T09:15:00Z',
+      last_used_at: '2025-05-21T11:20:00Z'
+    },
+    {
+      id: 'demo-4',
+      content_type: 'video_transcript',
+      title: 'SaaS Onboarding Best Practices',
+      description: 'Expert interview about user onboarding strategies for SaaS products.',
+      tags: ['saas', 'onboarding', 'user-experience'],
+      metadata: { video_id: 'demo456', duration: '45:20', word_count: 6800, source: 'Webinar' },
+      is_favorited: false,
+      usage_count: 2,
+      created_at: '2025-05-17T14:00:00Z',
+      last_used_at: '2025-05-18T10:30:00Z'
     }
   ];
 
