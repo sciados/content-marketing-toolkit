@@ -1,4 +1,4 @@
-// src/components/Common/SystemStatus.jsx - NEW
+// src/components/Common/SystemStatus.jsx - FIXED method name
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../../services/api';
 
@@ -13,21 +13,22 @@ const SystemStatus = ({ className = '' }) => {
   useEffect(() => {
     const checkStatus = async () => {
       try {
-        const health = await apiClient.checkHealth();
+        // FIXED: Use correct method name
+        const health = await apiClient.healthCheck();
         
-        if (health) {
+        if (health && health.success !== false) {
           setStatus({
             backend: 'operational',
             ai_services: health.services?.claude ? 'operational' : 'degraded',
-            database: health.database ? 'operational' : 'degraded',
+            database: health.services?.supabase ? 'operational' : 'degraded',
             websocket: health.websocket ? 'operational' : 'degraded'
           });
         } else {
           setStatus({
-            backend: 'down',
-            ai_services: 'down',
-            database: 'down',
-            websocket: 'down'
+            backend: 'degraded',
+            ai_services: 'unknown',
+            database: 'unknown',
+            websocket: 'unknown'
           });
         }
       } catch (error) {
