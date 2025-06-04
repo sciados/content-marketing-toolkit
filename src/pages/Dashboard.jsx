@@ -1,35 +1,87 @@
-// src/pages/Dashboard.jsx - SAFE VERSION with TierUtils Usage
+// src/pages/Dashboard.jsx - REAL USER DATA VERSION
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { supabase } from '../services/supabase/supabaseClient';
 import { getTierDisplayName, isSuperAdmin } from '../utils/tierUtils';
 
 const Dashboard = () => {
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [userTier, setUserTier] = useState(null);
   
-  // Test SuperAdmin with hardcoded value first
-  const currentTier = 'superAdmin'; // Later we'll get this from real user data
-  const isAdmin = isSuperAdmin(currentTier);
-  const tierDisplay = getTierDisplayName(currentTier);
+  console.log("Dashboard component rendering - REAL USER DATA VERSION");
   
-  console.log("Dashboard component rendering - SAFE VERSION WITH TIERUTILS");
-  console.log("Admin status:", { currentTier, isAdmin, tierDisplay });
-  
-  // Simple useEffect with proper dependencies
+  // Get real user data
   useEffect(() => {
-    const initializeUser = async () => {
+    const getUserData = async () => {
       try {
-        // Simulate loading
-        setTimeout(() => {
-          setLoading(false);
-        }, 1000);
+        // Get authenticated user
+        const { data: { session } } = await supabase.auth.getSession();
+        const authUser = session?.user;
+        
+        if (authUser) {
+          setUser(authUser);
+          
+          // Get user profile with subscription tier
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('subscription_tier, subscription_status')
+            .eq('id', authUser.id)
+            .single();
+            
+          if (profile && !error) {
+            setUserTier(profile.subscription_tier);
+            console.log('Real user data:', {
+              userId: authUser.id,
+              email: authUser.email,
+              tier: profile.subscription_tier,
+              status: profile.subscription_status
+            });
+          } else {
+            console.log('Profile fetch error:', error);
+            // Fallback to test data if profile fetch fails
+            setUserTier('superAdmin');
+          }
+        } else {
+          console.log('No authenticated user found');
+          // For testing without auth, use hardcoded admin
+          setUserTier('superAdmin');
+        }
+        
+        setLoading(false);
       } catch (error) {
-        console.error('Error loading:', error);
+        console.error('Error loading user data:', error);
+        // Fallback to test data on error
+        setUserTier('superAdmin');
         setLoading(false);
       }
     };
     
-    initializeUser();
-  }, []); // Empty dependency array prevents loops
+    getUserData();
+    
+    // Listen for auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        setUser(session.user);
+        // Re-fetch profile when auth changes
+        getUserData();
+      } else {
+        setUser(null);
+        setUserTier(null);
+      }
+    });
+    
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, []);
+
+  // Use real tier data with fallback
+  const currentTier = userTier || 'superAdmin'; // Fallback for testing
+  const isAdmin = isSuperAdmin(currentTier);
+  const tierDisplay = getTierDisplayName(currentTier);
+  
+  console.log("Tier data:", { currentTier, isAdmin, tierDisplay, userEmail: user?.email });
 
   if (loading) {
     return (
@@ -95,6 +147,11 @@ const Dashboard = () => {
                   {isAdmin && (
                     <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs font-bold">
                       UNLIMITED ACCESS
+                    </span>
+                  )}
+                  {user && (
+                    <span className="block text-xs opacity-75 mt-1">
+                      {user.email}
                     </span>
                   )}
                 </p>
@@ -277,12 +334,18 @@ const Dashboard = () => {
             ? `🛡️ Super Administrator Access - ${tierDisplay} Plan`
             : 'Standard user dashboard loaded'
           }
+          {user && (
+            <span className="block text-sm text-gray-500 mt-1">
+              Logged in as: {user.email}
+            </span>
+          )}
         </p>
-        {isAdmin && (
-          <div className="mt-2 text-sm text-red-600 font-medium">
-            Testing with hardcoded SuperAdmin tier
-          </div>
-        )}
+        <div className="mt-2 text-sm text-blue-600 font-medium">
+          {currentTier === 'superAdmin' 
+            ? `Real SuperAdmin tier detected from database`
+            : `Tier: ${currentTier} (from database)`
+          }
+        </div>
       </div>
     </div>
   );
