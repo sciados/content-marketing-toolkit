@@ -29,8 +29,8 @@ export const useEmailSeries = ({
   affiliateLink,
   tone,
   industry,
-  isUsingAI, // Keeping for backwards compatibility but not actively used
-  aiAvailable, // Keeping for backwards compatibility but not actively used
+  isUsingAI, // ✅ ACCEPT but don't send to backend (UI state only)
+  aiAvailable, // ✅ ACCEPT but don't send to backend (UI state only)
   exportFormat,
   currentEmailIndex,
   showToast,
@@ -46,19 +46,15 @@ export const useEmailSeries = ({
   // Add usage tracking hook
   const { trackEmailGeneration, trackSeriesCreated, trackAITokenUsage } = useUsageTracking();
 
-  // Remove unused variables warning by using them in debug logs
-  // Using underscore prefix to indicate intentionally unused parameters
-  const _isUsingAI = isUsingAI;
-  const _aiAvailable = aiAvailable;
-  
-  // Log for debugging purposes
-  console.log('Hook initialized with legacy params:', { 
-    hasIsUsingAI: !!_isUsingAI, 
-    hasAiAvailable: !!_aiAvailable 
+  // Log UI state (but don't send to backend)
+  console.log('Hook initialized with UI state:', { 
+    hasIsUsingAI: !!isUsingAI, 
+    hasAiAvailable: !!aiAvailable 
   });
 
   /**
    * Enhanced AI email generation using centralized emailApi
+   * ✅ FIXED: No longer sends isUsingAI or aiAvailable to backend
    */
   const generateEmailsWithAI = useCallback(async (selectedBenefitsList, websiteData, options) => {
     try {
@@ -67,14 +63,16 @@ export const useEmailSeries = ({
       console.log('🤖 Starting AI-first email generation with tier:', userTier);
       console.log('🎯 Benefits to process:', selectedBenefitsList.length);
       
-      // Use centralized emailApi for generation
+      // ✅ FIXED: Clean API call - no UI state fields
       const result = await emailApi.generateEmails({
         benefits: selectedBenefitsList,
         selectedBenefits: selectedBenefitsList.map(() => true),
-        websiteData,
+        websiteData: websiteData || {},
         tone: options.tone || 'persuasive',
         industry: options.industry || 'general',
-        affiliateLink: options.affiliateLink || ''
+        affiliateLink: options.affiliateLink || '',
+        autoSave: true
+        // ❌ REMOVED: isUsingAI and aiAvailable (these are UI state, not API parameters)
       });
       
       // Process results
