@@ -199,16 +199,20 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
       
       // Use centralized API with error handling
       const safeApiCall = withErrorHandling(emailApi.generateEmails);
-      const result = await safeApiCall({
+      
+      // ✅ FIXED: Clean request payload - remove UI-only fields
+      const cleanRequest = {
         benefits: extractedBenefits,
         selectedBenefits,
-        websiteData,
+        websiteData: websiteData || {},
         tone,
         industry,
         affiliateLink: affiliateLink.trim(),
-        isUsingAI,
-        aiAvailable
-      });
+        autoSave: true
+        // ❌ REMOVED: isUsingAI and aiAvailable (UI-only fields that caused validation error)
+      };
+      
+      const result = await safeApiCall(cleanRequest);
 
       console.log('✅ Email generation API response:', result);
 
@@ -239,7 +243,8 @@ export const useEmailGenerator = ({ showToast, onScanComplete }) => {
     } finally {
       setIsGeneratingEmails(false);
     }
-  }, [extractedBenefits, selectedBenefits, websiteData, tone, industry, affiliateLink, showToast, isUsingAI, aiAvailable, withErrorHandling]);
+  }, [extractedBenefits, selectedBenefits, websiteData, tone, industry, affiliateLink, showToast, withErrorHandling]);
+  // ✅ REMOVED: isUsingAI, aiAvailable from dependencies - they're UI-only state
 
   // Clear all data
   const clearData = useCallback(() => {
