@@ -1,4 +1,4 @@
-// AuthDebugComponent.jsx - Temporary debug component
+// AuthDebugComponent.jsx - Temporary debug component - FIXED VERSION
 import React, { useState } from 'react';
 
 const AuthDebugComponent = () => {
@@ -78,6 +78,7 @@ const AuthDebugComponent = () => {
       // Step 5: Test with email generator endpoint
       setTestResults(prev => prev + `🧪 Step 5: Testing email generator endpoint...\n`);
       
+      // ✅ FIXED: Clean test request data that matches backend schema
       const testRequestData = {
         benefits: ['Test benefit'],
         selectedBenefits: [true],
@@ -85,8 +86,8 @@ const AuthDebugComponent = () => {
         tone: 'persuasive',
         industry: 'general',
         affiliateLink: '',
-        isUsingAI: true,
-        aiAvailable: true
+        autoSave: true
+        // ❌ REMOVED: isUsingAI and aiAvailable (these caused validation errors)
       };
       
       const response2 = await fetch(`${API_BASE}/api/email-generator/generate`, {
