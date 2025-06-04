@@ -1,11 +1,24 @@
-// src/components/Layout/Sidebar.jsx - UPDATED with Content Library and Enhanced Navigation
+// src/components/Layout/Sidebar.jsx - UPDATED with SuperAdmin tier support
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import useSupabase from '../../hooks/useSupabase';
+import { 
+  isSuperAdmin, 
+  getTierDisplayName, 
+  getTierColor,
+  formatUsagePercentage 
+} from '../../utils/tierUtils';
+import { useUsageTracking } from '../../hooks/useUsageTracking';
 
 const Sidebar = () => {
   const { user } = useSupabase();
+  const { usage, limits } = useUsageTracking();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Use tierUtils instead of hardcoded ID check
+  const isAdmin = isSuperAdmin(user?.subscription_tier);
+  const tierDisplay = getTierDisplayName(user?.subscription_tier);
+  const tierColor = getTierColor(user?.subscription_tier);
 
   // Enhanced navigation items with Content Library and better organization
   const coreToolsItems = [
@@ -32,11 +45,12 @@ const Sidebar = () => {
     { name: 'Subscription', path: '/subscription', icon: 'creditCard', description: 'Billing & plans' },
   ];
 
-  // Add admin items if user is superuser
-  const adminItems = user?.id === 'e7eb009a-d165-4ab0-972f-dda205a03a85' 
+  // SuperAdmin items using tierUtils
+  const adminItems = isAdmin 
     ? [
-        { name: 'User Management', path: '/admin/users', icon: 'users', description: 'Manage users' },
-        { name: 'System Analytics', path: '/admin/analytics', icon: 'settings', description: 'Admin dashboard' },
+        { name: 'Admin Panel', path: '/admin', icon: 'shield', description: 'Super Admin Dashboard', isAdmin: true },
+        { name: 'User Management', path: '/admin/users', icon: 'users', description: 'Manage users', isAdmin: true },
+        { name: 'System Analytics', path: '/admin/analytics', icon: 'settings', description: 'Platform stats', isAdmin: true },
       ]
     : [];
 
@@ -47,7 +61,10 @@ const Sidebar = () => {
 
   const NavSection = ({ title, items, variant = 'default' }) => (
     <div className="mb-6">
-      <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-3">
+      <h3 className={`text-xs font-semibold uppercase tracking-wider mb-3 px-3 ${
+        variant === 'admin' ? 'text-red-400' : 'text-gray-400'
+      }`}>
+        {variant === 'admin' && '🛡️ '}
         {title}
       </h3>
       <nav className="space-y-1">
@@ -61,6 +78,8 @@ const Sidebar = () => {
                   ? variant === 'admin' 
                     ? 'bg-red-50 text-red-600 border-r-2 border-red-600' 
                     : 'bg-brand-50 text-brand-600 border-r-2 border-brand-600'
+                  : variant === 'admin'
+                  ? 'text-red-600 hover:bg-red-50 hover:text-red-700'
                   : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
               } ${
                 item.disabled ? 'opacity-50 cursor-not-allowed' : ''
@@ -89,14 +108,16 @@ const Sidebar = () => {
                       Soon
                     </span>
                   )}
-                  {variant === 'admin' && (
-                    <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                      Admin
+                  {item.isAdmin && (
+                    <span className="ml-auto inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800">
+                      ADMIN
                     </span>
                   )}
                 </div>
                 {item.description && (
-                  <div className="text-xs text-gray-500 mt-0.5 truncate">
+                  <div className={`text-xs mt-0.5 truncate ${
+                    variant === 'admin' ? 'text-red-500' : 'text-gray-500'
+                  }`}>
                     {item.description}
                   </div>
                 )}
@@ -134,6 +155,19 @@ const Sidebar = () => {
         overflow-y-auto lg:overflow-visible
       `}>
         <div className="p-4">
+          {/* SuperAdmin Banner */}
+          {isAdmin && (
+            <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center text-red-700 mb-2">
+                <span className="text-lg mr-2">🛡️</span>
+                <span className="font-bold text-sm">SUPER ADMIN</span>
+              </div>
+              <p className="text-xs text-red-600">
+                You have unlimited access and administrative privileges.
+              </p>
+            </div>
+          )}
+
           {/* Core Tools Section */}
           <NavSection title="Core Tools" items={coreToolsItems} />
 
@@ -143,13 +177,13 @@ const Sidebar = () => {
           {/* Account Section */}
           <NavSection title="Account" items={accountItems} />
 
+          {/* Admin Section (if applicable) - Enhanced */}
+          {adminItems.length > 0 && (
+            <NavSection title="Super Administration" items={adminItems} variant="admin" />
+          )}
+
           {/* Coming Soon Section */}
           <NavSection title="Coming Soon" items={comingSoonItems} />
-
-          {/* Admin Section (if applicable) */}
-          {adminItems.length > 0 && (
-            <NavSection title="Administration" items={adminItems} variant="admin" />
-          )}
 
           {/* Resources Section */}
           <div className="mt-8">
@@ -180,50 +214,106 @@ const Sidebar = () => {
             </nav>
           </div>
 
-          {/* Enhanced Upgrade Card */}
-          <div className="mt-8 mx-2 p-4 bg-gradient-to-br from-brand-500 to-accent-600 rounded-lg text-white">
-            <div className="flex items-center mb-2">
-              <h4 className="font-semibold">Upgrade to Pro</h4>
-              <span className="ml-2 text-xs bg-white bg-opacity-20 px-2 py-0.5 rounded-full">
-                Popular
-              </span>
+          {/* Enhanced Upgrade Card or Admin Status Card */}
+          {isAdmin ? (
+            <div className="mt-8 mx-2 p-4 bg-gradient-to-br from-red-500 to-red-600 rounded-lg text-white">
+              <div className="flex items-center mb-2">
+                <span className="text-lg mr-2">🛡️</span>
+                <h4 className="font-bold">Super Admin</h4>
+              </div>
+              <p className="text-sm opacity-90 mb-3">
+                Platform administration with unlimited access to all features.
+              </p>
+              <div className="text-xs opacity-75 mb-3 space-y-1">
+                <div>✓ Unlimited tokens & usage</div>
+                <div>✓ User management access</div>
+                <div>✓ System analytics</div>
+                <div>✓ All premium features</div>
+              </div>
+              <NavLink 
+                to="/admin"
+                className="block w-full bg-white text-red-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors text-center"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Admin Panel
+              </NavLink>
             </div>
-            <p className="text-sm opacity-90 mb-3">
-              Unlock advanced features, A/B variants, and unlimited content library.
-            </p>
-            <div className="text-xs opacity-75 mb-3 space-y-1">
-              <div>✓ 100K tokens/month</div>
-              <div>✓ A/B variant generation</div>
-              <div>✓ Advanced analytics</div>
-              <div>✓ Priority support</div>
+          ) : (
+            <div className="mt-8 mx-2 p-4 bg-gradient-to-br from-brand-500 to-accent-600 rounded-lg text-white">
+              <div className="flex items-center mb-2">
+                <h4 className="font-semibold">Upgrade to Pro</h4>
+                <span className="ml-2 text-xs bg-white bg-opacity-20 px-2 py-0.5 rounded-full">
+                  Popular
+                </span>
+              </div>
+              <p className="text-sm opacity-90 mb-3">
+                Unlock advanced features, A/B variants, and unlimited content library.
+              </p>
+              <div className="text-xs opacity-75 mb-3 space-y-1">
+                <div>✓ 100K tokens/month</div>
+                <div>✓ A/B variant generation</div>
+                <div>✓ Advanced analytics</div>
+                <div>✓ Priority support</div>
+              </div>
+              <NavLink 
+                to="/subscription"
+                className="block w-full bg-white text-brand-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors text-center"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Upgrade Now
+              </NavLink>
             </div>
-            <NavLink 
-              to="/subscription"
-              className="block w-full bg-white text-brand-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors text-center"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Upgrade Now
-            </NavLink>
-          </div>
+          )}
 
-          {/* Quick Stats Card */}
+          {/* Enhanced Quick Stats Card with SuperAdmin support */}
           {user && (
             <div className="mt-4 mx-2 p-3 bg-gray-50 rounded-lg">
-              <h4 className="font-medium text-gray-900 text-sm mb-2">Quick Stats</h4>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium text-gray-900 text-sm">Quick Stats</h4>
+                <div className={`
+                  inline-flex items-center px-2 py-1 rounded-full text-xs font-medium
+                  ${tierColor === 'red' 
+                    ? 'bg-red-100 text-red-800' 
+                    : tierColor === 'yellow'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : tierColor === 'purple'
+                    ? 'bg-purple-100 text-purple-800'
+                    : 'bg-gray-100 text-gray-800'
+                  }
+                `}>
+                  {tierDisplay}
+                </div>
+              </div>
               <div className="space-y-1 text-xs text-gray-600">
                 <div className="flex justify-between">
                   <span>Videos Processed:</span>
-                  <span className="font-medium">-</span>
+                  <span className="font-medium">{usage?.videos_today || 0}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Emails Generated:</span>
-                  <span className="font-medium">-</span>
+                  <span>Monthly Tokens:</span>
+                  <span className="font-medium">
+                    {isAdmin 
+                      ? 'Unlimited' 
+                      : formatUsagePercentage(
+                          usage?.monthly_tokens_used || 0,
+                          limits?.monthly_tokens || 10000,
+                          user?.subscription_tier
+                        )
+                    }
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Library Items:</span>
                   <span className="font-medium">-</span>
                 </div>
               </div>
+              {isAdmin && (
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  <div className="text-xs text-red-600 font-bold">
+                    🛡️ Admin: Unlimited Access
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -240,7 +330,7 @@ const Sidebar = () => {
   );
 };
 
-// Enhanced Icon component with new icons
+// Enhanced Icon component with admin shield icon
 const IconComponent = ({ name, className }) => {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -263,6 +353,7 @@ const IconComponent = ({ name, className }) => {
         </>
       )}
       {name === 'users' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />}
+      {name === 'shield' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />}
     </svg>
   );
 };

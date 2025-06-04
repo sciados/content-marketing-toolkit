@@ -1,9 +1,14 @@
-// src/components/Layout/Header.jsx - UPDATED with UsageMeter integration
+// src/components/Layout/Header.jsx - UPDATED with SuperAdmin tier support
 import React from 'react';
 import { Link } from 'react-router-dom';
 import useSupabase from '../../hooks/useSupabase';
 import { useProfile } from '../../hooks/useProfile';
 import { UsageMeter } from '../Common';
+import { 
+  getTierDisplayName, 
+  getTierColor, 
+  isSuperAdmin
+} from '../../utils/tierUtils';
 
 const Header = () => {
   const { user, logout } = useSupabase();
@@ -20,8 +25,29 @@ const Header = () => {
     }
   };
 
-  // Check if user is admin
-  const isAdmin = user?.id === 'e7eb009a-d165-4ab0-972f-dda205a03a85';
+  // Use tierUtils instead of hardcoded ID check
+  const isAdmin = isSuperAdmin(user?.subscription_tier);
+  const tierDisplay = getTierDisplayName(user?.subscription_tier);
+  const tierColor = getTierColor(user?.subscription_tier);
+
+  // Tier badge component
+  const TierBadge = () => (
+    <div className={`
+      inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border
+      ${tierColor === 'red' 
+        ? 'bg-red-100 text-red-800 border-red-200' 
+        : tierColor === 'yellow'
+        ? 'bg-yellow-100 text-yellow-800 border-yellow-200'
+        : tierColor === 'purple'
+        ? 'bg-purple-100 text-purple-800 border-purple-200'
+        : 'bg-gray-100 text-gray-800 border-gray-200'
+      }
+    `}>
+      {isAdmin && <span className="mr-1">🛡️</span>}
+      {tierDisplay}
+      {isAdmin && <span className="ml-1 text-xs opacity-75">(Admin)</span>}
+    </div>
+  );
 
   return (
     <header className="bg-white shadow-sm py-4">
@@ -100,7 +126,7 @@ const Header = () => {
                 </div>
               </div>
 
-              {/* NEW: Content Library */}
+              {/* Content Library */}
               <Link to="/tools/content-library" className="text-gray-600 hover:text-indigo-600 mx-3 flex items-center">
                 <span className="mr-1">📚</span>
                 Content Library
@@ -110,9 +136,19 @@ const Header = () => {
                 Analytics
               </Link>
 
-              {/* Usage Meter - Hidden on mobile, visible on desktop */}
+              {/* Usage Meter with SuperAdmin support */}
               <div className="hidden lg:flex items-center mx-3 px-3 py-1 bg-gray-50 rounded-lg">
                 <UsageMeter variant="compact" showLabels={true} />
+                {isAdmin && (
+                  <div className="ml-2 text-xs text-red-600 font-bold">
+                    UNLIMITED
+                  </div>
+                )}
+              </div>
+
+              {/* Tier Badge */}
+              <div className="hidden md:flex items-center mx-3">
+                <TierBadge />
               </div>
 
               {/* Profile Dropdown */}
@@ -123,21 +159,32 @@ const Header = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-                <div className="absolute top-full right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                <div className="absolute top-full right-0 mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
                   <div className="p-2">
                     <div className="px-3 py-2 border-b border-gray-100">
-                      <div className="text-sm font-medium text-gray-900">
-                        Hi, {firstName}!
+                      <div className="text-sm font-medium text-gray-900 flex items-center justify-between">
+                        <span>Hi, {firstName}!</span>
+                        <TierBadge />
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-gray-500 mt-1">
                         {user.email}
                       </div>
+                      {isAdmin && (
+                        <div className="text-xs text-red-600 font-bold mt-1 flex items-center">
+                          🛡️ Super Administrator
+                        </div>
+                      )}
                     </div>
 
                     {/* Usage Meter in dropdown for mobile */}
                     <div className="lg:hidden px-3 py-2 border-b border-gray-100">
                       <div className="text-xs font-medium text-gray-500 mb-2">Usage</div>
                       <UsageMeter variant="compact" showLabels={true} />
+                      {isAdmin && (
+                        <div className="text-xs text-red-600 font-bold mt-1">
+                          Unlimited Access
+                        </div>
+                      )}
                     </div>
                     
                     <Link 
@@ -159,13 +206,24 @@ const Header = () => {
                       Usage & Billing
                     </Link>
                     
-                    {/* Admin Section */}
+                    {/* Admin Section - Enhanced */}
                     {isAdmin && (
                       <>
                         <div className="border-t border-gray-100 my-2"></div>
                         <div className="px-3 py-1">
-                          <div className="text-xs font-medium text-red-600 uppercase tracking-wide">Admin</div>
+                          <div className="text-xs font-medium text-red-600 uppercase tracking-wide flex items-center">
+                            🛡️ Super Admin
+                          </div>
                         </div>
+                        <Link 
+                          to="/admin" 
+                          className="flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md font-medium"
+                        >
+                          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2-2V7a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 002 2h2a2 2 0 012-2V7a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 00-2 2h-2a2 2 0 00-2 2v6a2 2 0 01-2 2H9z" />
+                          </svg>
+                          Admin Panel
+                        </Link>
                         <Link 
                           to="/admin/users" 
                           className="flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md"
