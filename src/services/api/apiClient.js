@@ -42,24 +42,33 @@ class APIClient {
    * Build request headers with authentication
    */
   async buildHeaders(includeAuth = true, additionalHeaders = {}) {
-    const headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      ...additionalHeaders
-    };
+  const headers = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    ...additionalHeaders
+  };
 
-    if (includeAuth) {
-      try {
-        const token = await this.getAuthToken();
-        headers['Authorization'] = `Bearer ${token}`;
-      } catch (error) {
-        console.warn('⚠️ Could not add auth token to headers:', error.message);
-        // Don't throw here - let the endpoint handle auth errors
-      }
+  if (includeAuth) {
+    try {
+      const token = await this.getAuthToken();
+      
+      // 🔍 DEBUG: Log token details
+      console.log('🔍 Token being sent:', {
+        exists: !!token,
+        length: token ? token.length : 0,
+        firstChars: token ? token.substring(0, 20) : 'none',
+        lastChars: token ? token.substring(token.length - 20) : 'none',
+        segmentCount: token ? token.split('.').length : 0
+      });
+      
+      headers['Authorization'] = `Bearer ${token}`;
+    } catch (error) {
+      console.warn('⚠️ Could not add auth token to headers:', error.message);
     }
-
-    return headers;
   }
+
+  return headers;
+}
 
   /**
    * Sleep function for retry delays
