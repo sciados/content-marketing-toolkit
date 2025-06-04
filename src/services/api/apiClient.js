@@ -19,24 +19,33 @@ class APIClient {
    * Get current authentication token from Supabase session
    */
   async getAuthToken() {
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('❌ Error getting session:', error);
-        throw new Error(`Session error: ${error.message}`);
-      }
-      
-      if (!session?.access_token) {
-        throw new Error('No active session found');
-      }
-      
-      return session.access_token;
-    } catch (error) {
-      console.error('❌ Failed to get auth token:', error);
-      throw error;
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.error('❌ Error getting session:', error);
+      throw new Error(`Session error: ${error.message}`);
     }
+    
+    if (!session?.access_token) {
+      throw new Error('No active session found');
+    }
+    
+    // 🔍 DEBUG: Log token details
+    const token = session.access_token;
+    console.log('🔍 Token debug:', {
+      length: token.length,
+      segments: token.split('.').length,
+      preview: `${token.substring(0, 50)}...${token.substring(token.length - 20)}`,
+      isExpired: session.expires_at < (Date.now() / 1000)
+    });
+    
+    return token;
+  } catch (error) {
+    console.error('❌ Failed to get auth token:', error);
+    throw error;
   }
+}
 
   /**
    * Build request headers with authentication
