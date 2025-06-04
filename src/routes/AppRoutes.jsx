@@ -70,6 +70,15 @@ const FixSuperAdmin = lazy(() => {
   });
 });
 
+// NEW: Super Admin Panel
+const SuperAdminPanel = lazy(() => {
+  const tracker = trackLazyLoading('SuperAdminPanel');
+  return import('../components/SuperAdminPanel').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
 // Main App Pages
 const Welcome = lazy(() => {
   const tracker = trackLazyLoading('Welcome');
