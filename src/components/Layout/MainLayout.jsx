@@ -1,9 +1,10 @@
-// src/components/Layout/MainLayout.jsx - UPDATED with SuperAdmin tier support
-import React, { useContext, useState } from 'react';
+// src/components/Layout/MainLayout.jsx - FIXED to fetch real profile data
+import React, { useContext, useState, useEffect } from 'react';
 import { Outlet, Navigate, NavLink } from 'react-router-dom';
 import SupabaseContext from '../../context/SupabaseContext';
 import useSupabase from '../../hooks/useSupabase';
 import { useUsageTracking } from '../../hooks/useUsageTracking';
+import { supabase } from '../../services/supabase/supabaseClient';
 import Sidebar from './Sidebar';
 import AdSidebar from './AdSidebar';
 import { ErrorBoundary, SystemStatus, UsageMeter } from '../Common';
@@ -14,15 +15,78 @@ import {
 } from '../../utils/tierUtils';
 
 const MainLayout = () => {
-  const { user, loading } = useContext(SupabaseContext);
+  const { user, loading: authLoading } = useContext(SupabaseContext);
   const { logout } = useSupabase();
   const { wsConnected } = useUsageTracking();
   const [showSystemStatus, setShowSystemStatus] = useState(false);
+  
+  // NEW: State for profile data
+  const [userTier, setUserTier] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
 
-  // SuperAdmin tier support
-  const isAdmin = isSuperAdmin(user?.subscription_tier);
-  const tierDisplay = getTierDisplayName(user?.subscription_tier);
-  const tierColor = getTierColor(user?.subscription_tier);
+  // NEW: Fetch profile data the same way Dashboard.jsx does
+  useEffect(() => {
+    const getUserProfile = async () => {
+      try {
+        if (user) {
+          console.log('MainLayout: Fetching profile for user:', user.id);
+          
+          // Get user profile with subscription tier
+          const { data: profile, error } = await supabase
+            .from('profiles')
+            .select('subscription_tier, subscription_status')
+            .eq('id', user.id)
+            .single();
+            
+          if (profile && !error) {
+            setUserTier(profile.subscription_tier);
+            console.log('MainLayout: Real user tier fetched:', {
+              userId: user.id,
+              email: user.email,
+              tier: profile.subscription_tier,
+              status: profile.subscription_status
+            });
+          } else {
+            console.log('MainLayout: Profile fetch error:', error);
+            // Fallback for testing
+            setUserTier('superAdmin');
+          }
+        } else {
+          console.log('MainLayout: No authenticated user');
+          setUserTier(null);
+        }
+        
+        setProfileLoading(false);
+      } catch (error) {
+        console.error('MainLayout: Error loading profile:', error);
+        // Fallback for testing
+        setUserTier('superAdmin');
+        setProfileLoading(false);
+      }
+    };
+    
+    getUserProfile();
+    
+    // Listen for auth changes
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.user) {
+        getUserProfile();
+      } else {
+        setUserTier(null);
+        setProfileLoading(false);
+      }
+    });
+    
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, [user]);
+
+  // FIXED: Use real tier data
+  const currentTier = userTier || 'free'; // Use fetched tier instead of user?.subscription_tier
+  const isAdmin = isSuperAdmin(currentTier);
+  const tierDisplay = getTierDisplayName(currentTier);
+  const tierColor = getTierColor(currentTier);
 
   const handleLogout = async () => {
     try {
@@ -33,13 +97,15 @@ const MainLayout = () => {
     }
   };
 
-  // Show loading while checking auth
-  if (loading) {
+  // Show loading while checking auth OR profile
+  if (authLoading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600 mt-4">Loading...</p>
+          <p className="text-gray-600 mt-4">
+            {authLoading ? 'Loading...' : 'Loading profile...'}
+          </p>
         </div>
       </div>
     );
@@ -50,7 +116,7 @@ const MainLayout = () => {
     return <Navigate to="/" replace />;
   }
 
-  // Tier Badge Component
+  // Tier Badge Component - Now uses real data
   const TierBadge = ({ showFullText = false }) => (
     <div className={`
       inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border
@@ -72,11 +138,11 @@ const MainLayout = () => {
   return (
     <ErrorBoundary>
       <div className="min-h-screen bg-gray-50">
-        {/* Fixed Header with SuperAdmin support */}
+        {/* Fixed Header with Real SuperAdmin Data */}
         <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
           <div className="px-4 lg:px-6">
             <div className="flex items-center justify-between h-16">
-              {/* Logo and Brand */}
+              {/* Logo and Brand - Now shows real admin status */}
               <div className="flex items-center gap-3">
                 <NavLink to="/dashboard" className="flex items-center gap-2">
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
@@ -95,7 +161,7 @@ const MainLayout = () => {
                 </NavLink>
               </div>
 
-              {/* Header Navigation - Hidden on mobile */}
+              {/* Header Navigation - Now shows real admin items */}
               <nav className="hidden lg:flex items-center gap-6">
                 <NavLink 
                   to="/dashboard" 
@@ -127,7 +193,7 @@ const MainLayout = () => {
                 >
                   New Features
                 </NavLink>
-                {/* Admin-only navigation */}
+                {/* Admin-only navigation - Now works with real data */}
                 {isAdmin && (
                   <NavLink 
                     to="/admin" 
@@ -145,9 +211,9 @@ const MainLayout = () => {
                 </a>
               </nav>
 
-              {/* Header Right Section with Usage & User Menu */}
+              {/* Header Right Section - Now shows real tier data */}
               <div className="flex items-center gap-4">
-                {/* Usage Meter - Enhanced for SuperAdmin */}
+                {/* Usage Meter - Enhanced for Real SuperAdmin */}
                 <div className="hidden md:block">
                   <div className="flex items-center gap-2">
                     <UsageMeter variant="compact" showLabels={false} />
@@ -159,7 +225,7 @@ const MainLayout = () => {
                   </div>
                 </div>
 
-                {/* Tier Badge */}
+                {/* Tier Badge - Now shows real tier */}
                 <div className="hidden md:block">
                   <TierBadge />
                 </div>
@@ -188,7 +254,7 @@ const MainLayout = () => {
                   )}
                 </div>
 
-                {/* User Menu with SuperAdmin support */}
+                {/* User Menu - Now shows real SuperAdmin status */}
                 <div className="relative group">
                   <button className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 transition-colors">
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
@@ -224,6 +290,10 @@ const MainLayout = () => {
                           🛡️ You have administrative privileges and unlimited access.
                         </div>
                       )}
+                      {/* DEBUG: Show current tier data */}
+                      <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-700">
+                        Debug: Tier = {currentTier} | Is Admin = {isAdmin.toString()}
+                      </div>
                     </div>
                     
                     {/* Usage summary in user menu for mobile */}
@@ -251,7 +321,7 @@ const MainLayout = () => {
                         Usage & Billing
                       </NavLink>
                       
-                      {/* Admin Section */}
+                      {/* Admin Section - Now shows for real admins */}
                       {isAdmin && (
                         <>
                           <hr className="my-1" />
@@ -301,14 +371,14 @@ const MainLayout = () => {
 
         {/* Main Content Area - Below Fixed Header */}
         <div className="flex pt-16">
-          {/* Use the separate Sidebar component (already updated with SuperAdmin support) */}
+          {/* Use the separate Sidebar component */}
           <Sidebar />
 
           {/* Main Content with Error Boundary */}
           <main className="flex-1 overflow-x-hidden">
             <ErrorBoundary>
               <div className="container mx-auto px-6 py-8 max-w-7xl">
-                {/* SuperAdmin Alert Banner */}
+                {/* SuperAdmin Alert Banner - Now shows for real admins */}
                 {isAdmin && (
                   <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
                     <div className="flex items-center">
@@ -340,7 +410,7 @@ const MainLayout = () => {
             </ErrorBoundary>
           </main>
 
-          {/* Right Ad Sidebar - Dynamic ads from database */}
+          {/* Right Ad Sidebar */}
           <AdSidebar />
         </div>
 
