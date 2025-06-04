@@ -1,4 +1,4 @@
-// src/pages/Dashboard.jsx - FIXED VERSION with SuperAdmin tier support
+// src/pages/Dashboard.jsx - FULL VERSION with all features restored
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase/supabaseClient';
@@ -6,10 +6,6 @@ import { useProfile } from '../hooks/useProfile';
 import { useUsageTracking } from '../hooks/useUsageTracking';
 import { useContentLibrary } from '../hooks/useContentLibrary';
 import { UsageMeter, SystemStatus } from '../components/Common';
-import { 
-  getTierDisplayName, 
-  isSuperAdmin
-} from '../utils/tierUtils';
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
@@ -33,11 +29,6 @@ const Dashboard = () => {
   } = useContentLibrary();
   
   console.log("Dashboard component rendering with all features");
-  
-  // Check if current user is SuperAdmin
-  const isAdmin = isSuperAdmin(user?.subscription_tier || profileStats?.subscriptionTier);
-  const currentTier = user?.subscription_tier || profileStats?.subscriptionTier;
-  const tierDisplayName = getTierDisplayName(currentTier);
   
   // Tools offered by the application
   const tools = [
@@ -93,21 +84,6 @@ const Dashboard = () => {
       available: true,
       premium: false
     },
-    // Admin-only tool
-    ...(isAdmin ? [{
-      id: 'admin-panel',
-      name: 'Super Admin Panel',
-      description: 'Manage users, subscription tiers, and monitor platform-wide analytics.',
-      path: '/admin',
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-        </svg>
-      ),
-      available: true,
-      premium: false,
-      isAdmin: true
-    }] : []),
     {
       id: 'blog-post-creator',
       name: 'Blog Post Creator',
@@ -183,17 +159,13 @@ const Dashboard = () => {
       </div>
       
       {/* User welcome section with personalized greeting */}
-      <div className={`rounded-lg shadow-md mb-8 ${
-        isAdmin 
-          ? 'bg-gradient-to-r from-red-600 to-red-700' 
-          : 'bg-gradient-to-r from-indigo-600 to-purple-600'
-      }`}>
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-md mb-8">
         <div className="p-6 text-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div className="h-16 w-16 rounded-full bg-white/20 flex items-center justify-center text-white text-xl font-semibold">
-                  {isAdmin ? '🛡️' : (firstName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || '?')}
+                  {firstName?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || '?'}
                 </div>
               </div>
               <div className="ml-4">
@@ -204,38 +176,26 @@ const Dashboard = () => {
                     `Welcome back, ${firstName || 'User'}!`
                   )}
                 </h2>
-                <p className={isAdmin ? 'text-red-100' : 'text-indigo-100'}>
-                  {isAdmin ? 'Super Administrator Access' : 'What would you like to create today?'}
-                </p>
+                <p className="text-indigo-100">What would you like to create today?</p>
                 {profileStats && (
-                  <p className={`text-sm mt-1 ${isAdmin ? 'text-red-200' : 'text-indigo-200'}`}>
-                    {tierDisplayName} Plan • {getTierDisplayName(limits.tier)} tier
-                    {isAdmin && (
-                      <span className="ml-2 px-2 py-0.5 bg-white/20 rounded-full text-xs font-bold">
-                        UNLIMITED ACCESS
-                      </span>
-                    )}
+                  <p className="text-indigo-200 text-sm mt-1">
+                    {profileStats.subscriptionTier === 'free' ? 'Free Plan' : 
+                     profileStats.subscriptionTier === 'pro' ? 'Pro Plan' :
+                     profileStats.subscriptionTier === 'gold' ? 'Gold Plan' : 
+                     'Premium Plan'} • 
+                    {limits.tier} tier
                   </p>
                 )}
               </div>
             </div>
             
-            {/* Usage overview in header with enhanced SuperAdmin display */}
+            {/* Usage overview in header with UsageMeter */}
             {user && (
               <div className="hidden md:block">
                 <div className="text-right">
-                  <div className={`text-sm mb-1 ${isAdmin ? 'text-red-200' : 'text-indigo-200'}`}>
-                    Today's Usage
-                  </div>
-                  {isAdmin ? (
-                    <div className="text-white font-bold flex items-center">
-                      <span className="mr-2">🛡️</span>
-                      UNLIMITED ACCESS
-                    </div>
-                  ) : (
-                    <UsageMeter type="daily_tokens" showDetails={false} className="text-white" />
-                  )}
-                  {(isNearLimit || isAtLimit) && !isAdmin && (
+                  <div className="text-sm text-indigo-200 mb-1">Today's Usage</div>
+                  <UsageMeter type="daily_tokens" showDetails={false} className="text-white" />
+                  {(isNearLimit || isAtLimit) && (
                     <div className="text-xs text-yellow-200 mt-1">
                       {isAtLimit ? '⚠️ Limit reached' : '⚠️ Near limit'}
                     </div>
@@ -246,76 +206,38 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
-
-      {/* SuperAdmin Banner */}
-      {isAdmin && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <span className="text-red-600 text-xl">🛡️</span>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">
-                Super Administrator Access
-              </h3>
-              <div className="mt-2 text-sm text-red-700">
-                <p>
-                  You have unlimited access to all features and administrative privileges.
-                  <Link 
-                    to="/admin" 
-                    className="ml-2 font-medium underline hover:text-red-800"
-                  >
-                    Access Admin Panel →
-                  </Link>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
       
       {/* Enhanced Stats for Authenticated Users */}
       {user && (
         <div className="mb-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Token Usage Stats - Enhanced for SuperAdmin */}
-            <div className={`bg-white rounded-lg shadow p-6 border-l-4 ${
-              isAdmin ? 'border-red-500' : 'border-indigo-500'
-            }`}>
+            {/* Token Usage Stats */}
+            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-indigo-500">
               <div className="flex items-center justify-between">
                 <div className="flex items-center">
                   <div className="flex-shrink-0">
-                    <svg className={`h-8 w-8 ${isAdmin ? 'text-red-600' : 'text-indigo-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-8 w-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-500">Daily Tokens</p>
                     <p className="text-2xl font-semibold text-gray-900">
-                      {isAdmin 
-                        ? '∞' 
-                        : (remainingLimits.daily_tokens?.toLocaleString() || '0')
-                      }
+                      {remainingLimits.daily_tokens?.toLocaleString() || '0'}
                     </p>
                     <p className="text-xs text-gray-400">
-                      {isAdmin 
-                        ? 'Unlimited access'
-                        : `of ${limits.daily_token_limit?.toLocaleString() || '500'} remaining`
-                      }
+                      of {limits.daily_token_limit?.toLocaleString() || '500'} remaining
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <div className={`text-sm font-medium ${
-                    isAdmin ? 'text-red-600' :
                     usagePercentages.daily_tokens > 80 ? 'text-red-600' : 
                     usagePercentages.daily_tokens > 60 ? 'text-yellow-600' : 'text-green-600'
                   }`}>
-                    {isAdmin ? '∞' : `${(100 - (usagePercentages.daily_tokens || 0)).toFixed(1)}%`}
+                    {(100 - (usagePercentages.daily_tokens || 0)).toFixed(1)}%
                   </div>
-                  <div className="text-xs text-gray-400">
-                    {isAdmin ? 'unlimited' : 'available'}
-                  </div>
+                  <div className="text-xs text-gray-400">available</div>
                 </div>
               </div>
             </div>
@@ -343,7 +265,7 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Video Processing Stats - Enhanced for SuperAdmin */}
+            {/* Video Processing Stats */}
             <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
               <div className="flex items-center">
                 <div className="flex-shrink-0">
@@ -354,16 +276,10 @@ const Dashboard = () => {
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-500">Videos Today</p>
                   <p className="text-2xl font-semibold text-gray-900">
-                    {isAdmin 
-                      ? '∞'
-                      : ((limits.daily_video_limit || 5) - (limits.daily_videos_processed || 0))
-                    }
+                    {((limits.daily_video_limit || 5) - (limits.daily_videos_processed || 0))}
                   </p>
                   <p className="text-xs text-gray-400">
-                    {isAdmin 
-                      ? 'Unlimited processing'
-                      : `of ${limits.daily_video_limit || 5} remaining`
-                    }
+                    of {limits.daily_video_limit || 5} remaining
                   </p>
                 </div>
               </div>
@@ -400,8 +316,8 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Usage Alert - Hide for SuperAdmin */}
-      {user && (isNearLimit || isAtLimit) && !isAdmin && (
+      {/* Usage Alert */}
+      {user && (isNearLimit || isAtLimit) && (
         <div className={`mb-6 p-4 rounded-lg border ${
           isAtLimit ? 'bg-red-50 border-red-200' : 'bg-yellow-50 border-yellow-200'
         }`}>
@@ -444,24 +360,15 @@ const Dashboard = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {tools.map((tool) => (
-            <div key={tool.id} className={`bg-white rounded-lg shadow-md overflow-hidden ${
-              !tool.available ? 'opacity-70' : ''
-            } ${tool.isAdmin ? 'ring-2 ring-red-200' : ''}`}>
+            <div key={tool.id} className={`bg-white rounded-lg shadow-md overflow-hidden ${!tool.available ? 'opacity-70' : ''}`}>
               <div className="p-6">
                 <div className="mb-4 flex items-center justify-between">
                   {tool.icon}
-                  <div className="flex gap-2">
-                    {tool.premium && (
-                      <span className="px-2 py-0.5 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 text-xs rounded-full">
-                        PRO
-                      </span>
-                    )}
-                    {tool.isAdmin && (
-                      <span className="px-2 py-0.5 bg-red-100 text-red-800 text-xs rounded-full font-bold">
-                        🛡️ ADMIN
-                      </span>
-                    )}
-                  </div>
+                  {tool.premium && (
+                    <span className="px-2 py-0.5 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 text-xs rounded-full">
+                      PRO
+                    </span>
+                  )}
                 </div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2 flex items-center">
                   {tool.name}
@@ -475,13 +382,9 @@ const Dashboard = () => {
                 {tool.available ? (
                   <Link 
                     to={tool.path} 
-                    className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white focus:outline-none focus:ring-2 focus:ring-offset-2 ${
-                      tool.isAdmin 
-                        ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
-                        : 'bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500'
-                    }`}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
-                    {tool.isAdmin ? '🛡️ Access Panel' : 'Launch Tool'}
+                    Launch Tool
                   </Link>
                 ) : (
                   <button 
