@@ -1,9 +1,9 @@
-// src/hooks/useEmailSeries.js - UPDATED for centralized API architecture
+// src/hooks/useEmailSeries.js - FIXED VERSION with proper state management
 import { useState, useCallback } from 'react';
-import { emailApi } from '../services/api'; // Use centralized API
+import { emailApi } from '../services/api';
 import { useUsageTracking } from './useUsageTracking';
 
-// Helper functions - moved from emailGenerator to avoid circular imports
+// Helper functions
 const extractDomain = (url) => {
   try {
     const domain = url.replace(/(^\w+:|^)\/\//, '').split('/')[0];
@@ -18,8 +18,8 @@ const createSeriesNameFromDomain = (domain) => {
 };
 
 /**
- * Custom hook for email series generation and management with AI-first approach
- * Uses centralized emailApi for backend integration
+ * FIXED: Simplified email series hook that directly uses the email API
+ * No more duplicate state management - this is the single source of truth for emailSeries
  */
 export const useEmailSeries = ({
   extractedBenefits,
@@ -29,8 +29,6 @@ export const useEmailSeries = ({
   affiliateLink,
   tone,
   industry,
-  isUsingAI, // ✅ ACCEPT but don't send to backend (UI state only)
-  aiAvailable, // ✅ ACCEPT but don't send to backend (UI state only)
   exportFormat,
   currentEmailIndex,
   showToast,
@@ -38,86 +36,18 @@ export const useEmailSeries = ({
   user
 }) => {
 
-  console.log('🎯 useEmailSeries hook initialized with centralized API architecture');
+  console.log('🎯 useEmailSeries hook initialized - FIXED VERSION');
   
+  // ✅ SINGLE SOURCE OF TRUTH for email series state
   const [emailSeries, setEmailSeries] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // Add usage tracking hook
+  // Usage tracking
   const { trackEmailGeneration, trackSeriesCreated, trackAITokenUsage } = useUsageTracking();
 
-  // Log UI state (but don't send to backend)
-  console.log('Hook initialized with UI state:', { 
-    hasIsUsingAI: !!isUsingAI, 
-    hasAiAvailable: !!aiAvailable 
-  });
-
   /**
-   * Enhanced AI email generation using centralized emailApi
-   * ✅ FIXED: No longer sends isUsingAI or aiAvailable to backend
+   * ✅ FIXED: Direct API call with proper state management
    */
-  const generateEmailsWithAI = useCallback(async (selectedBenefitsList, websiteData, options) => {
-    try {
-      const userTier = user?.subscription_tier || 'free';
-      
-      console.log('🤖 Starting AI-first email generation with tier:', userTier);
-      console.log('🎯 Benefits to process:', selectedBenefitsList.length);
-      
-      // ✅ FIXED: Clean API call - no UI state fields
-      const result = await emailApi.generateEmails({
-        benefits: selectedBenefitsList,
-        selectedBenefits: selectedBenefitsList.map(() => true),
-        websiteData: websiteData || {},
-        tone: options.tone || 'persuasive',
-        industry: options.industry || 'general',
-        affiliateLink: options.affiliateLink || '',
-        autoSave: true
-        // ❌ REMOVED: isUsingAI and aiAvailable (these are UI state, not API parameters)
-      });
-      
-      // Process results
-      if (result.success && result.emails) {
-        console.log('🤖 AI Generation Complete:', {
-          emails: result.emails.length,
-          totalTokens: result.total_tokens || 0
-        });
-        
-        // Track actual AI tokens used
-        if (result.total_tokens > 0) {
-          await trackAITokenUsage(result.total_tokens);
-          console.log(`✅ Tracked ${result.total_tokens} AI tokens for ${userTier} tier`);
-        }
-        
-        showToast(`All ${result.emails.length} emails generated with AI! 🤖`, 'success');
-        
-        return {
-          emails: result.emails.map((email, index) => ({
-            ...email,
-            emailNumber: index + 1,
-            createdAt: new Date().toISOString(),
-            generatedWithAI: true,
-            domain: extractDomain(options.domain || url || ''),
-            readingLevel: '5th grade',
-            generationMethod: 'backend-api'
-          })),
-          usage: {
-            totalTokens: result.total_tokens || 0,
-            model: 'backend-ai',
-            aiSuccessRate: 100,
-            totalEmails: result.emails.length
-          }
-        };
-      } else {
-        throw new Error(result.error || 'Failed to generate emails');
-      }
-      
-    } catch (error) {
-      console.error('❌ AI generation failure:', error);
-      throw new Error(`AI service unavailable: ${error.message}`);
-    }
-  }, [user, trackAITokenUsage, showToast, url]);
-  
-  // Generate email series with AI-first approach
   const handleGenerateEmails = useCallback(async () => {
     const selectedBenefitsList = extractedBenefits.filter((_, index) => selectedBenefits[index]);
     
@@ -126,51 +56,45 @@ export const useEmailSeries = ({
       return;
     }
     
+    console.log('🚀 Starting email generation with selected benefits:', selectedBenefitsList);
+    
     setIsGenerating(true);
     
     try {
-      const domain = extractDomain(url);      
-      let emails = [];
-      let aiUsageData = null;
+      const domain = extractDomain(url);
       const userTier = user?.subscription_tier || 'free';
       
-      // Show initial generation message
-      const tierMessage = userTier === 'gold' ? 'premium AI' : 
-                         userTier === 'pro' ? 'professional AI' : 'AI';
-      showToast(`Generating ${selectedBenefitsList.length} unique emails with ${tierMessage}...`, 'info');
+      showToast(`Generating ${selectedBenefitsList.length} emails with AI...`, 'info');
       
-      try {
-        // Always attempt AI generation first using centralized API
-        const aiResult = await generateEmailsWithAI(
-          selectedBenefitsList,
-          websiteData,
-          {
-            domain,
-            affiliateLink,
-            tone,
-            industry
-          }
-        );
-        
-        emails = aiResult.emails;
-        aiUsageData = aiResult.usage;
-        
-      } catch (error) {
-        console.error('❌ AI generation completely failed:', error);
-        showToast('Unable to generate emails. Please check your AI service configuration.', 'error');
-        setIsGenerating(false);
-        return;
+      // ✅ DIRECT API CALL - no intermediary state
+      console.log('📡 Making direct API call to emailApi.generateEmails...');
+      
+      const result = await emailApi.generateEmails({
+        benefits: selectedBenefitsList,
+        selectedBenefits: selectedBenefitsList.map(() => true),
+        websiteData: websiteData || {},
+        tone: tone || 'persuasive',
+        industry: industry || 'general',
+        affiliateLink: affiliateLink || '',
+        autoSave: true
+      });
+      
+      console.log('✅ API Response received:', {
+        success: result.success,
+        emailCount: result.emails ? result.emails.length : 0,
+        totalTokens: result.total_tokens
+      });
+
+      if (!result.success) {
+        throw new Error(result.message || result.error || 'Failed to generate emails');
       }
-      
-      // Validate we have emails
-      if (!emails || emails.length === 0) {
-        showToast('No emails were generated. Please try again.', 'error');
-        setIsGenerating(false);
-        return;
+
+      if (!result.emails || result.emails.length === 0) {
+        throw new Error('No emails were generated by the API');
       }
-      
-      // Add comprehensive metadata to emails
-      emails = emails.map((email, index) => ({
+
+      // ✅ PROCESS AND SET STATE DIRECTLY
+      const emails = result.emails.map((email, index) => ({
         ...email,
         emailNumber: index + 1,
         createdAt: new Date().toISOString(),
@@ -178,44 +102,52 @@ export const useEmailSeries = ({
         domain,
         generatedWith: 'AI',
         userTier: userTier,
-        aiModel: aiUsageData?.model || 'backend-ai',
+        aiModel: 'backend-api',
         readingLevel: '5th grade',
         isAffilateMarketing: true,
         qualityScore: userTier === 'gold' ? 'Premium' : userTier === 'pro' ? 'Professional' : 'Standard',
-        generationMethod: `AI (Backend API)`
+        generationMethod: 'Backend API'
       }));
       
+      console.log('📧 Setting emailSeries state with processed emails:', emails.length);
+      
+      // ✅ THIS IS THE CRITICAL FIX - SET STATE IMMEDIATELY
       setEmailSeries(emails);
       
-      // Track usage comprehensively
+      // Track usage (non-blocking)
       try {
         await trackEmailGeneration(emails.length);
         await trackSeriesCreated(1);
         
-        console.log(`✅ Usage tracked: ${emails.length} emails, 1 series for ${userTier} user`);
-        
-        if (aiUsageData && aiUsageData.totalTokens > 0) {
-          console.log(`💰 AI Generation: ${aiUsageData.totalTokens} tokens`);
-          console.log(`📊 AI Success Rate: ${aiUsageData.aiSuccessRate}%`);
+        if (result.total_tokens > 0) {
+          await trackAITokenUsage(result.total_tokens);
         }
         
+        console.log('✅ Usage tracking completed');
       } catch (trackingError) {
-        console.error('⚠️ Error tracking usage:', trackingError);
-        // Don't fail the whole operation if tracking fails
+        console.warn('⚠️ Usage tracking failed but continuing:', trackingError);
       }
       
-      // Final success message
-      showToast(`🎉 Successfully generated ${emails.length} unique AI emails!`, 'success');
+      // Success message
+      showToast(`🎉 Successfully generated ${emails.length} AI emails!`, 'success');
       
+      // ✅ CALL COMPLETION CALLBACK WITH EMAILS
       if (onGenerateComplete) {
-        onGenerateComplete();
+        console.log('🎯 Calling onGenerateComplete with emails...');
+        onGenerateComplete({ emails });
       }
+      
+      console.log('✅ Email generation process completed successfully');
       
     } catch (error) {
       console.error('❌ Email generation error:', error);
-      showToast('Failed to generate emails. Please check your AI service and try again.', 'error');
+      showToast(`Failed to generate emails: ${error.message}`, 'error');
+      
+      // ✅ ENSURE STATE IS CLEARED ON ERROR
+      setEmailSeries([]);
     } finally {
       setIsGenerating(false);
+      console.log('🔄 Generation process finished, isGenerating = false');
     }
   }, [
     extractedBenefits, 
@@ -230,14 +162,22 @@ export const useEmailSeries = ({
     user,
     trackEmailGeneration,
     trackSeriesCreated,
-    generateEmailsWithAI
+    trackAITokenUsage
   ]);
   
   // Copy current email to clipboard
   const copyEmailToClipboard = useCallback(() => {
-    if (emailSeries.length === 0) return;
+    if (emailSeries.length === 0) {
+      console.warn('⚠️ No emails to copy - emailSeries is empty');
+      return;
+    }
     
     const email = emailSeries[currentEmailIndex];
+    
+    if (!email) {
+      console.warn('⚠️ No email at current index:', currentEmailIndex);
+      return;
+    }
     
     try {
       let content = '';
@@ -251,26 +191,32 @@ export const useEmailSeries = ({
       }
       
       navigator.clipboard.writeText(content);
-      
-      showToast(`Email copied to clipboard as ${exportFormat.toUpperCase()}! (AI Generated)`, 'success');
+      showToast(`Email copied to clipboard as ${exportFormat.toUpperCase()}!`, 'success');
     } catch (error) {
-      console.error('Error copying to clipboard:', error);
+      console.error('❌ Error copying to clipboard:', error);
       showToast('Failed to copy to clipboard', 'error');
     }
   }, [emailSeries, currentEmailIndex, exportFormat, showToast]);
   
-  // Handle export email with enhanced metadata
+  // Handle export email
   const handleExportEmail = useCallback((format) => {
-    if (emailSeries.length === 0) return;
+    if (emailSeries.length === 0) {
+      console.warn('⚠️ No emails to export - emailSeries is empty');
+      return;
+    }
     
     const email = emailSeries[currentEmailIndex];
+    
+    if (!email) {
+      console.warn('⚠️ No email at current index for export:', currentEmailIndex);
+      return;
+    }
     
     try {
       let content = '';
       let fileName = '';
       let mimeType = '';
       
-      // Enhanced metadata for exports
       const metadata = `
 Generated with: ${email.generationMethod || 'Backend API'}
 User Tier: ${email.userTier || 'free'}
@@ -325,15 +271,15 @@ Focus Benefit: ${email.benefit || 'Unknown'}`;
   </div>
 </body>
 </html>`;
-        fileName = `email-${email.emailNumber}-${email.domain}-${email.userTier}-ai.html`;
+        fileName = `email-${email.emailNumber}-${email.domain}-ai.html`;
         mimeType = 'text/html';
       } else if (format === 'text') {
         content = `Subject: ${email.subject}\n\n${email.content || email.body}\n\n---\nEmail Metadata:${metadata}`;
-        fileName = `email-${email.emailNumber}-${email.domain}-${email.userTier}-ai.txt`;
+        fileName = `email-${email.emailNumber}-${email.domain}-ai.txt`;
         mimeType = 'text/plain';
       } else if (format === 'markdown') {
         content = `# ${email.subject}\n\n${email.content || email.body}\n\n---\n**Email Metadata:**${metadata}`;
-        fileName = `email-${email.emailNumber}-${email.domain}-${email.userTier}-ai.md`;
+        fileName = `email-${email.emailNumber}-${email.domain}-ai.md`;
         mimeType = 'text/markdown';
       }
       
@@ -348,12 +294,20 @@ Focus Benefit: ${email.benefit || 'Unknown'}`;
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      showToast(`Email exported as ${format.toUpperCase()}! (AI Generated)`, 'success');
+      showToast(`Email exported as ${format.toUpperCase()}!`, 'success');
     } catch (error) {
-      console.error(`Error exporting as ${format}:`, error);
+      console.error(`❌ Error exporting as ${format}:`, error);
       showToast(`Failed to export as ${format}`, 'error');
     }
   }, [emailSeries, currentEmailIndex, showToast]);
+  
+  // ✅ DEBUG: Log state changes
+  console.log('🔍 useEmailSeries state:', {
+    emailSeriesLength: emailSeries.length,
+    isGenerating,
+    currentIndex: currentEmailIndex,
+    hasEmails: emailSeries.length > 0
+  });
   
   return {
     emailSeries,
@@ -361,12 +315,11 @@ Focus Benefit: ${email.benefit || 'Unknown'}`;
     handleGenerateEmails,
     copyEmailToClipboard,
     handleExportEmail,
-    // Enhanced metadata for UI components
     userTier: user?.subscription_tier || 'free',
-    aiAvailableForTier: true, // Always attempt AI first
+    aiAvailableForTier: true,
     generationStats: emailSeries.length > 0 ? {
       total: emailSeries.length,
-      aiGenerated: emailSeries.length, // All emails now AI generated
+      aiGenerated: emailSeries.length,
       templateFallback: 0,
       aiSuccessRate: 100
     } : null
