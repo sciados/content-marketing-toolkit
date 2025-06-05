@@ -138,9 +138,9 @@ const SalesPageEmailGenerator = lazy(() => {
 });
 
 // Content Library
-const ContentLibrary = lazy(() => {
-  const tracker = trackLazyLoading('ContentLibrary');
-  return import('../pages/ContentLibrary').then(module => {
+const CampaignContentLibrary = lazy(() => {
+  const tracker = trackLazyLoading('CampaignContentLibrary');
+  return import('../components/ContentLibrary/CampaignContentLibrary').then(module => {
     if (tracker) tracker();
     return module;
   });
@@ -451,10 +451,10 @@ const AppRoutes = () => {
           
           {/* Content Library Route */}
           <Route 
-            path="/tools/content-library" 
+            path="/tools/campaign-content-library" 
             element={
-              <LazyRoute pageName="Content Library">
-                <ContentLibrary />
+              <LazyRoute pageName="Campaign Content Library">
+                <CampaignContentLibrary />
               </LazyRoute>
             } 
           />

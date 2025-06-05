@@ -1,445 +1,410 @@
-// src/hooks/useContentLibrary.js - TEMPORARY: Disable API calls, use demo data
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { contentLibraryApi } from '../services/api';
-import { useErrorHandler } from './useErrorHandler';
+// src/hooks/useContentLibrary.js - UPDATED for campaign schema
+import { useState, useCallback, useEffect } from 'react';
+import useSupabase from './useSupabase';
 
+/**
+ * Content Library hook that works with the new campaign schema
+ * Shows organized content by campaigns instead of flat list
+ */
 export const useContentLibrary = () => {
-  const navigate = useNavigate();
-  const { withErrorHandling } = useErrorHandler();
+  const { supabase, user } = useSupabase();
   
-  const [items, setItems] = useState([]);
+  // State for campaign-organized content
+  const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [filters, setFilters] = useState({
-    content_type: 'all',
-    favorited: false,
-    tags: [],
-    sortBy: 'created_desc'
-  });
   const [searchTerm, setSearchTerm] = useState('');
-  const [backendAvailable, setBackendAvailable] = useState(true); // CHANGED: Re-enable API
+  const [filterType, setFilterType] = useState('all'); // all, emails, social, blog, video
 
-  // Check if backend APIs are available - RE-ENABLED
-  const checkBackendAvailability = useCallback(async () => {
-    try {
-      const result = await contentLibraryApi.getHealth();
-      const available = result.success;
-      setBackendAvailable(available);
-      console.log('✅ Content Library API health:', { available });
-      return available;
-    } catch (error) {
-      console.warn('⚠️ Content Library backend unavailable:', error);
-      setBackendAvailable(false);
-      return false;
-    }
-  }, []);
+  /**
+   * ✅ Load all campaigns with their content counts
+   */
+  const loadCampaigns = useCallback(async () => {
+    if (!user?.id) return;
 
-  // Demo data for fallback (enhanced with more items)
-  const getDemoData = () => [
-    {
-      id: 'demo-1',
-      content_type: 'video_transcript',
-      title: 'Marketing Strategy Video Transcript',
-      description: 'Transcript from a 30-minute marketing strategy video covering customer acquisition and retention strategies.',
-      tags: ['marketing', 'strategy', 'customer-acquisition'],
-      metadata: { video_id: 'demo123', duration: '30:45', word_count: 4500, source: 'YouTube' },
-      is_favorited: true,
-      usage_count: 3,
-      created_at: '2025-05-20T10:00:00Z',
-      last_used_at: '2025-05-20T14:30:00Z'
-    },
-    {
-      id: 'demo-2',
-      content_type: 'scanned_page',
-      title: 'ConvertKit Sales Page Analysis',
-      description: 'Extracted benefits and features from ConvertKit pricing page for email marketing insights.',
-      tags: ['email-marketing', 'saas', 'pricing'],
-      metadata: { url: 'https://convertkit.com/pricing', benefits_count: 8, features_count: 12 },
-      is_favorited: false,
-      usage_count: 1,
-      created_at: '2025-05-19T15:30:00Z',
-      last_used_at: '2025-05-19T16:00:00Z'
-    },
-    {
-      id: 'demo-3',
-      content_type: 'generated_asset',
-      title: 'Email Series: Product Launch',
-      description: 'Complete 5-email sequence for product launch campaign with subject lines and CTAs.',
-      tags: ['email-series', 'product-launch', 'campaigns'],
-      metadata: { 
-        email_count: 5, 
-        estimated_open_rate: '25%',
-        content: 'Email 1: Welcome to our new product...\nEmail 2: Key benefits you need to know...'
-      },
-      is_favorited: true,
-      usage_count: 5,
-      created_at: '2025-05-18T09:15:00Z',
-      last_used_at: '2025-05-21T11:20:00Z'
-    },
-    {
-      id: 'demo-4',
-      content_type: 'video_transcript',
-      title: 'SaaS Onboarding Best Practices',
-      description: 'Expert interview about user onboarding strategies for SaaS products.',
-      tags: ['saas', 'onboarding', 'user-experience'],
-      metadata: { video_id: 'demo456', duration: '45:20', word_count: 6800, source: 'Webinar' },
-      is_favorited: false,
-      usage_count: 2,
-      created_at: '2025-05-17T14:00:00Z',
-      last_used_at: '2025-05-18T10:30:00Z'
-    }
-  ];
-
-  // Fetch items using centralized API
-  const fetchItems = useCallback(async () => {
     setLoading(true);
     setError(null);
-    
+
     try {
-      const isAvailable = await checkBackendAvailability();
-      
-      if (!isAvailable) {
-        console.warn('⚠️ Backend not available, using demo data');
-        setItems(getDemoData());
-        setLoading(false);
-        return;
-      }
+      console.log('📚 Loading campaigns for Content Library...');
 
-      // Use centralized API service with error handling
-      const safeApiCall = withErrorHandling(contentLibraryApi.getItems);
-      const result = await safeApiCall({
-        type: filters.content_type || 'all',
-        search: searchTerm || '',
-        favorited: (filters.favorited || false).toString(),
-        tags: Array.isArray(filters.tags) ? filters.tags.join(',') : '',
-        sort: filters.sortBy || 'created_desc',
-        limit: '50'
-      });
+      // Use the campaign_overview view for rich data
+      const { data: campaignData, error: campaignError } = await supabase
+        .from('campaign_overview')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('last_activity_at', { ascending: false });
 
-      if (result.success) {
-        setItems(result.items || []);
-        console.log(`✅ Fetched ${result.items?.length || 0} Content Library items`);
-      } else {
-        throw new Error(result.message || result.error || 'API returned unsuccessful response');
-      }
-    } catch (error) {
-      console.error('❌ Failed to fetch content library:', error);
-      setError(error.message);
-      
-      // Fallback to demo data
-      console.warn('⚠️ Using demo data as fallback');
-      setItems(getDemoData());
+      if (campaignError) throw campaignError;
+
+      console.log('✅ Loaded campaigns:', campaignData?.length || 0);
+      setCampaigns(campaignData || []);
+
+    } catch (err) {
+      console.error('❌ Error loading campaigns:', err);
+      setError(err.message);
+      setCampaigns([]);
     } finally {
       setLoading(false);
     }
-  }, [filters, searchTerm, checkBackendAvailability, withErrorHandling]);
+  }, [supabase, user]);
 
-  // Initial load
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+  /**
+   * ✅ Get detailed content for a specific campaign
+   */
+  const getCampaignContent = useCallback(async (campaignId) => {
+    if (!campaignId) return null;
 
-  // Toggle favorite using centralized API
-  const toggleFavorite = useCallback(async (itemId, currentFavorited) => {
     try {
-      // Optimistic update
-      setItems(prev => prev.map(item => 
-        item.id === itemId 
-          ? { ...item, is_favorited: !currentFavorited }
-          : item
-      ));
+      console.log('🔍 Loading content for campaign:', campaignId);
 
-      if (!backendAvailable) {
-        console.log('⚠️ Backend not available - favorite change stored locally only');
-        return;
-      }
-
-      // Use centralized API service with error handling
-      const safeApiCall = withErrorHandling(contentLibraryApi.toggleFavorite);
-      const result = await safeApiCall(itemId, !currentFavorited);
-
-      if (!result.success) {
-        // Revert optimistic update on failure
-        setItems(prev => prev.map(item => 
-          item.id === itemId 
-            ? { ...item, is_favorited: currentFavorited }
-            : item
-        ));
-      }
-    } catch (error) {
-      console.error('❌ Failed to toggle favorite:', error);
-      // Revert optimistic update
-      setItems(prev => prev.map(item => 
-        item.id === itemId 
-          ? { ...item, is_favorited: currentFavorited }
-          : item
-      ));
-    }
-  }, [backendAvailable, withErrorHandling]);
-
-  // Use content item with centralized API
-  const useContentItem = useCallback(async (item) => {
-    try {
-      console.log('🔧 Using content item:', item.title, 'Type:', item.content_type);
-      
-      // Optimistic update for usage count
-      setItems(prev => prev.map(prevItem => 
-        prevItem.id === item.id 
-          ? { 
-              ...prevItem, 
-              usage_count: (prevItem.usage_count || 0) + 1,
-              last_used_at: new Date().toISOString()
-            }
-          : prevItem
-      ));
-
-      // Track usage using centralized API
-      if (backendAvailable) {
-        try {
-          const safeApiCall = withErrorHandling(contentLibraryApi.trackUsage);
-          await safeApiCall(item.id, item.content_type);
-        } catch (trackingError) {
-          console.warn('⚠️ Usage tracking failed:', trackingError);
-        }
-      }
-
-      // Navigate using React Router (prevents logout issue)
-      if (item.content_type === 'video_transcript') {
-        console.log('🔧 Navigating to Video2Promo with React Router');
-        navigate('/tools/video2promo');
-      } else if (item.content_type === 'scanned_page') {
-        console.log('🔧 Navigating to Email Generator with React Router');
-        navigate('/tools/email-generator');
-      } else if (item.content_type === 'generated_asset') {
-        console.log('🔧 Using generated asset:', item);
+      // Load all content types for this campaign
+      const [emailSeries, socialContent, blogContent, videoAssets] = await Promise.all([
+        supabase
+          .from('campaign_email_series')
+          .select(`
+            *,
+            campaign_emails(*)
+          `)
+          .eq('campaign_id', campaignId),
         
-        // Try to copy content to clipboard if available
-        if (navigator.clipboard && item.metadata?.content) {
-          try {
-            await navigator.clipboard.writeText(item.metadata.content);
-            console.log('✅ Content copied to clipboard');
-          } catch (clipboardError) {
-            console.warn('⚠️ Failed to copy to clipboard:', clipboardError);
-          }
-        }
+        supabase
+          .from('campaign_social_content')
+          .select('*')
+          .eq('campaign_id', campaignId),
         
-        navigate('/tools/email-generator');
-      }
-    } catch (error) {
-      console.error('❌ Failed to use content item:', error);
-      setError('Failed to use content item');
-    }
-  }, [backendAvailable, navigate, withErrorHandling]);
+        supabase
+          .from('campaign_blog_content')
+          .select('*')
+          .eq('campaign_id', campaignId),
+        
+        supabase
+          .from('campaign_video_assets')
+          .select('*')
+          .eq('campaign_id', campaignId)
+      ]);
 
-  // Delete item using centralized API
-  const deleteItem = useCallback(async (itemId) => {
-    if (!confirm('Are you sure you want to delete this item?')) {
-      return;
-    }
+      // Check for errors
+      if (emailSeries.error) throw emailSeries.error;
+      if (socialContent.error) throw socialContent.error;
+      if (blogContent.error) throw blogContent.error;
+      if (videoAssets.error) throw videoAssets.error;
 
-    // Store the item to delete BEFORE removing it (for potential restoration)
-    const itemToDelete = items.find(item => item.id === itemId);
-    
-    if (!itemToDelete) {
-      console.warn('⚠️ Item not found for deletion:', itemId);
-      return;
-    }
-
-    try {
-      // Optimistic removal
-      setItems(prev => prev.filter(item => item.id !== itemId));
-
-      if (!backendAvailable) {
-        console.log('⚠️ Backend not available - item removed locally only');
-        return;
-      }
-
-      // Use centralized API service with error handling
-      const safeApiCall = withErrorHandling(contentLibraryApi.deleteItem);
-      const result = await safeApiCall(itemId);
-      
-      if (result.success) {
-        console.log('✅ Item deleted successfully:', itemId);
-      } else {
-        // Restore item on API failure
-        setItems(prev => [itemToDelete, ...prev]);
-      }
-
-    } catch (error) {
-      console.error('❌ Failed to delete item:', error);
-      setError('Failed to delete item');
-      
-      // Restore item on error using the stored reference
-      setItems(prev => [itemToDelete, ...prev]);
-    }
-  }, [items, backendAvailable, withErrorHandling]);
-
-  // Add to library using centralized API
-  const addToLibrary = useCallback(async (contentData) => {
-    try {
-      if (!backendAvailable) {
-        console.warn('⚠️ Backend not available - cannot add to library');
-        setError('Backend not available. Cannot save to Content Library.');
-        return null;
-      }
-
-      const mappedData = {
-        content_type: contentData.type || contentData.content_type,
-        title: contentData.title,
-        description: contentData.description || '',
-        tags: contentData.tags || [],
-        source_url: contentData.source_url,
-        metadata: {
-          ...contentData.metadata,
-          cost_saved: contentData.cost_saved || 0,
-          word_count: contentData.word_count || 0
-        }
+      const content = {
+        emailSeries: emailSeries.data || [],
+        socialContent: socialContent.data || [],
+        blogContent: blogContent.data || [],
+        videoAssets: videoAssets.data || [],
+        totalItems: (emailSeries.data?.length || 0) + 
+                   (socialContent.data?.length || 0) + 
+                   (blogContent.data?.length || 0) + 
+                   (videoAssets.data?.length || 0)
       };
 
-      // Use centralized API service with error handling
-      const safeApiCall = withErrorHandling(contentLibraryApi.createItem);
-      const result = await safeApiCall(mappedData);
+      console.log('✅ Campaign content loaded:', content.totalItems, 'items');
+      return content;
 
-      if (result.success && result.item) {
-        setItems(prev => [result.item, ...prev]);
-        console.log(`✅ Added to Content Library: ${contentData.title}`);
-        return result.item;
-      } else {
-        throw new Error(result.message || result.error || 'Failed to add item');
+    } catch (err) {
+      console.error('❌ Error loading campaign content:', err);
+      throw err;
+    }
+  }, [supabase]);
+
+  /**
+   * ✅ Create a new campaign (replaces old addToLibrary)
+   */
+  const createCampaign = useCallback(async (campaignData) => {
+    if (!user?.id) throw new Error('User not authenticated');
+
+    try {
+      console.log('📁 Creating new campaign:', campaignData.name);
+
+      const { data, error } = await supabase
+        .from('campaigns')
+        .insert({
+          user_id: user.id,
+          name: campaignData.name,
+          description: campaignData.description,
+          industry: campaignData.industry || 'general',
+          tone: campaignData.tone || 'professional',
+          target_audience: campaignData.targetAudience,
+          status: 'active',
+          tags: campaignData.tags || [],
+          color: campaignData.color || '#4f46e5'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      console.log('✅ Campaign created:', data.id);
+      
+      // Refresh campaigns list
+      await loadCampaigns();
+      
+      return data;
+
+    } catch (err) {
+      console.error('❌ Error creating campaign:', err);
+      throw err;
+    }
+  }, [supabase, user, loadCampaigns]);
+
+  /**
+   * ✅ Add content to library (now organized by campaign)
+   * This maintains compatibility with existing code but organizes by campaign
+   */
+  const addToLibrary = useCallback(async (contentData) => {
+    if (!user?.id) throw new Error('User not authenticated');
+
+    try {
+      console.log('📚 Adding content to library (campaign-organized):', contentData.type);
+
+      // If no campaign specified, create a default one
+      let campaignId = contentData.campaignId;
+      
+      if (!campaignId) {
+        const defaultCampaign = await createCampaign({
+          name: contentData.title || 'Untitled Campaign',
+          description: contentData.description || 'Auto-created campaign',
+          industry: contentData.metadata?.industry || 'general',
+          tone: contentData.metadata?.tone || 'professional',
+          tags: contentData.tags || ['auto-created']
+        });
+        campaignId = defaultCampaign.id;
       }
-    } catch (error) {
-      console.error('❌ Failed to add to library:', error);
-      setError(`Failed to add to library: ${error.message}`);
+
+      // Add content based on type
+      let savedContent = null;
+
+      if (contentData.type === 'email_series') {
+        // Save as campaign email series
+        const { data, error } = await supabase
+          .from('campaign_email_series')
+          .insert({
+            campaign_id: campaignId,
+            user_id: user.id,
+            series_name: contentData.title,
+            series_description: contentData.description,
+            total_emails: contentData.metadata?.emails_count || 0,
+            tone: contentData.metadata?.tone,
+            industry: contentData.metadata?.industry,
+            affiliate_link: contentData.metadata?.affiliate_link,
+            ai_model_used: 'imported',
+            tokens_consumed: 0
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        savedContent = data;
+
+      } else if (contentData.type === 'social_content') {
+        // Save as campaign social content
+        const { data, error } = await supabase
+          .from('campaign_social_content')
+          .insert({
+            campaign_id: campaignId,
+            user_id: user.id,
+            platform: contentData.metadata?.platform || 'generic',
+            content_type: contentData.metadata?.content_type || 'post',
+            content_text: contentData.content || contentData.description,
+            hashtags: contentData.tags || [],
+            ai_model_used: 'imported'
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        savedContent = data;
+
+      } else {
+        // For other types, save as blog content (fallback)
+        const { data, error } = await supabase
+          .from('campaign_blog_content')
+          .insert({
+            campaign_id: campaignId,
+            user_id: user.id,
+            title: contentData.title,
+            content_body: contentData.content || contentData.description,
+            excerpt: contentData.description,
+            seo_keywords: contentData.tags || [],
+            ai_model_used: 'imported'
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        savedContent = data;
+      }
+
+      console.log('✅ Content added to campaign library:', savedContent.id);
+      
+      // Refresh campaigns list
+      await loadCampaigns();
+      
+      return savedContent;
+
+    } catch (err) {
+      console.error('❌ Error adding to library:', err);
+      throw err;
+    }
+  }, [supabase, user, createCampaign, loadCampaigns]);
+
+  /**
+   * ✅ Search across all campaigns and content
+   */
+  const searchContent = useCallback(async (query) => {
+    if (!user?.id || !query.trim()) return [];
+
+    try {
+      console.log('🔍 Searching content:', query);
+
+      // Search campaigns by name/description
+      const { data: campaignResults, error: campaignError } = await supabase
+        .from('campaigns')
+        .select('*')
+        .eq('user_id', user.id)
+        .or(`name.ilike.%${query}%,description.ilike.%${query}%`);
+
+      if (campaignError) throw campaignError;
+
+      // Search email content
+      const { data: emailResults, error: emailError } = await supabase
+        .from('campaign_emails')
+        .select(`
+          *,
+          campaign_email_series(series_name, campaign_id),
+          campaigns(name)
+        `)
+        .or(`subject_line.ilike.%${query}%,email_body.ilike.%${query}%`)
+        .limit(20);
+
+      if (emailError) throw emailError;
+
+      const searchResults = {
+        campaigns: campaignResults || [],
+        emails: emailResults || [],
+        totalResults: (campaignResults?.length || 0) + (emailResults?.length || 0)
+      };
+
+      console.log('✅ Search completed:', searchResults.totalResults, 'results');
+      return searchResults;
+
+    } catch (err) {
+      console.error('❌ Search error:', err);
+      return { campaigns: [], emails: [], totalResults: 0 };
+    }
+  }, [supabase, user]);
+
+  /**
+   * ✅ Delete campaign and all its content
+   */
+  const deleteCampaign = useCallback(async (campaignId) => {
+    if (!campaignId) return;
+
+    try {
+      console.log('🗑️ Deleting campaign:', campaignId);
+
+      // Delete campaign (CASCADE will handle related content)
+      const { error } = await supabase
+        .from('campaigns')
+        .delete()
+        .eq('id', campaignId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      console.log('✅ Campaign deleted');
+      
+      // Refresh campaigns list
+      await loadCampaigns();
+
+    } catch (err) {
+      console.error('❌ Error deleting campaign:', err);
+      throw err;
+    }
+  }, [supabase, user, loadCampaigns]);
+
+  /**
+   * ✅ Get library statistics (campaign-based)
+   */
+  const getLibraryStats = useCallback(async () => {
+    if (!user?.id) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('campaign_overview')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      const stats = {
+        totalCampaigns: data?.length || 0,
+        totalInputSources: data?.reduce((sum, campaign) => sum + (campaign.total_input_sources || 0), 0) || 0,
+        totalOutputContent: data?.reduce((sum, campaign) => sum + (campaign.total_output_content || 0), 0) || 0,
+        emailSeriesCount: data?.reduce((sum, campaign) => sum + (campaign.email_series_count || 0), 0) || 0,
+        socialContentCount: data?.reduce((sum, campaign) => sum + (campaign.social_content_count || 0), 0) || 0,
+        totalTokensUsed: data?.reduce((sum, campaign) => sum + (campaign.total_tokens_used || 0), 0) || 0,
+        activeCampaigns: data?.filter(campaign => campaign.status === 'active').length || 0
+      };
+
+      console.log('📊 Library stats:', stats);
+      return stats;
+
+    } catch (err) {
+      console.error('❌ Error getting library stats:', err);
       return null;
     }
-  }, [backendAvailable, withErrorHandling]);
+  }, [supabase, user]);
 
-  // Search items using centralized API
-  const searchItems = useCallback(async (query) => {
-    if (!backendAvailable) {
-      console.warn('⚠️ Backend not available - using local search');
-      // Local search fallback
-      const filtered = items.filter(item => 
-        item.title.toLowerCase().includes(query.toLowerCase()) ||
-        item.description.toLowerCase().includes(query.toLowerCase())
-      );
-      return filtered;
+  // Load campaigns on mount and user change
+  useEffect(() => {
+    if (user?.id) {
+      loadCampaigns();
     }
+  }, [user?.id, loadCampaigns]);
 
-    try {
-      const safeApiCall = withErrorHandling(contentLibraryApi.search);
-      const result = await safeApiCall({
-        query: query,
-        type: filters.content_type || 'all',
-        limit: '20'
-      });
+  // Filter campaigns based on search and type
+  const filteredCampaigns = campaigns.filter(campaign => {
+    const matchesSearch = !searchTerm || 
+      campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      campaign.description?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      if (result.success) {
-        return result.items || [];
-      } else {
-        throw new Error(result.message || 'Search failed');
-      }
-    } catch (error) {
-      console.error('❌ Search failed:', error);
-      return [];
-    }
-  }, [backendAvailable, items, filters.content_type, withErrorHandling]);
+    const matchesType = filterType === 'all' || 
+      (filterType === 'emails' && campaign.email_series_count > 0) ||
+      (filterType === 'social' && campaign.social_content_count > 0) ||
+      (filterType === 'blog' && campaign.blog_content_count > 0) ||
+      (filterType === 'video' && campaign.video_assets_count > 0);
 
-  // Get library stats using centralized API
-  const getLibraryStats = useCallback(async () => {
-    if (!backendAvailable) {
-      // Return local stats
-      return {
-        total_items: items.length,
-        favorites_count: items.filter(item => item.is_favorited).length,
-        recent_items_week: items.filter(item => {
-          const weekAgo = new Date();
-          weekAgo.setDate(weekAgo.getDate() - 7);
-          return new Date(item.created_at) > weekAgo;
-        }).length,
-        items_by_type: items.reduce((acc, item) => {
-          acc[item.content_type] = (acc[item.content_type] || 0) + 1;
-          return acc;
-        }, {})
-      };
-    }
-
-    try {
-      const safeApiCall = withErrorHandling(contentLibraryApi.getStats);
-      const result = await safeApiCall();
-
-      if (result.success) {
-        return result.data || {};
-      } else {
-        throw new Error(result.message || 'Failed to get stats');
-      }
-    } catch (error) {
-      console.error('❌ Failed to get library stats:', error);
-      return {};
-    }
-  }, [backendAvailable, items, withErrorHandling]);
-
-  // Helper functions
-  const getItemsByType = useCallback((contentType) => {
-    return items.filter(item => item.content_type === contentType);
-  }, [items]);
-
-  const getFavoriteItems = useCallback(() => {
-    return items.filter(item => item.is_favorited);
-  }, [items]);
-
-  const getRecentItems = useCallback((count = 5) => {
-    return items
-      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      .slice(0, count);
-  }, [items]);
-
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
-
-  const refetch = useCallback(() => {
-    fetchItems();
-  }, [fetchItems]);
+    return matchesSearch && matchesType;
+  });
 
   return {
+    // Campaign-organized data
+    campaigns: filteredCampaigns,
+    allCampaigns: campaigns,
+    
     // State
-    items,
     loading,
     error,
-    filters,
     searchTerm,
-    backendAvailable,
+    setSearchTerm,
+    filterType,
+    setFilterType,
     
     // Actions
-    setFilters,
-    setSearchTerm,
-    toggleFavorite,
-    useContentItem,
-    deleteItem,
-    addToLibrary,
-    refetch,
-    clearError,
-    
-    // Advanced functions
-    searchItems,
+    loadCampaigns,
+    getCampaignContent,
+    createCampaign,
+    addToLibrary, // Maintains compatibility but uses campaigns
+    searchContent,
+    deleteCampaign,
     getLibraryStats,
     
-    // Computed values
-    totalItems: items.length,
-    favoriteCount: items.filter(item => item.is_favorited).length,
-    isEmpty: items.length === 0,
-    hasError: !!error,
-    
-    // Helper functions
-    getItemsByType,
-    getFavoriteItems,
-    getRecentItems,
-    
-    // Content type counts
-    videoTranscriptCount: items.filter(item => item.content_type === 'video_transcript').length,
-    scannedPageCount: items.filter(item => item.content_type === 'scanned_page').length,
-    generatedAssetCount: items.filter(item => item.content_type === 'generated_asset').length
+    // Backward compatibility (for components still expecting old format)
+    items: campaigns, // Maps campaigns to old 'items' property
+    refreshItems: loadCampaigns // Maps to old refresh function
   };
 };

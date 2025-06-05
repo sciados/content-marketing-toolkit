@@ -87,19 +87,20 @@ const EnhancedSalesEmailGenerator = () => {
       if (result.emails && result.emails.length > 0) {
         try {
           addToLibrary({
-            type: 'email_series',
-            title: `Email Series - ${websiteData?.title || url}`,
-            description: `Generated ${result.emails.length} emails from ${url}`,
-            tags: ['email', 'marketing', industry].filter(Boolean),
-            metadata: {
-              source_url: url,
-              emails_count: result.emails.length,
-              benefits_used: selectedBenefits.filter(Boolean).length,
-              tone: tone,
-              industry: industry,
-              generated_at: new Date().toISOString()
-            }
-          });
+  type: 'email_series',
+  title: `Email Series - ${websiteData?.title || url}`,
+  description: `Generated ${result.emails.length} emails from ${url}`,
+  tags: ['email', 'marketing', industry].filter(Boolean),
+  metadata: {
+    source_url: url,
+    emails_count: result.emails.length,
+    benefits_used: selectedBenefits.filter(Boolean).length,
+    tone: tone,
+    industry: industry,
+    generated_at: new Date().toISOString(),
+    emails: result.emails
+  }
+});
         } catch (error) {
           console.warn('⚠️ Failed to auto-save to Content Library:', error);
           // Don't break the flow if Content Library save fails
