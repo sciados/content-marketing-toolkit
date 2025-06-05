@@ -3,10 +3,7 @@ import { Play, CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import VideoUrlForm from '../components/Video2Promo/VideoUrlForm';
 import ImprovedProgress from '../components/Video2Promo/ImprovedProgress';
 import AuthenticationRequired from '../components/Video2Promo/AuthenticationRequired';
-import StatusBanner from '../components/Video2Promo/StatusBanner';
-import ProcessingStatus from '../components/Video2Promo/ProcessingStatus';
-import ErrorDisplay from '../components/Video2Promo/ErrorDisplay';
-import UsageStats from '../components/Video2Promo/UsageStats';
+import { StatusBanner, ProcessingStatus, ErrorDisplay, UsageStats } from '../components/Video2Promo/StatusComponents';
 
 // Mock hooks for demonstration - only return what we use
 const useVideo2Promo = () => ({
