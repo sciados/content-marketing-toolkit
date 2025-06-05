@@ -81,100 +81,37 @@ const Dashboard = () => {
     
     const fetchRealStats = async (userId, tier) => {
       try {
-        console.log('🔧 Attempting to fetch real stats for user:', userId);
+        console.log('🔧 Using mock dashboard data - database queries disabled');
         
-        // Calculate limits based on tier first
+        // Calculate limits based on tier
         const limits = getTierLimits(tier);
         
-        // Try to get token usage - handle permission errors gracefully
-        let dailyUsed = 0;
-        try {
-          const { data: tokenData, error: tokenError } = await supabase
-            .from('token_pool')
-            .select('daily_tokens_used, monthly_tokens_used')
-            .eq('user_id', userId)
-            .single();
-          
-          if (tokenError) {
-            console.warn('⚠️ Token pool access denied or not found:', tokenError.message);
-          } else {
-            dailyUsed = tokenData?.daily_tokens_used || 0;
-          }
-        } catch (tokenErr) {
-          console.warn('⚠️ Token pool query failed:', tokenErr);
-        }
-        
-        // Try to get campaign count - handle permission errors gracefully
-        let campaignCount = 0;
-        try {
-          const { count, error: campaignError } = await supabase
-            .from('campaigns')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', userId);
-          
-          if (campaignError) {
-            console.warn('⚠️ Campaigns access denied:', campaignError.message);
-          } else {
-            campaignCount = count || 0;
-          }
-        } catch (campaignErr) {
-          console.warn('⚠️ Campaigns query failed:', campaignErr);
-        }
-        
-        // Try to get email count - handle permission errors gracefully
-        let emailCount = 0;
-        try {
-          const { count, error: emailError } = await supabase
-            .from('campaign_emails')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', userId);
-          
-          if (emailError) {
-            console.warn('⚠️ Campaign emails access denied:', emailError.message);
-          } else {
-            emailCount = count || 0;
-          }
-        } catch (emailErr) {
-          console.warn('⚠️ Campaign emails query failed:', emailErr);
-        }
-        
-        // Try to get video count - handle permission errors gracefully
-        let videoCount = 0;
-        try {
-          const { count, error: videoError } = await supabase
-            .from('campaign_video_sources')
-            .select('*', { count: 'exact', head: true })
-            .eq('user_id', userId);
-          
-          if (videoError) {
-            console.warn('⚠️ Campaign videos access denied:', videoError.message);
-          } else {
-            videoCount = count || 0;
-          }
-        } catch (videoErr) {
-          console.warn('⚠️ Campaign videos query failed:', videoErr);
-        }
-        
-        // Calculate remaining tokens
-        const remainingTokens = Math.max(0, limits.dailyTokens - dailyUsed);
-        
-        const stats = {
-          dailyTokensUsed: dailyUsed,
+        // Use mock data instead of real database queries
+        // This prevents all the 400 errors from Supabase
+        const mockStats = {
+          dailyTokensUsed: 50,  // Mock usage
           dailyTokensLimit: limits.dailyTokens,
-          totalCampaigns: campaignCount,
-          totalEmails: emailCount,
-          totalVideosProcessed: videoCount,
+          totalCampaigns: 0,    // Show zeros until database is ready
+          totalEmails: 0,
+          totalVideosProcessed: 0,
           monthlyVideosLimit: limits.monthlyVideos,
-          remainingTokens: remainingTokens
+          remainingTokens: limits.dailyTokens - 50
         };
         
-        console.log('📊 Dashboard stats (with fallbacks):', stats);
-        setRealStats(stats);
+        console.log('📊 Mock dashboard stats:', mockStats);
+        setRealStats(mockStats);
+        
+        // TODO: Re-enable database queries once RLS policies are set up
+        /* 
+        // Real database queries (disabled for now):
+        const { data: tokenData } = await supabase.from('token_pool')...
+        const { count: campaignCount } = await supabase.from('campaigns')...
+        */
         
       } catch (error) {
-        console.error('❌ Error fetching dashboard stats:', error);
+        console.error('❌ Error with mock stats:', error);
         
-        // Use fallback stats if everything fails
+        // Ultimate fallback
         const limits = getTierLimits(tier);
         setRealStats({
           dailyTokensUsed: 0,
