@@ -1,4 +1,4 @@
-// src/components/Layout/Header.jsx - UPDATED with Campaign Hub
+// src/components/Layout/Header.jsx - UPDATED with Campaign Hub and fixed Content Library route
 import React from 'react';
 import { Link } from 'react-router-dom';
 import useSupabase from '../../hooks/useSupabase';
@@ -186,8 +186,8 @@ const Header = () => {
                 </div>
               </div>
 
-              {/* Content Library */}
-              <Link to="/tools/content-library" className="text-gray-600 hover:text-indigo-600 mx-3 flex items-center">
+              {/* FIXED: Content Library - Updated route to use new campaign system */}
+              <Link to="/content-library" className="text-gray-600 hover:text-indigo-600 mx-3 flex items-center">
                 <span className="mr-1">📚</span>
                 Content Library
               </Link>

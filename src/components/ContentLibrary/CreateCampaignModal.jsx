@@ -1,9 +1,6 @@
 // src/components/ContentLibrary/CreateCampaignModal.jsx - Campaign Creation Modal
 import React, { useState } from 'react';
 
-/**
- * Modal for creating new campaigns
- */
 const CreateCampaignModal = ({ onClose, onSubmit }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -11,272 +8,354 @@ const CreateCampaignModal = ({ onClose, onSubmit }) => {
     industry: 'general',
     tone: 'professional',
     targetAudience: '',
-    color: '#4f46e5',
-    tags: []
+    tags: '',
+    color: '#4f46e5'
   });
-  const [tagInput, setTagInput] = useState('');
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState({});
 
   const industries = [
-    { value: 'general', label: 'General' },
-    { value: 'technology', label: 'Technology' },
-    { value: 'healthcare', label: 'Healthcare' },
-    { value: 'finance', label: 'Finance' },
-    { value: 'education', label: 'Education' },
-    { value: 'retail', label: 'Retail' },
-    { value: 'manufacturing', label: 'Manufacturing' },
-    { value: 'services', label: 'Services' },
-    { value: 'nonprofit', label: 'Non-profit' },
-    { value: 'other', label: 'Other' }
+    { value: 'general', label: '📁 General' },
+    { value: 'technology', label: '💻 Technology' },
+    { value: 'healthcare', label: '🏥 Healthcare' },
+    { value: 'finance', label: '💰 Finance' },
+    { value: 'education', label: '📚 Education' },
+    { value: 'retail', label: '🛍️ Retail' },
+    { value: 'real-estate', label: '🏠 Real Estate' },
+    { value: 'food', label: '🍕 Food & Beverage' },
+    { value: 'fitness', label: '💪 Fitness & Health' },
+    { value: 'travel', label: '✈️ Travel' },
+    { value: 'automotive', label: '🚗 Automotive' },
+    { value: 'beauty', label: '💄 Beauty & Fashion' },
+    { value: 'entertainment', label: '🎬 Entertainment' }
   ];
 
   const tones = [
-    { value: 'professional', label: 'Professional' },
-    { value: 'friendly', label: 'Friendly' },
-    { value: 'casual', label: 'Casual' },
-    { value: 'persuasive', label: 'Persuasive' },
-    { value: 'authoritative', label: 'Authoritative' },
-    { value: 'conversational', label: 'Conversational' }
+    { value: 'professional', label: 'Professional & Authoritative' },
+    { value: 'friendly', label: 'Friendly & Conversational' },
+    { value: 'casual', label: 'Casual & Relaxed' },
+    { value: 'enthusiastic', label: 'Enthusiastic & Energetic' },
+    { value: 'informative', label: 'Informative & Educational' },
+    { value: 'persuasive', label: 'Persuasive & Sales-Focused' },
+    { value: 'empathetic', label: 'Empathetic & Understanding' },
+    { value: 'humorous', label: 'Humorous & Playful' }
   ];
 
   const colors = [
-    '#4f46e5', '#7c3aed', '#db2777', '#dc2626', '#ea580c',
-    '#d97706', '#65a30d', '#059669', '#0891b2', '#0284c7'
+    '#4f46e5', '#7c3aed', '#dc2626', '#ea580c', 
+    '#d97706', '#ca8a04', '#65a30d', '#16a34a',
+    '#059669', '#0891b2', '#0284c7', '#2563eb',
+    '#8b5cf6', '#a855f7', '#c026d3', '#db2777'
   ];
 
-  const handleInputChange = (field, value) => {
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [name]: value
     }));
-  };
-
-  const handleAddTag = (e) => {
-    e.preventDefault();
-    if (tagInput.trim() && !formData.tags.includes(tagInput.trim().toLowerCase())) {
-      setFormData(prev => ({
+    
+    // Clear specific error when user starts typing
+    if (errors[name]) {
+      setErrors(prev => ({
         ...prev,
-        tags: [...prev.tags, tagInput.trim().toLowerCase()]
+        [name]: null
       }));
-      setTagInput('');
     }
   };
 
-  const handleRemoveTag = (tagToRemove) => {
+  const handleColorSelect = (color) => {
     setFormData(prev => ({
       ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
+      color: color
     }));
+  };
+
+  const validateForm = () => {
+    const newErrors = {};
+    
+    if (!formData.name.trim()) {
+      newErrors.name = 'Campaign name is required';
+    } else if (formData.name.length > 100) {
+      newErrors.name = 'Campaign name must be less than 100 characters';
+    }
+
+    if (formData.description && formData.description.length > 500) {
+      newErrors.description = 'Description must be less than 500 characters';
+    }
+
+    if (formData.targetAudience && formData.targetAudience.length > 200) {
+      newErrors.targetAudience = 'Target audience must be less than 200 characters';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.name.trim()) {
-      alert('Campaign name is required');
+    if (!validateForm()) {
       return;
     }
 
     setIsSubmitting(true);
     
     try {
-      await onSubmit(formData);
+      const campaignData = {
+        ...formData,
+        tags: formData.tags ? formData.tags.split(',').map(tag => tag.trim()).filter(Boolean) : []
+      };
+
+      await onSubmit(campaignData);
     } catch (error) {
-      console.error('Error creating campaign:', error);
-      alert('Failed to create campaign. Please try again.');
+      console.error('Failed to create campaign:', error);
+      setErrors({ submit: 'Failed to create campaign. Please try again.' });
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+    <div 
+      className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50"
+      onClick={handleBackdropClick}
+    >
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex justify-between items-center pb-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Create New Campaign</h3>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900">Create New Campaign</h3>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-500 focus:outline-none focus:text-gray-500"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="mt-4 space-y-6">
-          {/* Campaign Name */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Campaign Name *
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => handleInputChange('name', e.target.value)}
-              placeholder="e.g., Product Launch Q1 2025"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              required
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Description
-            </label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => handleInputChange('description', e.target.value)}
-              placeholder="Brief description of this campaign's goals and content..."
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-
-          {/* Industry and Tone Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="px-6 py-4">
+          <div className="space-y-6">
+            {/* Campaign Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Industry
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                Campaign Name *
               </label>
-              <select
-                value={formData.industry}
-                onChange={(e) => handleInputChange('industry', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                {industries.map(industry => (
-                  <option key={industry.value} value={industry.value}>
-                    {industry.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tone
-              </label>
-              <select
-                value={formData.tone}
-                onChange={(e) => handleInputChange('tone', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                {tones.map(tone => (
-                  <option key={tone.value} value={tone.value}>
-                    {tone.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Target Audience */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Target Audience
-            </label>
-            <input
-              type="text"
-              value={formData.targetAudience}
-              onChange={(e) => handleInputChange('targetAudience', e.target.value)}
-              placeholder="e.g., Small business owners, Tech professionals, etc."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-
-          {/* Campaign Color */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Campaign Color
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {colors.map(color => (
-                <button
-                  key={color}
-                  type="button"
-                  onClick={() => handleInputChange('color', color)}
-                  className={`w-8 h-8 rounded-full border-2 ${
-                    formData.color === color ? 'border-gray-900 scale-110' : 'border-gray-300'
-                  } transition-all duration-200`}
-                  style={{ backgroundColor: color }}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Tags */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tags
-            </label>
-            <div className="flex gap-2 mb-2">
               <input
                 type="text"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                placeholder="Add a tag..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                onKeyPress={(e) => e.key === 'Enter' && handleAddTag(e)}
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                placeholder="e.g., Product Launch Q1 2025"
+                className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-1 ${
+                  errors.name 
+                    ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                }`}
+                maxLength={100}
+                required
               />
-              <button
-                type="button"
-                onClick={handleAddTag}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
-              >
-                Add
-              </button>
+              {errors.name && (
+                <p className="mt-1 text-sm text-red-600">{errors.name}</p>
+              )}
             </div>
-            
-            {/* Tag Display */}
-            {formData.tags.length > 0 && (
+
+            {/* Description */}
+            <div>
+              <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+                Description
+              </label>
+              <textarea
+                id="description"
+                name="description"
+                value={formData.description}
+                onChange={handleInputChange}
+                placeholder="Describe the goals and scope of this campaign..."
+                rows={3}
+                className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-1 ${
+                  errors.description 
+                    ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                }`}
+                maxLength={500}
+              />
+              {errors.description && (
+                <p className="mt-1 text-sm text-red-600">{errors.description}</p>
+              )}
+              <p className="mt-1 text-sm text-gray-500">
+                {formData.description.length}/500 characters
+              </p>
+            </div>
+
+            {/* Industry and Tone Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Industry */}
+              <div>
+                <label htmlFor="industry" className="block text-sm font-medium text-gray-700 mb-1">
+                  Industry
+                </label>
+                <select
+                  id="industry"
+                  name="industry"
+                  value={formData.industry}
+                  onChange={handleInputChange}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  {industries.map((industry) => (
+                    <option key={industry.value} value={industry.value}>
+                      {industry.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Tone */}
+              <div>
+                <label htmlFor="tone" className="block text-sm font-medium text-gray-700 mb-1">
+                  Tone
+                </label>
+                <select
+                  id="tone"
+                  name="tone"
+                  value={formData.tone}
+                  onChange={handleInputChange}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  {tones.map((tone) => (
+                    <option key={tone.value} value={tone.value}>
+                      {tone.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Target Audience */}
+            <div>
+              <label htmlFor="targetAudience" className="block text-sm font-medium text-gray-700 mb-1">
+                Target Audience
+              </label>
+              <input
+                type="text"
+                id="targetAudience"
+                name="targetAudience"
+                value={formData.targetAudience}
+                onChange={handleInputChange}
+                placeholder="e.g., Small business owners, Tech professionals"
+                className={`block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-1 ${
+                  errors.targetAudience 
+                    ? 'border-red-300 focus:ring-red-500 focus:border-red-500' 
+                    : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'
+                }`}
+                maxLength={200}
+              />
+              {errors.targetAudience && (
+                <p className="mt-1 text-sm text-red-600">{errors.targetAudience}</p>
+              )}
+            </div>
+
+            {/* Campaign Color */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Campaign Color
+              </label>
               <div className="flex flex-wrap gap-2">
-                {formData.tags.map(tag => (
-                  <span
-                    key={tag}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800"
-                  >
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveTag(tag)}
-                      className="ml-2 text-indigo-600 hover:text-indigo-800"
-                    >
-                      ×
-                    </button>
-                  </span>
+                {colors.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => handleColorSelect(color)}
+                    className={`w-8 h-8 rounded-full border-2 transition-all duration-200 ${
+                      formData.color === color 
+                        ? 'border-gray-900 scale-110 ring-2 ring-offset-2 ring-gray-300' 
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                    style={{ backgroundColor: color }}
+                    title={`Select ${color}`}
+                  />
                 ))}
               </div>
-            )}
+            </div>
+
+            {/* Tags */}
+            <div>
+              <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-1">
+                Tags
+              </label>
+              <input
+                type="text"
+                id="tags"
+                name="tags"
+                value={formData.tags}
+                onChange={handleInputChange}
+                placeholder="Enter tags separated by commas"
+                className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+              />
+              <p className="mt-1 text-sm text-gray-500">
+                Enter tags separated by commas (e.g., launch, product, q1, marketing)
+              </p>
+            </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
+          {/* Submit Error */}
+          {errors.submit && (
+            <div className="mt-6 rounded-md bg-red-50 p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-red-800">{errors.submit}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Form Actions */}
+          <div className="flex items-center justify-end space-x-3 pt-6 mt-6 border-t border-gray-200">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
               disabled={isSubmitting}
+              className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
+            
             <button
               type="submit"
               disabled={isSubmitting || !formData.name.trim()}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center"
             >
               {isSubmitting ? (
                 <>
                   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  Creating...
+                  Creating Campaign...
                 </>
               ) : (
-                'Create Campaign'
+                <>
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                  </svg>
+                  Create Campaign
+                </>
               )}
             </button>
           </div>

@@ -1,4 +1,4 @@
-// src/components/Layout/Sidebar.jsx - UPDATED with Campaign Hub
+// src/components/Layout/Sidebar.jsx - UPDATED with Campaign Hub and fixed Content Library route
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import useSupabase from '../../hooks/useSupabase';
@@ -46,8 +46,9 @@ const Sidebar = () => {
     { name: 'Email Series', path: '/tools/email-series', icon: 'collection', description: 'Manage campaigns' },
   ];
 
+  // FIXED: Content Library route updated to use new campaign system
   const contentItems = [
-    { name: 'Content Library', path: '/tools/content-library', icon: 'library', description: 'Saved transcripts & pages' },
+    { name: 'Content Library', path: '/content-library', icon: 'library', description: 'Campaign content manager' },
     { name: 'Analytics', path: '/analytics', icon: 'chart', description: 'Usage & performance' },
   ];
 
