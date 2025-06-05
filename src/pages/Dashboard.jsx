@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase/supabaseClient';
@@ -31,7 +30,7 @@ const Dashboard = () => {
     remainingTokens: 0
   });
   
-  console.log("Dashboard component rendering - REAL DATA VERSION");
+  console.log("Dashboard component rendering - FIXED VERSION with error handling");
   
   // Get real user data and stats
   useEffect(() => {
@@ -82,54 +81,110 @@ const Dashboard = () => {
     
     const fetchRealStats = async (userId, tier) => {
       try {
-        // Get token usage from token_pool
-        const { data: tokenData, error: tokenError } = await supabase
-          .from('token_pool')
-          .select('daily_tokens_used, monthly_tokens_used')
-          .eq('user_id', userId)  // ← This should be a method call
-          .single();
-          
-        // Get campaign count
-        const { count: campaignCount, error: campaignError } = await supabase
-          .from('campaigns')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userId);
-          
-        // Get total emails across all campaigns
-        const { count: emailCount, error: emailError } = await supabase
-          .from('campaign_emails')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userId);
-          
-        // Get videos processed count
-        const { count: videoCount, error: videoError } = await supabase
-          .from('campaign_video_sources')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userId);
+        console.log('🔧 Attempting to fetch real stats for user:', userId);
         
-        // Calculate limits based on tier
+        // Calculate limits based on tier first
         const limits = getTierLimits(tier);
         
+        // Try to get token usage - handle permission errors gracefully
+        let dailyUsed = 0;
+        try {
+          const { data: tokenData, error: tokenError } = await supabase
+            .from('token_pool')
+            .select('daily_tokens_used, monthly_tokens_used')
+            .eq('user_id', userId)
+            .single();
+          
+          if (tokenError) {
+            console.warn('⚠️ Token pool access denied or not found:', tokenError.message);
+          } else {
+            dailyUsed = tokenData?.daily_tokens_used || 0;
+          }
+        } catch (tokenErr) {
+          console.warn('⚠️ Token pool query failed:', tokenErr);
+        }
+        
+        // Try to get campaign count - handle permission errors gracefully
+        let campaignCount = 0;
+        try {
+          const { count, error: campaignError } = await supabase
+            .from('campaigns')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId);
+          
+          if (campaignError) {
+            console.warn('⚠️ Campaigns access denied:', campaignError.message);
+          } else {
+            campaignCount = count || 0;
+          }
+        } catch (campaignErr) {
+          console.warn('⚠️ Campaigns query failed:', campaignErr);
+        }
+        
+        // Try to get email count - handle permission errors gracefully
+        let emailCount = 0;
+        try {
+          const { count, error: emailError } = await supabase
+            .from('campaign_emails')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId);
+          
+          if (emailError) {
+            console.warn('⚠️ Campaign emails access denied:', emailError.message);
+          } else {
+            emailCount = count || 0;
+          }
+        } catch (emailErr) {
+          console.warn('⚠️ Campaign emails query failed:', emailErr);
+        }
+        
+        // Try to get video count - handle permission errors gracefully
+        let videoCount = 0;
+        try {
+          const { count, error: videoError } = await supabase
+            .from('campaign_video_sources')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId);
+          
+          if (videoError) {
+            console.warn('⚠️ Campaign videos access denied:', videoError.message);
+          } else {
+            videoCount = count || 0;
+          }
+        } catch (videoErr) {
+          console.warn('⚠️ Campaign videos query failed:', videoErr);
+        }
+        
         // Calculate remaining tokens
-        const dailyUsed = tokenData?.daily_tokens_used || 0;
         const remainingTokens = Math.max(0, limits.dailyTokens - dailyUsed);
         
         const stats = {
           dailyTokensUsed: dailyUsed,
           dailyTokensLimit: limits.dailyTokens,
-          totalCampaigns: campaignCount || 0,
-          totalEmails: emailCount || 0,
-          totalVideosProcessed: videoCount || 0,
+          totalCampaigns: campaignCount,
+          totalEmails: emailCount,
+          totalVideosProcessed: videoCount,
           monthlyVideosLimit: limits.monthlyVideos,
           remainingTokens: remainingTokens
         };
         
-        console.log('Real stats fetched:', stats);
+        console.log('📊 Dashboard stats (with fallbacks):', stats);
         setRealStats(stats);
         
       } catch (error) {
-        console.error('Error fetching real stats:', error);
-        // Keep default zeros if error
+        console.error('❌ Error fetching dashboard stats:', error);
+        
+        // Use fallback stats if everything fails
+        const limits = getTierLimits(tier);
+        setRealStats({
+          dailyTokensUsed: 0,
+          dailyTokensLimit: limits.dailyTokens,
+          totalCampaigns: 0,
+          totalEmails: 0,
+          totalVideosProcessed: 0,
+          monthlyVideosLimit: limits.monthlyVideos,
+          remainingTokens: limits.dailyTokens
+        });
       }
     };
     
@@ -180,7 +235,7 @@ const Dashboard = () => {
   const isAdmin = isSuperAdmin(currentTier);
   const tierDisplay = getTierDisplayName(currentTier);
   
-  console.log("Real dashboard data:", { 
+  console.log("Dashboard data:", { 
     currentTier, 
     isAdmin, 
     tierDisplay, 
