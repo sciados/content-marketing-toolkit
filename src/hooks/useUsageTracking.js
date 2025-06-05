@@ -19,6 +19,16 @@ export const useUsageTracking = () => {
     return Promise.resolve();
   }, []);
 
+  const checkUsageLimit = useCallback(async (feature = 'general') => {
+  console.log(`🔧 Mock usage limit check for: ${feature}`);
+  return Promise.resolve({ 
+    allowed: true, 
+    message: 'Usage tracking disabled - unlimited access',
+    current_usage: 0,
+    limit_value: 999999
+  });
+}, []);
+
   const trackAITokenUsage = useCallback(async (tokens, feature = 'general') => {
     console.log(`🔧 Mock tracking: ${tokens} tokens for ${feature}`);
     return Promise.resolve({ success: true, message: 'Tracking disabled' });
@@ -94,6 +104,7 @@ export const useUsageTracking = () => {
     trackEmailSaved,
     trackUsage,
     checkCanUseTokens,
+    checkUsageLimit,
     
     // Utilities
     canPerformAction,
