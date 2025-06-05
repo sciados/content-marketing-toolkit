@@ -8,7 +8,7 @@ import { useUsageTracking } from '../hooks/useUsageTracking';
 import useSupabase from '../hooks/useSupabase';
 
 // Component imports
-import ImprovedVideoUrlForm from '../components/Video2Promo/ImprovedVideoUrlForm';
+import VideoUrlForm from '../components/Video2Promo/VideoUrlForm';
 import ImprovedProgress from '../components/Video2Promo/ImprovedProgress';
 import AuthenticationRequired from '../components/Video2Promo/AuthenticationRequired';
 import { StatusBanner, ProcessingStatus, ErrorDisplay, UsageStats } from '../components/Video2Promo/StatusComponents';
@@ -138,7 +138,7 @@ export default function Video2Promo() {
             {/* Step Content */}
             <div className="space-y-8">
               {effectiveStep === 'input' && (
-                <ImprovedVideoUrlForm
+                <VideoUrlForm
                   onSubmit={handleVideoSubmit}  // ← This now calls the REAL function
                   loading={loading}
                   disabled={false}
