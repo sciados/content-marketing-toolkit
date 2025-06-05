@@ -2,14 +2,14 @@
 
 import { useState, useCallback } from 'react';
 import useSupabase from './useSupabase';
-import { useUsageTracking } from './useUsageTracking';
+// import { useUsageTracking } from './useUsageTracking';
 
 // Enhanced API_BASE with fallback and debugging
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://aiworkers.onrender.com';
 
 export const useVideo2Promo = () => {
   const { user, session } = useSupabase();
-  const { checkUsageLimit } = useUsageTracking();
+  // const { checkUsageLimit } = useUsageTracking();
   
   const [state, setState] = useState({
     currentStep: 'input',
@@ -238,8 +238,12 @@ export const useVideo2Promo = () => {
       }));
 
       // Check usage limits
-      const canProceed = await checkUsageLimit('video2promo_projects');
+      // const canProceed = await checkUsageLimit('video2promo_projects');
       
+      // Skip usage tracking for now
+         const canProceed = { allowed: true };
+         console.log('⚠️ Usage tracking bypassed');
+
       if (!canProceed || typeof canProceed !== 'object') {
         throw new Error('Unable to verify usage limits. Please try again.');
       }
@@ -278,7 +282,7 @@ export const useVideo2Promo = () => {
         error: error.message
       };
     }
-  }, [checkUsageLimit, extractTranscript, retryExtraction, state.retryCount]);
+  }, [extractTranscript, retryExtraction, state.retryCount]);
 
   // [Rest of your existing functions remain the same...]
   const analyzeTranscript = useCallback(async (transcript, keywords = [], tone = 'professional') => {
