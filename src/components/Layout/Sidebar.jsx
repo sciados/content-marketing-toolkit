@@ -1,4 +1,4 @@
-// src/components/Layout/Sidebar.jsx - UPDATED with Campaign Hub and fixed Content Library route
+// src/components/Layout/Sidebar.jsx - FIXED: Added error handling for data dependencies
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import useSupabase from '../../hooks/useSupabase';
@@ -6,35 +6,49 @@ import {
   isSuperAdmin, 
   getTierDisplayName, 
   getTierColor,
-  formatUsagePercentage 
+  // formatUsagePercentage 
 } from '../../utils/tierUtils';
 import { useUsageTracking } from '../../hooks/useUsageTracking';
 
 const Sidebar = () => {
   const { user } = useSupabase();
-  const { usage, limits } = useUsageTracking();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // FIXED: Add error handling for usage tracking
+  let usage = null;
+  let limits = null;
+  
+  try {
+    const usageData = useUsageTracking();
+    usage = usageData?.usage;
+    limits = usageData?.limits;
+  } catch (error) {
+    console.warn('Usage tracking hook error:', error);
+    // Fallback to safe defaults
+    usage = { videos_today: 0, monthly_tokens_used: 0 };
+    limits = { monthly_tokens: 10000 };
+  }
 
-  // Use tierUtils instead of hardcoded ID check
-  const isAdmin = isSuperAdmin(user?.subscription_tier);
-  const tierDisplay = getTierDisplayName(user?.subscription_tier);
-  const tierColor = getTierColor(user?.subscription_tier);
+  // Use tierUtils instead of hardcoded ID check with safe fallbacks
+  const isAdmin = user ? isSuperAdmin(user?.subscription_tier) : false;
+  const tierDisplay = user ? getTierDisplayName(user?.subscription_tier) : 'Free';
+  const tierColor = user ? getTierColor(user?.subscription_tier) : 'gray';
 
-  // NEW: Campaign navigation items
+  // FIXED: Campaign navigation items - pointing to working routes
   const campaignItems = [
     { 
-      name: 'Campaign Hub', 
-      path: '/campaigns/create', 
-      icon: 'rocket', 
-      description: 'Create multi-format campaigns',
+      name: 'Campaign Manager', 
+      path: '/content-library', 
+      icon: 'library', 
+      description: 'Organize content by campaigns',
       isNew: true,
-      feature: 'Create campaigns with unlimited input sources'
+      feature: 'New campaign-based organization'
     },
     { 
-      name: 'My Campaigns', 
+      name: 'All Campaigns', 
       path: '/campaigns', 
       icon: 'folder', 
-      description: 'View and manage campaigns',
+      description: 'View all campaign projects',
       feature: 'Track campaign performance'
     },
   ];
@@ -48,7 +62,6 @@ const Sidebar = () => {
 
   // FIXED: Content Library route updated to use new campaign system
   const contentItems = [
-    { name: 'Content Library', path: '/content-library', icon: 'library', description: 'Campaign content manager' },
     { name: 'Analytics', path: '/analytics', icon: 'chart', description: 'Usage & performance' },
   ];
 
@@ -65,7 +78,7 @@ const Sidebar = () => {
     { name: 'Subscription', path: '/subscription', icon: 'creditCard', description: 'Billing & plans' },
   ];
 
-  // SuperAdmin items using tierUtils
+  // SuperAdmin items using tierUtils with safe fallback
   const adminItems = isAdmin 
     ? [
         { name: 'Admin Panel', path: '/admin', icon: 'shield', description: 'Super Admin Dashboard', isAdmin: true },
@@ -197,14 +210,14 @@ const Sidebar = () => {
             </div>
           )}
 
-          {/* NEW: Campaign Section */}
+          {/* FIXED: Campaign Section - Updated navigation */}
           <NavSection title="Content Campaigns" items={campaignItems} variant="campaign" />
 
           {/* Core Tools Section */}
           <NavSection title="Core Tools" items={coreToolsItems} />
 
           {/* Content & Analytics Section */}
-          <NavSection title="Content & Analytics" items={contentItems} />
+          <NavSection title="Analytics" items={contentItems} />
 
           {/* Account Section */}
           <NavSection title="Account" items={accountItems} />
@@ -246,30 +259,30 @@ const Sidebar = () => {
             </nav>
           </div>
 
-          {/* NEW: Campaign Hub Feature Card */}
+          {/* FIXED: Campaign Hub Feature Card - Updated to point to working Campaign Manager */}
           <div className="mt-8 mx-2 p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg text-white">
             <div className="flex items-center mb-2">
               <span className="text-lg mr-2">🚀</span>
-              <h4 className="font-bold">Campaign Hub</h4>
+              <h4 className="font-bold">Campaign Manager</h4>
               <span className="ml-2 text-xs bg-white bg-opacity-20 px-2 py-0.5 rounded-full">
                 New
               </span>
             </div>
             <p className="text-sm opacity-90 mb-3">
-              Create comprehensive content campaigns from multiple sources.
+              Organize your content by marketing campaigns for better project management.
             </p>
             <div className="text-xs opacity-75 mb-3 space-y-1">
-              <div>✓ Mix library content + new sources</div>
-              <div>✓ Multiple input types supported</div>
-              <div>✓ Generate 25+ content pieces</div>
-              <div>✓ Category-based organization</div>
+              <div>✓ Campaign-based organization</div>
+              <div>✓ Source tracking & attribution</div>
+              <div>✓ Content performance analytics</div>
+              <div>✓ Project management workflow</div>
             </div>
             <NavLink 
-              to="/campaigns/create"
+              to="/content-library"
               className="block w-full bg-white text-blue-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors text-center"
               onClick={() => setIsMobileMenuOpen(false)}
             >
-              Create Campaign
+              Open Campaign Manager
             </NavLink>
           </div>
 
@@ -324,7 +337,7 @@ const Sidebar = () => {
             </div>
           )}
 
-          {/* Enhanced Quick Stats Card with SuperAdmin support */}
+          {/* FIXED: Enhanced Quick Stats Card with error handling */}
           {user && (
             <div className="mt-4 mx-2 p-3 bg-gray-50 rounded-lg">
               <div className="flex items-center justify-between mb-2">
@@ -353,21 +366,13 @@ const Sidebar = () => {
                   <span className="font-medium">
                     {isAdmin 
                       ? 'Unlimited' 
-                      : formatUsagePercentage(
-                          usage?.monthly_tokens_used || 0,
-                          limits?.monthly_tokens || 10000,
-                          user?.subscription_tier
-                        )
+                      : `${usage?.monthly_tokens_used || 0}/${limits?.monthly_tokens || 10000}`
                     }
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Library Items:</span>
-                  <span className="font-medium">-</span>
-                </div>
-                <div className="flex justify-between">
                   <span>Campaigns:</span>
-                  <span className="font-medium text-blue-600">New!</span>
+                  <span className="font-medium text-blue-600">Campaign Manager</span>
                 </div>
               </div>
               {isAdmin && (
@@ -417,8 +422,7 @@ const IconComponent = ({ name, className }) => {
       )}
       {name === 'users' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />}
       {name === 'shield' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />}
-      {/* NEW: Campaign icons */}
-      {name === 'rocket' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2-2V7a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 002 2h2a2 2 0 012-2V7a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 00-2 2h-2a2 2 0 00-2 2v6a2 2 0 01-2 2H9z" />}
+      {/* Campaign icons */}
       {name === 'folder' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />}
     </svg>
   );
