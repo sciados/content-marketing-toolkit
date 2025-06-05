@@ -86,7 +86,7 @@ const Dashboard = () => {
         const { data: tokenData, error: tokenError } = await supabase
           .from('token_pool')
           .select('daily_tokens_used, monthly_tokens_used')
-          .eq('user_id', userId)
+          .eq('user_id', userId)  // ← This should be a method call
           .single();
           
         // Get campaign count
