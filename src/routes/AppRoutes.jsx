@@ -1,4 +1,4 @@
-// src/routes/AppRoutes.jsx - UPDATED with Universal Creation Hub
+// src/routes/AppRoutes.jsx - UPDATED with proper Content Library routing
 import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { preloadEmailComponents } from '../utils/emailPreloaderUtils';
@@ -70,7 +70,7 @@ const FixSuperAdmin = lazy(() => {
   });
 });
 
-// NEW: Super Admin Panel
+// Super Admin Panel
 const SuperAdminPanel = lazy(() => {
   const tracker = trackLazyLoading('SuperAdminPanel');
   return import('../components/SuperAdminPanel').then(module => {
@@ -137,25 +137,16 @@ const SalesPageEmailGenerator = lazy(() => {
   });
 });
 
-// Content Library
-const CampaignContentLibrary = lazy(() => {
-  const tracker = trackLazyLoading('CampaignContentLibrary');
-  return import('../components/ContentLibrary/CampaignContentLibrary').then(module => {
+// UPDATED: Content Library now uses Campaign System
+const ContentLibrary = lazy(() => {
+  const tracker = trackLazyLoading('ContentLibrary');
+  return import('../pages/ContentLibrary').then(module => {
     if (tracker) tracker();
     return module;
   });
 });
 
-// NEW: Universal Creation Hub
-const UniversalCreationHub = lazy(() => {
-  const tracker = trackLazyLoading('UniversalCreationHub');
-  return import('../components/UniversalCreationHub').then(module => {
-    if (tracker) tracker();
-    return module;
-  });
-});
-
-// NEW: Campaign Management Pages
+// Campaign Management Pages
 const CampaignList = lazy(() => {
   const tracker = trackLazyLoading('CampaignList');
   return import('../pages/CampaignList').catch(() => {
@@ -231,7 +222,7 @@ const Analytics = lazy(() => {
   });
 });
 
-// Future tool pages - with better fallbacks
+// Future tool pages
 const AIWritingAssistant = lazy(() => {
   const tracker = trackLazyLoading('AIWritingAssistant');
   return import('../pages/Tools/AIWritingAssistant').then(module => {
@@ -299,7 +290,7 @@ const AdminAds = lazy(() => {
   });
 });
 
-// Enhanced loading component with preloading hints
+// Enhanced loading component
 const PageLoader = ({ pageName }) => {
   useRenderTime('PageLoader', isDevelopment);
   
@@ -323,7 +314,7 @@ const PageLoader = ({ pageName }) => {
   );
 };
 
-// Enhanced route wrapper with preloading and error boundary
+// Enhanced route wrapper
 const LazyRoute = ({ 
   children, 
   pageName, 
@@ -385,7 +376,7 @@ const AppRoutes = () => {
           />
         </Route>
         
-        {/* Admin Routes - Using AdminLayout */}
+        {/* Admin Routes */}
         <Route element={<AdminLayout />}>
           <Route 
             path="/admin" 
@@ -449,17 +440,17 @@ const AppRoutes = () => {
             } 
           />
           
-          {/* Content Library Route */}
+          {/* UPDATED: Content Library Route - Now uses Campaign System */}
           <Route 
-            path="/tools/campaign-content-library" 
+            path="/content-library" 
             element={
-              <LazyRoute pageName="Campaign Content Library">
-                <CampaignContentLibrary />
+              <LazyRoute pageName="Content Library">
+                <ContentLibrary />
               </LazyRoute>
             } 
           />
           
-          {/* NEW: Campaign Routes */}
+          {/* Campaign Routes */}
           <Route 
             path="/campaigns" 
             element={
@@ -473,7 +464,11 @@ const AppRoutes = () => {
             path="/campaigns/create" 
             element={
               <LazyRoute pageName="Create Campaign">
-                <UniversalCreationHub />
+                <div className="max-w-4xl mx-auto p-8 text-center">
+                  <div className="text-6xl mb-4">🚀</div>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-4">Create Campaign</h2>
+                  <p className="text-lg text-gray-600">Campaign creation coming soon!</p>
+                </div>
               </LazyRoute>
             } 
           />
@@ -483,15 +478,6 @@ const AppRoutes = () => {
             element={
               <LazyRoute pageName="Campaign Details">
                 <CampaignDetail />
-              </LazyRoute>
-            } 
-          />
-          
-          <Route 
-            path="/campaigns/:campaignId/edit" 
-            element={
-              <LazyRoute pageName="Edit Campaign">
-                <UniversalCreationHub />
               </LazyRoute>
             } 
           />
