@@ -1,4 +1,4 @@
-// src/components/Layout/Sidebar.jsx - UPDATED with SuperAdmin tier support
+// src/components/Layout/Sidebar.jsx - UPDATED with Campaign Hub
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import useSupabase from '../../hooks/useSupabase';
@@ -20,6 +20,25 @@ const Sidebar = () => {
   const tierDisplay = getTierDisplayName(user?.subscription_tier);
   const tierColor = getTierColor(user?.subscription_tier);
 
+  // NEW: Campaign navigation items
+  const campaignItems = [
+    { 
+      name: 'Campaign Hub', 
+      path: '/campaigns/create', 
+      icon: 'rocket', 
+      description: 'Create multi-format campaigns',
+      isNew: true,
+      feature: 'Create campaigns with unlimited input sources'
+    },
+    { 
+      name: 'My Campaigns', 
+      path: '/campaigns', 
+      icon: 'folder', 
+      description: 'View and manage campaigns',
+      feature: 'Track campaign performance'
+    },
+  ];
+
   // Enhanced navigation items with Content Library and better organization
   const coreToolsItems = [
     { name: 'Video2Promo', path: '/tools/video2promo', icon: 'video', description: 'YouTube to campaigns' },
@@ -28,7 +47,7 @@ const Sidebar = () => {
   ];
 
   const contentItems = [
-    { name: 'Content Library', path: '/tools/content-library', icon: 'library', description: 'Saved transcripts & pages', isNew: true },
+    { name: 'Content Library', path: '/tools/content-library', icon: 'library', description: 'Saved transcripts & pages' },
     { name: 'Analytics', path: '/analytics', icon: 'chart', description: 'Usage & performance' },
   ];
 
@@ -62,9 +81,12 @@ const Sidebar = () => {
   const NavSection = ({ title, items, variant = 'default' }) => (
     <div className="mb-6">
       <h3 className={`text-xs font-semibold uppercase tracking-wider mb-3 px-3 ${
-        variant === 'admin' ? 'text-red-400' : 'text-gray-400'
+        variant === 'admin' ? 'text-red-400' : 
+        variant === 'campaign' ? 'text-blue-400' :
+        'text-gray-400'
       }`}>
         {variant === 'admin' && '🛡️ '}
+        {variant === 'campaign' && '🚀 '}
         {title}
       </h3>
       <nav className="space-y-1">
@@ -77,9 +99,13 @@ const Sidebar = () => {
                 isActive 
                   ? variant === 'admin' 
                     ? 'bg-red-50 text-red-600 border-r-2 border-red-600' 
+                    : variant === 'campaign'
+                    ? 'bg-blue-50 text-blue-600 border-r-2 border-blue-600'
                     : 'bg-brand-50 text-brand-600 border-r-2 border-brand-600'
                   : variant === 'admin'
                   ? 'text-red-600 hover:bg-red-50 hover:text-red-700'
+                  : variant === 'campaign'
+                  ? 'text-blue-600 hover:bg-blue-50 hover:text-blue-700'
                   : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
               } ${
                 item.disabled ? 'opacity-50 cursor-not-allowed' : ''
@@ -116,7 +142,9 @@ const Sidebar = () => {
                 </div>
                 {item.description && (
                   <div className={`text-xs mt-0.5 truncate ${
-                    variant === 'admin' ? 'text-red-500' : 'text-gray-500'
+                    variant === 'admin' ? 'text-red-500' : 
+                    variant === 'campaign' ? 'text-blue-500' :
+                    'text-gray-500'
                   }`}>
                     {item.description}
                   </div>
@@ -168,6 +196,9 @@ const Sidebar = () => {
             </div>
           )}
 
+          {/* NEW: Campaign Section */}
+          <NavSection title="Content Campaigns" items={campaignItems} variant="campaign" />
+
           {/* Core Tools Section */}
           <NavSection title="Core Tools" items={coreToolsItems} />
 
@@ -214,9 +245,36 @@ const Sidebar = () => {
             </nav>
           </div>
 
+          {/* NEW: Campaign Hub Feature Card */}
+          <div className="mt-8 mx-2 p-4 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg text-white">
+            <div className="flex items-center mb-2">
+              <span className="text-lg mr-2">🚀</span>
+              <h4 className="font-bold">Campaign Hub</h4>
+              <span className="ml-2 text-xs bg-white bg-opacity-20 px-2 py-0.5 rounded-full">
+                New
+              </span>
+            </div>
+            <p className="text-sm opacity-90 mb-3">
+              Create comprehensive content campaigns from multiple sources.
+            </p>
+            <div className="text-xs opacity-75 mb-3 space-y-1">
+              <div>✓ Mix library content + new sources</div>
+              <div>✓ Multiple input types supported</div>
+              <div>✓ Generate 25+ content pieces</div>
+              <div>✓ Category-based organization</div>
+            </div>
+            <NavLink 
+              to="/campaigns/create"
+              className="block w-full bg-white text-blue-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors text-center"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              Create Campaign
+            </NavLink>
+          </div>
+
           {/* Enhanced Upgrade Card or Admin Status Card */}
           {isAdmin ? (
-            <div className="mt-8 mx-2 p-4 bg-gradient-to-br from-red-500 to-red-600 rounded-lg text-white">
+            <div className="mt-4 mx-2 p-4 bg-gradient-to-br from-red-500 to-red-600 rounded-lg text-white">
               <div className="flex items-center mb-2">
                 <span className="text-lg mr-2">🛡️</span>
                 <h4 className="font-bold">Super Admin</h4>
@@ -239,7 +297,7 @@ const Sidebar = () => {
               </NavLink>
             </div>
           ) : (
-            <div className="mt-8 mx-2 p-4 bg-gradient-to-br from-brand-500 to-accent-600 rounded-lg text-white">
+            <div className="mt-4 mx-2 p-4 bg-gradient-to-br from-brand-500 to-accent-600 rounded-lg text-white">
               <div className="flex items-center mb-2">
                 <h4 className="font-semibold">Upgrade to Pro</h4>
                 <span className="ml-2 text-xs bg-white bg-opacity-20 px-2 py-0.5 rounded-full">
@@ -306,6 +364,10 @@ const Sidebar = () => {
                   <span>Library Items:</span>
                   <span className="font-medium">-</span>
                 </div>
+                <div className="flex justify-between">
+                  <span>Campaigns:</span>
+                  <span className="font-medium text-blue-600">New!</span>
+                </div>
               </div>
               {isAdmin && (
                 <div className="mt-2 pt-2 border-t border-gray-200">
@@ -330,7 +392,7 @@ const Sidebar = () => {
   );
 };
 
-// Enhanced Icon component with admin shield icon
+// Enhanced Icon component with campaign icons
 const IconComponent = ({ name, className }) => {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -354,6 +416,9 @@ const IconComponent = ({ name, className }) => {
       )}
       {name === 'users' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />}
       {name === 'shield' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />}
+      {/* NEW: Campaign icons */}
+      {name === 'rocket' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2-2V7a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 002 2h2a2 2 0 012-2V7a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 00-2 2h-2a2 2 0 00-2 2v6a2 2 0 01-2 2H9z" />}
+      {name === 'folder' && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />}
     </svg>
   );
 };

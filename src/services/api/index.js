@@ -91,7 +91,7 @@ export const contentLibraryApi = {
   // Health check
   getHealth: () => apiClient.safeApiCall(apiClient.get, '/api/content-library/health', {}, { auth: false }),
 
-  // Get content items
+  // Content Library Operations (existing)
   getItems: (params = {}) => apiClient.safeApiCall(apiClient.get, '/api/content-library/items', {
     type: params.type || 'all',
     search: params.search || '',
@@ -102,7 +102,6 @@ export const contentLibraryApi = {
     offset: params.offset || '0'
   }),
 
-  // Create content item
   createItem: (data) => apiClient.safeApiCall(apiClient.post, '/api/content-library/items', {
     content_type: data.content_type,
     title: data.title,
@@ -113,10 +112,8 @@ export const contentLibraryApi = {
     metadata: data.metadata || {}
   }),
 
-  // Get specific item
   getItem: (id) => apiClient.safeApiCall(apiClient.get, `/api/content-library/item/${id}`),
 
-  // Update item
   updateItem: (id, data) => apiClient.safeApiCall(apiClient.put, `/api/content-library/item/${id}`, {
     title: data.title,
     content: data.content,
@@ -125,31 +122,70 @@ export const contentLibraryApi = {
     metadata: data.metadata
   }),
 
-  // Delete item
   deleteItem: (id) => apiClient.safeApiCall(apiClient.delete, `/api/content-library/item/${id}`),
 
-  // Toggle favorite
   toggleFavorite: (id, favorited) => apiClient.safeApiCall(apiClient.post, `/api/content-library/item/${id}/favorite`, {
     favorited: favorited
   }),
 
-  // Track usage
   trackUsage: (id, contentType) => apiClient.safeApiCall(apiClient.post, `/api/content-library/item/${id}/use`, {
     content_type: contentType
   }),
 
-  // Get library stats
   getStats: () => apiClient.safeApiCall(apiClient.get, '/api/content-library/stats'),
 
-  // Search items
   search: (params = {}) => apiClient.safeApiCall(apiClient.get, '/api/content-library/search', {
     query: params.query || '',
     type: params.type || 'all',
     limit: params.limit || '20'
   }),
 
-  // Get content types
-  getTypes: () => apiClient.safeApiCall(apiClient.get, '/api/content-library/types')
+  getTypes: () => apiClient.safeApiCall(apiClient.get, '/api/content-library/types'),
+
+  // NEW: Campaign Operations
+  
+  // Create a new campaign
+  createCampaign: (data) => apiClient.safeApiCall(apiClient.post, '/api/content-library/campaigns', {
+    name: data.name,
+    category: data.category,
+    keywords: data.keywords || [],
+    description: data.description || '',
+    input_sources: data.input_sources || []
+  }),
+
+  // Get user's campaigns
+  getCampaigns: (params = {}) => apiClient.safeApiCall(apiClient.get, '/api/content-library/campaigns', {
+    category: params.category || '',
+    status: params.status || '',
+    search: params.search || '',
+    limit: params.limit || '20',
+    offset: params.offset || '0'
+  }),
+
+  // Get specific campaign
+  getCampaign: (id) => apiClient.safeApiCall(apiClient.get, `/api/content-library/campaigns/${id}`),
+
+  // Update campaign
+  updateCampaign: (id, data) => apiClient.safeApiCall(apiClient.put, `/api/content-library/campaigns/${id}`, data),
+
+  // Delete campaign
+  deleteCampaign: (id) => apiClient.safeApiCall(apiClient.delete, `/api/content-library/campaigns/${id}`),
+
+  // Check for existing content matches
+  checkContentMatches: (data) => apiClient.safeApiCall(apiClient.post, '/api/content-library/check-matches', {
+    type: data.type,
+    url: data.url,
+    data: data.data || {},
+    category: data.category
+  }),
+
+  // Browse content by category
+  browseByCategory: (params = {}) => apiClient.safeApiCall(apiClient.get, '/api/content-library/browse', {
+    category: params.category || '',
+    type: params.type || 'all',
+    search: params.search || '',
+    limit: params.limit || '20'
+  })
 };
 
 /**

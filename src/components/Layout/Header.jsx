@@ -1,4 +1,4 @@
-// src/components/Layout/Header.jsx - UPDATED with SuperAdmin tier support
+// src/components/Layout/Header.jsx - UPDATED with Campaign Hub
 import React from 'react';
 import { Link } from 'react-router-dom';
 import useSupabase from '../../hooks/useSupabase';
@@ -64,6 +64,66 @@ const Header = () => {
                 Dashboard
               </Link>
               
+              {/* NEW: Campaign Hub Link */}
+              <div className="relative group mx-3">
+                <button className="text-gray-600 hover:text-indigo-600 flex items-center">
+                  Campaigns
+                  <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    New
+                  </span>
+                  <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <div className="absolute top-full left-0 mt-1 w-72 bg-white rounded-lg shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  <div className="p-2">
+                    <Link 
+                      to="/campaigns/create" 
+                      className="flex items-center px-3 py-3 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-md"
+                    >
+                      <span className="mr-3 text-lg">🚀</span>
+                      <div>
+                        <div className="font-medium flex items-center">
+                          Campaign Hub
+                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            New
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500">Create multi-format content campaigns</div>
+                      </div>
+                    </Link>
+                    <Link 
+                      to="/campaigns" 
+                      className="flex items-center px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-md"
+                    >
+                      <span className="mr-3">📋</span>
+                      <div>
+                        <div className="font-medium">My Campaigns</div>
+                        <div className="text-xs text-gray-500">View and manage campaigns</div>
+                      </div>
+                    </Link>
+                    <div className="border-t border-gray-100 my-2"></div>
+                    <div className="px-3 py-2">
+                      <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Features</div>
+                      <div className="space-y-1">
+                        <div className="flex items-center text-sm text-gray-600">
+                          <span className="mr-2">✓</span>
+                          <span>Mix library content + new sources</span>
+                        </div>
+                        <div className="flex items-center text-sm text-gray-600">
+                          <span className="mr-2">✓</span>
+                          <span>Generate 25+ content pieces</span>
+                        </div>
+                        <div className="flex items-center text-sm text-gray-600">
+                          <span className="mr-2">✓</span>
+                          <span>Multi-format output (coming soon)</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Tools Dropdown */}
               <div className="relative group mx-3">
                 <button className="text-gray-600 hover:text-indigo-600 flex items-center">

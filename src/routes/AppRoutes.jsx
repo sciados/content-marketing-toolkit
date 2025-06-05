@@ -1,4 +1,4 @@
-// src/routes/AppRoutes.jsx - UPDATED with ErrorBoundary wrapper
+// src/routes/AppRoutes.jsx - UPDATED with Universal Creation Hub
 import React, { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { preloadEmailComponents } from '../utils/emailPreloaderUtils';
@@ -137,10 +137,62 @@ const SalesPageEmailGenerator = lazy(() => {
   });
 });
 
-// NEW: Content Library
+// Content Library
 const ContentLibrary = lazy(() => {
   const tracker = trackLazyLoading('ContentLibrary');
   return import('../pages/ContentLibrary').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
+// NEW: Universal Creation Hub
+const UniversalCreationHub = lazy(() => {
+  const tracker = trackLazyLoading('UniversalCreationHub');
+  return import('../components/UniversalCreationHub').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
+// NEW: Campaign Management Pages
+const CampaignList = lazy(() => {
+  const tracker = trackLazyLoading('CampaignList');
+  return import('../pages/CampaignList').catch(() => {
+    return { 
+      default: () => (
+        <div className="max-w-4xl mx-auto p-8 text-center">
+          <div className="text-6xl mb-4">📋</div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Campaign Manager</h2>
+          <p className="text-lg text-gray-600 mb-6">Manage your content campaigns</p>
+          <a 
+            href="/campaigns/create" 
+            className="inline-flex items-center px-6 py-3 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+          >
+            Create New Campaign
+          </a>
+        </div>
+      )
+    };
+  }).then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
+const CampaignDetail = lazy(() => {
+  const tracker = trackLazyLoading('CampaignDetail');
+  return import('../pages/CampaignDetail').catch(() => {
+    return { 
+      default: () => (
+        <div className="max-w-4xl mx-auto p-8 text-center">
+          <div className="text-6xl mb-4">📊</div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Campaign Details</h2>
+          <p className="text-lg text-gray-600">View campaign performance and content</p>
+        </div>
+      )
+    };
+  }).then(module => {
     if (tracker) tracker();
     return module;
   });
@@ -397,12 +449,49 @@ const AppRoutes = () => {
             } 
           />
           
-          {/* NEW: Content Library Route */}
+          {/* Content Library Route */}
           <Route 
             path="/tools/content-library" 
             element={
               <LazyRoute pageName="Content Library">
                 <ContentLibrary />
+              </LazyRoute>
+            } 
+          />
+          
+          {/* NEW: Campaign Routes */}
+          <Route 
+            path="/campaigns" 
+            element={
+              <LazyRoute pageName="Campaign List">
+                <CampaignList />
+              </LazyRoute>
+            } 
+          />
+          
+          <Route 
+            path="/campaigns/create" 
+            element={
+              <LazyRoute pageName="Create Campaign">
+                <UniversalCreationHub />
+              </LazyRoute>
+            } 
+          />
+          
+          <Route 
+            path="/campaigns/:campaignId" 
+            element={
+              <LazyRoute pageName="Campaign Details">
+                <CampaignDetail />
+              </LazyRoute>
+            } 
+          />
+          
+          <Route 
+            path="/campaigns/:campaignId/edit" 
+            element={
+              <LazyRoute pageName="Edit Campaign">
+                <UniversalCreationHub />
               </LazyRoute>
             } 
           />

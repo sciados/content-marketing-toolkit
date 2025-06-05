@@ -58,8 +58,8 @@ content-marketing-toolkit-api/
 ## 🌐 API Endpoints Map
 
 ### **Base URL Structure**
-- **Production**: `https://your-api-domain.com`
-- **Development**: `http://localhost:5000`
+- **Production**: `https://content-marketing-toolkit-8w8d.vercel.app`
+- **Development**: `http://localhost:5137`
 
 ### **🏥 Health & System Endpoints**
 **Blueprint**: `health_bp`  
