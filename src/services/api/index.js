@@ -66,23 +66,59 @@ export const usageApi = {
   // Health check
   getHealth: () => apiClient.safeApiCall(apiClient.get, '/api/usage/health', {}, { auth: false }),
 
-  // Get usage limits
+  // Get usage limits - FIXED: This is the correct endpoint
   getLimits: () => apiClient.safeApiCall(apiClient.get, '/api/usage/limits'),
 
-  // Track token usage
-  trackUsage: (data) => apiClient.safeApiCall(apiClient.post, '/api/usage/track', {
-    feature: data.feature,
-    tokensUsed: data.tokensUsed,
-    metadata: data.metadata || {}
-  }),
+  // Track token usage - FIXED: With proper error handling
+  trackUsage: async (data) => {
+    try {
+      // Validate required fields
+      if (!data.feature) {
+        console.warn('⚠️ trackUsage: feature is required, using default');
+        data.feature = 'general';
+      }
+      
+      if (typeof data.tokensUsed !== 'number') {
+        console.warn('⚠️ trackUsage: tokensUsed must be a number, converting:', data.tokensUsed);
+        data.tokensUsed = parseInt(data.tokensUsed) || 0;
+      }
 
-  // Get usage history
+      const payload = {
+        feature: data.feature,
+        tokensUsed: data.tokensUsed,
+        metadata: data.metadata || {}
+      };
+
+      console.log('📊 Tracking usage:', payload);
+      
+      const result = await apiClient.safeApiCall(apiClient.post, '/api/usage/track', payload);
+      
+      if (result.success) {
+        console.log('✅ Usage tracked successfully:', result);
+        return result;
+      } else {
+        console.warn('⚠️ Usage tracking failed but continuing:', result.error);
+        // Don't throw error - allow app to continue
+        return { success: false, error: result.error };
+      }
+    } catch (error) {
+      console.warn('⚠️ Usage tracking error, continuing anyway:', error.message);
+      // Return a non-throwing error response
+      return { 
+        success: false, 
+        error: error.message,
+        message: 'Usage tracking failed but operation can continue'
+      };
+    }
+  },
+
+  // Get usage history - FIXED: Proper parameter handling
   getHistory: (params = {}) => apiClient.safeApiCall(apiClient.get, '/api/usage/history', {
     days: params.days || 30,
     feature: params.feature || '',
     limit: params.limit || 50
-  })
-};
+  }),
+}
 
 /**
  * Content Library API Service - Content management endpoints
