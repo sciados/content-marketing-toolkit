@@ -38,9 +38,16 @@ const AIKeywordSuggestionInterface = () => {
   const getAIKeywordSuggestions = async () => {
     if (!videoUrl) return;
     
-    // 🔧 FIXED: Check authentication first
+    // 🔧 FIXED: Better authentication debugging
+    console.log('🔍 Auth State Debug:');
+    console.log('Session:', session);
+    console.log('User:', user);
+    console.log('Session keys:', session ? Object.keys(session) : 'No session');
+    console.log('User keys:', user ? Object.keys(user) : 'No user');
+    
     if (!session || !user) {
       setError('Please log in to use AI keyword suggestions');
+      console.error('❌ Missing session or user:', { session: !!session, user: !!user });
       return;
     }
     
@@ -49,21 +56,46 @@ const AIKeywordSuggestionInterface = () => {
     setError(null);
     
     try {
-      // 🔧 FIXED: Add authentication headers
+      // 🔧 FIXED: Add authentication headers with better debugging
       const headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       };
 
-      // Add authorization header if available
+      // Add authorization header - try multiple possible token locations
+      let authToken = null;
+      
+      // Check all possible token locations (same as KeywordVideoExtraction)
       if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
+        authToken = session.access_token;
+        console.log('✅ Found token in session.access_token');
+      } else if (session?.token) {
+        authToken = session.token;
+        console.log('✅ Found token in session.token');
+      } else if (session?.user?.access_token) {
+        authToken = session.user.access_token;
+        console.log('✅ Found token in session.user.access_token');
+      } else if (user?.access_token) {
+        authToken = user.access_token;
+        console.log('✅ Found token in user.access_token');
+      } else {
+        console.error('❌ No auth token found in any location');
+        console.log('Available session properties:', session ? Object.keys(session) : 'none');
+        console.log('Available user properties:', user ? Object.keys(user) : 'none');
+        setError('Authentication token not found. Please log out and log back in.');
+        return;
       }
 
-      console.log('🔐 Making authenticated request to AI keyword endpoint');
-      console.log('🔐 User:', user?.email);
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+        console.log('🔐 Using auth token (first 50 chars):', authToken.substring(0, 50) + '...');
+      }
 
-      // 🔧 FIXED: Call correct backend URL with authentication
+      console.log('🔐 Making authenticated request to:', `${API_BASE_URL}/api/video2promo/suggest-keywords`);
+      console.log('🔐 Headers (without token):', { ...headers, Authorization: headers.Authorization ? '[TOKEN_PRESENT]' : '[NO_TOKEN]' });
+      console.log('🔐 User email:', user?.email);
+
+      // 🔧 FIXED: Call correct backend URL with robust authentication
       const response = await fetch(`${API_BASE_URL}/api/video2promo/suggest-keywords`, {
         method: 'POST',
         headers,
@@ -74,11 +106,21 @@ const AIKeywordSuggestionInterface = () => {
       });
       
       console.log('📡 AI Keyword Response status:', response.status);
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
       
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ AI Keyword Response error:', errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        
+        if (response.status === 401) {
+          throw new Error(`Authentication failed. Please log out and log back in. Token issue detected.`);
+        } else if (response.status === 500) {
+          throw new Error(`Server error: The AI keyword suggestion feature may not be fully deployed yet.`);
+        } else if (response.status === 503) {
+          throw new Error(`Service unavailable: AI keyword suggestions are not enabled on the backend.`);
+        } else {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
       }
       
       const data = await response.json();

@@ -93,7 +93,7 @@ export const useVideo2Promo = () => {
       
       // Create request body
       const requestBody = {
-        videoUrl: cleanUrl,
+        url: cleanUrl,
         method: method
       };
       
