@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Clock, Target, Zap } from 'lucide-react';
-import useSupabase from '../../hooks/useSupabase'; // Add authentication hook
+import useSupabase from '../hooks/useSupabase'; // Add authentication hook
 
 const KeywordVideoExtraction = () => {
   const [videoUrl, setVideoUrl] = useState('');
@@ -12,6 +12,15 @@ const KeywordVideoExtraction = () => {
 
   // 🔧 FIXED: Add authentication
   const { session, user } = useSupabase();
+
+  // eslint-disable-next-line no-undef
+  useEffect(() => {
+  console.log('🔍 Auth Debug:');
+  console.log('Session:', session);
+  console.log('User:', user);
+  console.log('Access Token:', session?.access_token ? 'Present' : 'Missing');
+  console.log('Session Keys:', session ? Object.keys(session) : 'No session');
+}, [session, user]);
 
   // 🔧 FIXED: Use correct backend URL (matches your .env file)
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://aiworkers.onrender.com';
@@ -31,9 +40,16 @@ const KeywordVideoExtraction = () => {
   };
 
   const handleExtraction = async () => {
-    // 🔧 FIXED: Check authentication first
+    // 🔧 FIXED: Better authentication debugging
+    console.log('🔍 Auth State Debug:');
+    console.log('Session:', session);
+    console.log('User:', user);
+    console.log('Session keys:', session ? Object.keys(session) : 'No session');
+    console.log('User keys:', user ? Object.keys(user) : 'No user');
+    
     if (!session || !user) {
       setError('Please log in to use video extraction');
+      console.error('❌ Missing session or user:', { session: !!session, user: !!user });
       return;
     }
 
@@ -48,20 +64,44 @@ const KeywordVideoExtraction = () => {
     };
 
     try {
-      // 🔧 FIXED: Add authentication headers
+      // 🔧 FIXED: Add authentication headers with better debugging
       const headers = {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       };
 
-      // Add authorization header if available
+      // Add authorization header - try multiple possible token locations
+      let authToken = null;
+      
+      // Check all possible token locations
       if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
+        authToken = session.access_token;
+        console.log('✅ Found token in session.access_token');
+      } else if (session?.token) {
+        authToken = session.token;
+        console.log('✅ Found token in session.token');
+      } else if (session?.user?.access_token) {
+        authToken = session.user.access_token;
+        console.log('✅ Found token in session.user.access_token');
+      } else if (user?.access_token) {
+        authToken = user.access_token;
+        console.log('✅ Found token in user.access_token');
+      } else {
+        console.error('❌ No auth token found in any location');
+        console.log('Available session properties:', session ? Object.keys(session) : 'none');
+        console.log('Available user properties:', user ? Object.keys(user) : 'none');
+        setError('Authentication token not found. Please log out and log back in.');
+        return;
+      }
+
+      if (authToken) {
+        headers['Authorization'] = `Bearer ${authToken}`;
+        console.log('🔐 Using auth token (first 50 chars):', authToken.substring(0, 50) + '...');
       }
 
       console.log('🔐 Making authenticated request to:', `${API_BASE_URL}/api/video2promo/extract-targeted`);
-      console.log('🔐 Headers:', headers);
-      console.log('🔐 User:', user?.email);
+      console.log('🔐 Headers (without token):', { ...headers, Authorization: headers.Authorization ? '[TOKEN_PRESENT]' : '[NO_TOKEN]' });
+      console.log('🔐 User email:', user?.email);
 
       // 🔧 FIXED: Call Render backend with authentication
       const response = await fetch(`${API_BASE_URL}/api/video2promo/extract-targeted`, {
@@ -71,11 +111,21 @@ const KeywordVideoExtraction = () => {
       });
       
       console.log('📡 Response status:', response.status);
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
       
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ Response error:', errorText);
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        
+        if (response.status === 401) {
+          throw new Error(`Authentication failed. Please log out and log back in. Token issue detected.`);
+        } else if (response.status === 500) {
+          throw new Error(`Server error: The targeted extraction feature may not be fully deployed yet. Try standard extraction instead.`);
+        } else if (response.status === 503) {
+          throw new Error(`Service unavailable: Targeted extraction is not enabled on the backend.`);
+        } else {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
       }
       
       const data = await response.json();
