@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, CheckCircle, AlertCircle, Clock, Target, Sparkles } from 'lucide-react';
+import { Play, CheckCircle, AlertCircle, Clock, Target, Sparkles, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 
 // REAL HOOKS - These will make the button work!
 import { useVideo2Promo } from '../hooks/useVideo2Promo';
@@ -8,21 +8,354 @@ import { useUsageTracking } from '../hooks/useUsageTracking';
 import useSupabase from '../hooks/useSupabase';
 
 // Component imports
-import VideoUrlForm from '../components/Video2Promo/VideoUrlForm';
 import ImprovedProgress from '../components/Video2Promo/ImprovedProgress';
 import AuthenticationRequired from '../components/Video2Promo/AuthenticationRequired';
 import { StatusBanner, ProcessingStatus, ErrorDisplay, UsageStats } from '../components/Video2Promo/StatusComponents';
-
-// NEW: Import keyword extraction component
 import KeywordVideoExtraction from '../components/Video2Promo/KeywordVideoExtraction';
 
+// Multi-step wizard component
+const StandardExtractionWizard = ({ onSubmit, loading }) => {
+  const [currentStep, setCurrentStep] = useState(1);
+  const [formData, setFormData] = useState({
+    videoUrl: '',
+    keywords: '',
+    affiliateLink: '',
+    tone: 'professional',
+    targetAudience: '',
+    campaignName: ''
+  });
+
+  const steps = [
+    { id: 1, title: 'Video Source', description: 'Add your YouTube video', icon: Play, color: 'bg-blue-500' },
+    { id: 2, title: 'Keywords', description: 'Define your focus', icon: Target, color: 'bg-green-500' },
+    { id: 3, title: 'Affiliate Link', description: 'Monetization setup', icon: Sparkles, color: 'bg-purple-500' },
+    { id: 4, title: 'Content Style', description: 'Tone & audience', icon: CheckCircle, color: 'bg-orange-500' },
+    { id: 5, title: 'Campaign Setup', description: 'Final details', icon: Zap, color: 'bg-red-500' }
+  ];
+
+  const toneOptions = [
+    { value: 'professional', label: 'Professional', description: 'Business-focused, authoritative' },
+    { value: 'friendly', label: 'Friendly', description: 'Conversational, approachable' },
+    { value: 'enthusiastic', label: 'Enthusiastic', description: 'Energetic, exciting' },
+    { value: 'educational', label: 'Educational', description: 'Informative, clear' },
+    { value: 'persuasive', label: 'Persuasive', description: 'Sales-focused, compelling' }
+  ];
+
+  const updateFormData = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const nextStep = () => {
+    if (currentStep < steps.length) setCurrentStep(currentStep + 1);
+  };
+
+  const prevStep = () => {
+    if (currentStep > 1) setCurrentStep(currentStep - 1);
+  };
+
+  const canProceed = () => {
+    switch (currentStep) {
+      case 1: return formData.videoUrl.trim() && (formData.videoUrl.includes('youtube.com') || formData.videoUrl.includes('youtu.be'));
+      case 2: return true; // Keywords optional
+      case 3: return true; // Affiliate link optional
+      case 4: return formData.tone;
+      case 5: return formData.campaignName.trim();
+      default: return true;
+    }
+  };
+
+  const handleSubmit = () => {
+    // Call your existing onSubmit function with the collected data
+    onSubmit(formData.videoUrl, {
+      keywords: formData.keywords,
+      affiliate_link: formData.affiliateLink,
+      tone: formData.tone,
+      target_audience: formData.targetAudience,
+      campaign_name: formData.campaignName
+    });
+  };
+
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <Play className="mx-auto h-16 w-16 text-blue-500 mb-4" />
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Add Your YouTube Video</h3>
+              <p className="text-gray-600">Enter the URL of the YouTube video you want to transform</p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">YouTube Video URL *</label>
+              <input
+                type="url"
+                value={formData.videoUrl}
+                onChange={(e) => updateFormData('videoUrl', e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {formData.videoUrl && !formData.videoUrl.includes('youtube') && (
+                <p className="mt-2 text-sm text-red-600">Please enter a valid YouTube URL</p>
+              )}
+            </div>
+
+            <div className="bg-blue-50 rounded-lg p-4">
+              <h4 className="font-medium text-blue-900 mb-2">💡 Pro Tips:</h4>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• Choose videos with clear audio for best results</li>
+                <li>• Educational and tutorial content works exceptionally well</li>
+                <li>• Videos under 30 minutes process fastest</li>
+              </ul>
+            </div>
+          </div>
+        );
+
+      case 2:
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <Target className="mx-auto h-16 w-16 text-green-500 mb-4" />
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Marketing Keywords</h3>
+              <p className="text-gray-600">Define the key topics you want to focus on</p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Keywords (Optional)</label>
+              <textarea
+                value={formData.keywords}
+                onChange={(e) => updateFormData('keywords', e.target.value)}
+                placeholder="email marketing, lead generation, conversion optimization..."
+                rows={4}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+              <p className="mt-2 text-sm text-gray-500">Separate keywords with commas. Leave blank to extract all content.</p>
+            </div>
+          </div>
+        );
+
+      case 3:
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <Sparkles className="mx-auto h-16 w-16 text-purple-500 mb-4" />
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Affiliate Link</h3>
+              <p className="text-gray-600">Monetize your content with affiliate links</p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Affiliate Link (Optional)</label>
+              <input
+                type="url"
+                value={formData.affiliateLink}
+                onChange={(e) => updateFormData('affiliateLink', e.target.value)}
+                placeholder="https://your-affiliate-link.com"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <p className="mt-2 text-sm text-gray-500">This link will be integrated into your generated content</p>
+            </div>
+          </div>
+        );
+
+      case 4:
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <CheckCircle className="mx-auto h-16 w-16 text-orange-500 mb-4" />
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Content Style</h3>
+              <p className="text-gray-600">Define the tone and target audience</p>
+            </div>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">Content Tone *</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {toneOptions.map((option) => (
+                    <label key={option.value} className="cursor-pointer">
+                      <input
+                        type="radio"
+                        name="tone"
+                        value={option.value}
+                        checked={formData.tone === option.value}
+                        onChange={(e) => updateFormData('tone', e.target.value)}
+                        className="sr-only"
+                      />
+                      <div className={`p-4 border-2 rounded-lg transition-all ${
+                        formData.tone === option.value 
+                          ? 'border-orange-500 bg-orange-50' 
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}>
+                        <div className="font-medium text-gray-900">{option.label}</div>
+                        <div className="text-sm text-gray-600">{option.description}</div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Target Audience (Optional)</label>
+                <input
+                  type="text"
+                  value={formData.targetAudience}
+                  onChange={(e) => updateFormData('targetAudience', e.target.value)}
+                  placeholder="Small business owners, marketing professionals..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+          </div>
+        );
+
+      case 5:
+        return (
+          <div className="space-y-6">
+            <div className="text-center">
+              <Zap className="mx-auto h-16 w-16 text-red-500 mb-4" />
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">Campaign Setup</h3>
+              <p className="text-gray-600">Final details before processing</p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Campaign Name *</label>
+              <input
+                type="text"
+                value={formData.campaignName}
+                onChange={(e) => updateFormData('campaignName', e.target.value)}
+                placeholder="Q1 Product Launch Campaign"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+              />
+            </div>
+
+            <div className="bg-red-50 rounded-lg p-4">
+              <h4 className="font-medium text-red-900 mb-2">📋 Ready to Process:</h4>
+              <ul className="text-sm text-red-800 space-y-1">
+                <li>• Video: {formData.videoUrl ? '✅ Added' : '❌ Missing'}</li>
+                <li>• Keywords: {formData.keywords ? '✅ Added' : '⚪ Optional'}</li>
+                <li>• Affiliate Link: {formData.affiliateLink ? '✅ Added' : '⚪ Optional'}</li>
+                <li>• Tone: {formData.tone ? '✅ Selected' : '❌ Missing'}</li>
+                <li>• Campaign: {formData.campaignName ? '✅ Named' : '❌ Missing'}</li>
+              </ul>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      {/* Progress Steps */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          {steps.map((step, index) => {
+            const StepIcon = step.icon;
+            const isActive = currentStep === step.id;
+            const isCompleted = currentStep > step.id;
+            
+            return (
+              <div key={step.id} className="flex flex-col items-center relative">
+                {index < steps.length - 1 && (
+                  <div className={`absolute top-6 left-full w-full h-0.5 ${
+                    isCompleted ? 'bg-green-500' : 'bg-gray-200'
+                  }`} style={{ width: '100%', marginLeft: '2rem' }} />
+                )}
+                
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                  isActive 
+                    ? `${step.color} text-white scale-110` 
+                    : isCompleted 
+                    ? 'bg-green-500 text-white' 
+                    : 'bg-gray-200 text-gray-500'
+                }`}>
+                  {isCompleted ? (
+                    <CheckCircle className="w-5 h-5" />
+                  ) : (
+                    <StepIcon className="w-5 h-5" />
+                  )}
+                </div>
+                
+                <div className="mt-2 text-center">
+                  <div className={`text-sm font-medium ${isActive ? 'text-gray-900' : 'text-gray-500'}`}>
+                    {step.title}
+                  </div>
+                  <div className="text-xs text-gray-400">{step.description}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Step Content */}
+      <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
+        {renderStepContent()}
+      </div>
+
+      {/* Navigation */}
+      <div className="flex justify-between items-center">
+        <button
+          onClick={prevStep}
+          disabled={currentStep === 1}
+          className={`flex items-center space-x-2 px-6 py-3 rounded-lg transition-colors ${
+            currentStep === 1
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+          }`}
+        >
+          <ChevronLeft className="w-4 h-4" />
+          <span>Previous</span>
+        </button>
+
+        <div className="text-sm text-gray-500">Step {currentStep} of {steps.length}</div>
+
+        {currentStep === steps.length ? (
+          <button
+            onClick={handleSubmit}
+            disabled={!canProceed() || loading}
+            className={`flex items-center space-x-2 px-8 py-3 rounded-lg transition-colors ${
+              canProceed() && !loading
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <span>Processing...</span>
+              </>
+            ) : (
+              <>
+                <Zap className="w-4 h-4" />
+                <span>Generate Content</span>
+              </>
+            )}
+          </button>
+        ) : (
+          <button
+            onClick={nextStep}
+            disabled={!canProceed()}
+            className={`flex items-center space-x-2 px-6 py-3 rounded-lg transition-colors ${
+              canProceed()
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            <span>Next</span>
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function Video2Promo() {
-  // NEW: Add extraction mode state
-  const [extractionMode, setExtractionMode] = useState('standard'); // 'standard' or 'keyword'
-  
+  const [extractionMode, setExtractionMode] = useState('standard');
   const [manualStep, setManualStep] = useState(null);
   
-  // REAL HOOKS - These connect to your Render API and Supabase
   const { user, session } = useSupabase();
   
   const { 
@@ -30,14 +363,14 @@ export default function Video2Promo() {
     loading, 
     error, 
     processingStage, 
-    processVideo,           // ← This is the REAL function that calls Render API
+    processVideo,
     reset,
     transcript,
-    extractedBenefits,
-    generatedAssets,
-    canRetry,
-    retryExtraction,
-    debug
+    // extractedBenefits,
+    // generatedAssets,
+    // canRetry,
+    // retryExtraction,
+    // debug
   } = useVideo2Promo();
   
   const { 
@@ -51,7 +384,6 @@ export default function Video2Promo() {
     getRemainingLimits
   } = useUsageTracking();
 
-  // Calculate remaining tokens from your usage tracking
   const remainingTokens = getRemainingLimits().daily_tokens;
   const effectiveStep = manualStep || currentStep;
   const userTier = user?.subscription_tier || 'free';
@@ -63,21 +395,16 @@ export default function Video2Promo() {
   };
 
   const handleVideoSubmit = async (youtubeUrl, formData) => {
-    console.log('🚀 Processing video with REAL hooks:', youtubeUrl, formData);
+    console.log('🚀 Processing video with wizard data:', youtubeUrl, formData);
     
     try {
-      // This calls your REAL processVideo function that:
-      // 1. Validates the YouTube URL
-      // 2. Checks usage limits via useUsageTracking
-      // 3. Calls https://aiworkers.onrender.com/api/video2promo/extract-transcript
-      // 4. Uses your enhanced_extractor_v3.py with Webshare rotating proxies
-      // 5. Updates the UI state (currentStep, transcript, etc.)
-      
       const result = await processVideo(youtubeUrl, {
         keywords: formData.keywords,
         affiliate_link: formData.affiliate_link,
         utm_params: formData.utm_params,
-        tone: formData.tone
+        tone: formData.tone,
+        target_audience: formData.target_audience,
+        campaign_name: formData.campaign_name
       });
       
       console.log('✅ Video processing result:', result);
@@ -89,7 +416,7 @@ export default function Video2Promo() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Enhanced Header */}
+      {/* Your existing header */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
@@ -120,7 +447,7 @@ export default function Video2Promo() {
             </div>
           </div>
           
-          {/* NEW: Extraction Mode Selector */}
+          {/* Mode Selector */}
           <div className="mt-6 flex space-x-4">
             <button 
               onClick={() => setExtractionMode('standard')}
@@ -153,46 +480,6 @@ export default function Video2Promo() {
               )}
             </button>
           </div>
-
-          {/* NEW: Mode Description */}
-          <div className="mt-4 p-4 rounded-lg bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200">
-            {extractionMode === 'standard' ? (
-              <div className="flex items-start space-x-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Play className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">Standard Extraction</h3>
-                  <p className="text-gray-600 text-sm">
-                    Complete video transcription and analysis. Extract the full content for comprehensive marketing campaigns.
-                  </p>
-                  <div className="mt-2 flex items-center space-x-4 text-xs text-gray-500">
-                    <span>⏱️ 5-15 minutes</span>
-                    <span>📝 Complete transcript</span>
-                    <span>🎯 100% coverage</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-start space-x-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Target className="h-5 w-5 text-purple-600" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">AI Keyword Extraction</h3>
-                  <p className="text-gray-600 text-sm">
-                    AI analyzes your video and suggests relevant keywords. Extract only the most valuable content segments.
-                  </p>
-                  <div className="mt-2 flex items-center space-x-4 text-xs text-gray-500">
-                    <span>⚡ 1-3 minutes</span>
-                    <span>🎯 90%+ relevant</span>
-                    <span>🧠 AI-powered</span>
-                    <span>✨ Beginner-friendly</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
 
@@ -201,207 +488,56 @@ export default function Video2Promo() {
           <AuthenticationRequired />
         ) : (
           <>
-            {/* Render content based on extraction mode */}
             {extractionMode === 'standard' ? (
               <>
-                {/* EXISTING STANDARD EXTRACTION FLOW */}
                 <StatusBanner />
-                <ImprovedProgress currentStep={effectiveStep} />
                 
-                <ProcessingStatus 
-                  processingStage={processingStage}
-                  isGeneratingAssets={isGeneratingAssets}
-                />
-                
-                <ErrorDisplay 
-                  error={error}
-                  assetError={assetError}
-                  onReset={handleReset}
-                />
+                {/* Use wizard for input step only */}
+                {effectiveStep === 'input' ? (
+                  <StandardExtractionWizard 
+                    onSubmit={handleVideoSubmit}
+                    loading={loading}
+                  />
+                ) : (
+                  <>
+                    <ImprovedProgress currentStep={effectiveStep} />
+                    <ProcessingStatus processingStage={processingStage} isGeneratingAssets={isGeneratingAssets} />
+                    <ErrorDisplay error={error} assetError={assetError} onReset={handleReset} />
 
-                {/* Step Content */}
-                <div className="space-y-8">
-                  {effectiveStep === 'input' && (
-                    <VideoUrlForm
-                      onSubmit={handleVideoSubmit}  // ← This now calls the REAL function
-                      loading={loading}
-                      disabled={false}
-                    />
-                  )}
-
-                  {effectiveStep === 'transcript' && transcript && (
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-                      <h3 className="text-xl font-semibold text-gray-800 mb-4">Extracted Transcript</h3>
-                      <div className="max-h-96 overflow-y-auto bg-gray-50 p-4 rounded-xl">
-                        <p className="text-gray-700 leading-relaxed">{transcript}</p>
-                      </div>
-                      <div className="mt-4 flex space-x-3">
-                        <div className="text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg">
-                          📊 {transcript.split(' ').length} words extracted
-                        </div>
-                        <button
-                          onClick={() => setManualStep('input')}
-                          className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors"
-                        >
-                          Process Another Video
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {effectiveStep === 'benefits' && extractedBenefits && extractedBenefits.length > 0 && (
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-                      <h3 className="text-xl font-semibold text-gray-800 mb-4">Extracted Benefits</h3>
-                      <div className="space-y-3">
-                        {extractedBenefits.map((benefit, index) => (
-                          <div key={index} className="p-4 bg-green-50 rounded-xl border border-green-200">
-                            <p className="text-green-800">{benefit}</p>
+                    {/* Your existing result display components */}
+                    <div className="space-y-8">
+                      {effectiveStep === 'transcript' && transcript && (
+                        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                          <h3 className="text-xl font-semibold text-gray-800 mb-4">Extracted Transcript</h3>
+                          <div className="max-h-96 overflow-y-auto bg-gray-50 p-4 rounded-xl">
+                            <p className="text-gray-700 leading-relaxed">{transcript}</p>
                           </div>
-                        ))}
-                      </div>
-                      <button
-                        onClick={() => setManualStep('input')}
-                        className="mt-4 px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors"
-                      >
-                        Process Another Video
-                      </button>
-                    </div>
-                  )}
-
-                  {effectiveStep === 'assets_complete' && generatedAssets && (
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
-                      <h3 className="text-xl font-semibold text-gray-800 mb-4">Generated Marketing Assets</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {generatedAssets.emails && (
-                          <div className="bg-blue-50 p-6 rounded-xl">
-                            <h4 className="font-semibold text-blue-800 mb-3">Email Sequences</h4>
-                            <p className="text-blue-700">{generatedAssets.emails.length} emails generated</p>
+                          <div className="mt-4 flex space-x-3">
+                            <div className="text-sm text-gray-600 bg-blue-50 px-3 py-2 rounded-lg">
+                              📊 {transcript.split(' ').length} words extracted
+                            </div>
+                            <button
+                              onClick={() => setManualStep('input')}
+                              className="px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors"
+                            >
+                              Process Another Video
+                            </button>
                           </div>
-                        )}
-                        {generatedAssets.socialPosts && (
-                          <div className="bg-purple-50 p-6 rounded-xl">
-                            <h4 className="font-semibold text-purple-800 mb-3">Social Media Posts</h4>
-                            <p className="text-purple-700">{generatedAssets.socialPosts.length} posts created</p>
-                          </div>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => setManualStep('input')}
-                        className="mt-4 px-6 py-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors"
-                      >
-                        Start New Video
-                      </button>
-                    </div>
-                  )}
-
-                  {effectiveStep !== 'input' && effectiveStep !== 'transcript' && effectiveStep !== 'benefits' && effectiveStep !== 'assets_complete' && (
-                    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
-                      <div className="text-6xl mb-4">⚡</div>
-                      <h3 className="text-xl font-semibold text-gray-800 mb-2">Processing: {effectiveStep}</h3>
-                      <p className="text-gray-600">Your video is being processed by our AI systems...</p>
-                      <div className="mt-4 flex items-center justify-center space-x-2">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                        <span className="text-blue-600">Working with Render API v4.0</span>
-                      </div>
-                      {debug && debug.processingStage && (
-                        <div className="mt-3 text-sm text-gray-500">
-                          {debug.processingStage}
                         </div>
                       )}
-                    </div>
-                  )}
-                </div>
 
-                <UsageStats 
-                  userTier={userTier}
-                  usageData={usageData}
-                  remainingTokens={remainingTokens}
-                />
-                
-                {/* Debug Info for Development */}
-                {debug && import.meta.env.MODE === 'development' && (
-                  <div className="mt-8 bg-gray-50 rounded-2xl p-6 border border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">Debug Information</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <div className="font-medium text-gray-700">Backend Status</div>
-                        <div className={`${debug.backendStatus === 'healthy' ? 'text-green-600' : 'text-red-600'}`}>
-                          {debug.backendStatus}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="font-medium text-gray-700">Proxy Status</div>
-                        <div className={`${debug.proxyStatus === 'configured' ? 'text-green-600' : 'text-yellow-600'}`}>
-                          {debug.proxyStatus}
-                        </div>
-                      </div>
-                      <div>
-                        <div className="font-medium text-gray-700">Retry Count</div>
-                        <div className="text-gray-600">{debug.retryCount}/3</div>
-                      </div>
-                      <div>
-                        <div className="font-medium text-gray-700">Backend URL</div>
-                        <div className="text-gray-600 text-xs">{debug.backendUrl}</div>
-                      </div>
+                      {/* Add your other result components here */}
                     </div>
-                    {canRetry && (
-                      <button
-                        onClick={() => retryExtraction(debug.videoUrl || '')}
-                        className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors"
-                      >
-                        🔄 Retry Extraction ({3 - debug.retryCount} attempts left)
-                      </button>
-                    )}
-                  </div>
+                  </>
                 )}
+
+                <UsageStats userTier={userTier} usageData={usageData} remainingTokens={remainingTokens} />
               </>
             ) : (
               <>
-                {/* NEW: AI KEYWORD EXTRACTION MODE */}
-                <div className="mb-8">
-                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-2xl p-6">
-                    <div className="flex items-center space-x-3 mb-4">
-                      <div className="p-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl">
-                        <Sparkles className="h-6 w-6 text-white" />
-                      </div>
-                      <div>
-                        <h2 className="text-2xl font-bold text-gray-900">AI-Powered Keyword Extraction</h2>
-                        <p className="text-gray-600">Let AI analyze your video and suggest the most relevant keywords for targeted extraction</p>
-                      </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                      <div className="bg-white p-4 rounded-xl border border-purple-100">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <Target className="h-5 w-5 text-purple-600" />
-                          <span className="font-semibold text-gray-900">Smart Analysis</span>
-                        </div>
-                        <p className="text-sm text-gray-600">AI analyzes video metadata and suggests relevant keywords automatically</p>
-                      </div>
-                      
-                      <div className="bg-white p-4 rounded-xl border border-purple-100">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <Clock className="h-5 w-5 text-green-600" />
-                          <span className="font-semibold text-gray-900">70% Faster</span>
-                        </div>
-                        <p className="text-sm text-gray-600">Extract only relevant segments instead of processing entire videos</p>
-                      </div>
-                      
-                      <div className="bg-white p-4 rounded-xl border border-purple-100">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <CheckCircle className="h-5 w-5 text-blue-600" />
-                          <span className="font-semibold text-gray-900">90%+ Relevant</span>
-                        </div>
-                        <p className="text-sm text-gray-600">Get highly focused content instead of sifting through everything</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Keyword Extraction Component */}
+                {/* Your existing keyword extraction mode */}
                 <KeywordVideoExtraction />
                 
-                {/* Back to Standard Mode Option */}
                 <div className="mt-8 text-center">
                   <button
                     onClick={() => setExtractionMode('standard')}
