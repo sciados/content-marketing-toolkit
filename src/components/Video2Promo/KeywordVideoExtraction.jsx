@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Clock, Target, Zap } from 'lucide-react';
 import useSupabase from '../../hooks/useSupabase'; // Add authentication hook
 
@@ -13,7 +13,6 @@ const KeywordVideoExtraction = () => {
   // 🔧 FIXED: Add authentication
   const { session, user } = useSupabase();
 
-  // eslint-disable-next-line no-undef
   useEffect(() => {
   console.log('🔍 Auth Debug:');
   console.log('Session:', session);
