@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Sparkles, Brain, Target, Clock, CheckCircle, Lightbulb } from 'lucide-react';
-import useSupabase from '../hooks/useSupabase'; // Add authentication hook
+import useSupabase from '../../hooks/useSupabase'; // Add authentication hook
 
 const AIKeywordSuggestionInterface = () => {
   const [videoUrl, setVideoUrl] = useState('');
