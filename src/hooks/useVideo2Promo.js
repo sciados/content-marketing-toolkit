@@ -56,7 +56,7 @@ export const useVideo2Promo = () => {
   }, []);
 
   // Enhanced extractTranscript function with better error handling and retry logic
-  const extractTranscript = useCallback(async (videoUrl, method = 'auto') => {
+  const extractTranscript = useCallback(async (videoUrl) => {
     try {
       // Check if user is authenticated
       if (!session?.access_token) {
@@ -91,10 +91,11 @@ export const useVideo2Promo = () => {
       // Clean and validate the URL
       const cleanUrl = videoUrl.trim();
       
-      // Create request body
+      // ✅ FIXED: Create request body for /extract-targeted endpoint
       const requestBody = {
         url: cleanUrl,
-        method: method
+        keywords: [],
+        extraction_mode: 'smart'
       };
       
       // Create headers
@@ -103,8 +104,8 @@ export const useVideo2Promo = () => {
         'Authorization': `Bearer ${session.access_token}`
       };
       
-      // Make the API call with timeout
-      const apiUrl = `${API_BASE}/api/video2promo/extract-transcript`;
+      // ✅ FIXED: Use correct API endpoint
+      const apiUrl = `${API_BASE}/api/video2promo/extract-targeted`;
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
@@ -153,9 +154,12 @@ export const useVideo2Promo = () => {
           }
         }
 
+        // ✅ FIXED: Handle response from /extract-targeted endpoint
+        const transcript = responseData.data?.transcript || responseData.transcript;
+        
         setState(prev => ({
           ...prev,
-          transcript: responseData.transcript,
+          transcript: transcript,
           currentStep: 'transcript',
           processingStage: `Transcript extracted successfully${healthCheck.proxy_status?.configured ? ' (via proxy)' : ''}`,
           loading: false,
@@ -164,10 +168,10 @@ export const useVideo2Promo = () => {
 
         return {
           success: true,
-          transcript: responseData.transcript,
-          extractionMethod: responseData.extractionMethod,
-          wordCount: responseData.wordCount,
-          proxyUsed: responseData.extractionMethod?.includes('proxy') || false
+          transcript: transcript,
+          extractionMethod: responseData.data?.method || responseData.method,
+          wordCount: responseData.data?.word_count || responseData.wordCount,
+          proxyUsed: responseData.data?.method?.includes('proxy') || false
         };
 
       } catch (fetchError) {
