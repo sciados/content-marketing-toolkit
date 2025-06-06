@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Sparkles, Brain, Target, Clock, CheckCircle, Lightbulb } from 'lucide-react';
+import useSupabase from '../hooks/useSupabase'; // Add authentication hook
 
 const AIKeywordSuggestionInterface = () => {
   const [videoUrl, setVideoUrl] = useState('');
@@ -9,6 +10,13 @@ const AIKeywordSuggestionInterface = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [keywordDetails, setKeywordDetails] = useState(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [error, setError] = useState(null);
+
+  // 🔧 FIXED: Add authentication
+  const { session, user } = useSupabase();
+
+  // 🔧 FIXED: Use correct backend URL
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://aiworkers.onrender.com';
 
   const intentOptions = [
     { value: '', label: 'Any content (let AI decide)', icon: '🤖' },
@@ -22,30 +30,62 @@ const AIKeywordSuggestionInterface = () => {
   const getAIKeywordSuggestions = async () => {
     if (!videoUrl) return;
     
+    // 🔧 FIXED: Check authentication first
+    if (!session || !user) {
+      setError('Please log in to use AI keyword suggestions');
+      return;
+    }
+    
     setIsAnalyzing(true);
     setShowSuggestions(false);
+    setError(null);
     
     try {
-      const response = await fetch('/api/video2promo/suggest-keywords', {
+      // 🔧 FIXED: Add authentication headers
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+
+      // Add authorization header if available
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      console.log('🔐 Making authenticated request to AI keyword endpoint');
+      console.log('🔐 User:', user?.email);
+
+      // 🔧 FIXED: Call correct backend URL with authentication
+      const response = await fetch(`${API_BASE_URL}/api/video2promo/suggest-keywords`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           videoUrl,
           userIntent: userIntent || null
         })
       });
       
+      console.log('📡 AI Keyword Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ AI Keyword Response error:', errorText);
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
       const data = await response.json();
+      console.log('✅ AI Keyword Response data:', data);
       
       if (data.success) {
         setSuggestedKeywords(data.data.suggested_keywords || []);
         setKeywordDetails(data.data);
         setShowSuggestions(true);
       } else {
-        console.error('Keyword suggestion failed:', data.error);
+        throw new Error(data.error || 'Keyword suggestion failed');
       }
     } catch (error) {
       console.error('AI analysis failed:', error);
+      setError(`AI keyword analysis failed: ${error.message}`);
     } finally {
       setIsAnalyzing(false);
     }
@@ -71,6 +111,14 @@ const AIKeywordSuggestionInterface = () => {
   const startTargetedExtraction = () => {
     // This would trigger the targeted extraction with selected keywords
     console.log('Starting extraction with keywords:', selectedKeywords);
+    // You could emit an event or call a parent function here
+    if (typeof window !== 'undefined' && window.parent) {
+      window.parent.postMessage({
+        type: 'START_TARGETED_EXTRACTION',
+        keywords: selectedKeywords,
+        videoUrl: videoUrl
+      }, '*');
+    }
   };
 
   return (
@@ -84,7 +132,41 @@ const AIKeywordSuggestionInterface = () => {
         <p className="text-gray-600">
           Let AI analyze your video and suggest the most relevant keywords for extraction
         </p>
+        
+        {/* Auth Status */}
+        <div className="mt-3 text-sm">
+          <span className="text-gray-500">Backend: </span>
+          <span className="text-green-600 font-medium">{API_BASE_URL}</span>
+          {user && (
+            <>
+              <span className="text-gray-500 ml-4">User: </span>
+              <span className="text-blue-600 font-medium">{user.email}</span>
+            </>
+          )}
+          {!session && (
+            <span className="text-red-600 font-medium ml-4">⚠️ Not authenticated</span>
+          )}
+        </div>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-red-800">AI Analysis Error</h3>
+              <div className="mt-2 text-sm text-red-700">
+                <p>{error}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Step 1: Video URL + Intent */}
       <div className="mb-8 p-6 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
@@ -133,23 +215,30 @@ const AIKeywordSuggestionInterface = () => {
         </div>
 
         {/* Analyze Button */}
-        <button
-          onClick={getAIKeywordSuggestions}
-          disabled={!videoUrl || isAnalyzing}
-          className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:bg-gray-400 text-white font-semibold py-4 px-6 rounded-lg transition-all"
-        >
-          {isAnalyzing ? (
-            <div className="flex items-center justify-center">
-              <Brain className="animate-pulse h-5 w-5 mr-3" />
-              Analyzing video with AI...
-            </div>
-          ) : (
-            <div className="flex items-center justify-center">
-              <Sparkles className="h-5 w-5 mr-3" />
-              🧠 Get AI Keyword Suggestions
-            </div>
-          )}
-        </button>
+        {!session ? (
+          <div className="text-center p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-yellow-800 font-medium">Please log in to use AI keyword suggestions</p>
+            <p className="text-yellow-600 text-sm mt-1">You need to be authenticated to access this feature</p>
+          </div>
+        ) : (
+          <button
+            onClick={getAIKeywordSuggestions}
+            disabled={!videoUrl || isAnalyzing}
+            className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:bg-gray-400 text-white font-semibold py-4 px-6 rounded-lg transition-all"
+          >
+            {isAnalyzing ? (
+              <div className="flex items-center justify-center">
+                <Brain className="animate-pulse h-5 w-5 mr-3" />
+                Analyzing video with AI...
+              </div>
+            ) : (
+              <div className="flex items-center justify-center">
+                <Sparkles className="h-5 w-5 mr-3" />
+                🧠 Get AI Keyword Suggestions
+              </div>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Step 2: AI Suggestions */}

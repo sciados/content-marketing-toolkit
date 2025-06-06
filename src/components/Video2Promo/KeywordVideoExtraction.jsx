@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Clock, Target, Zap } from 'lucide-react';
+import useSupabase from '../hooks/useSupabase'; // Add authentication hook
 
 const KeywordVideoExtraction = () => {
   const [videoUrl, setVideoUrl] = useState('');
@@ -9,8 +10,11 @@ const KeywordVideoExtraction = () => {
   const [results, setResults] = useState(null);
   const [error, setError] = useState(null);
 
-  // 🔧 FIXED: Use correct backend URL
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://aiworkers.onrender.com';
+  // 🔧 FIXED: Add authentication
+  const { session, user } = useSupabase();
+
+  // 🔧 FIXED: Use correct backend URL (matches your .env file)
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://aiworkers.onrender.com';
 
   const addKeyword = () => {
     setKeywords([...keywords, '']);
@@ -27,6 +31,12 @@ const KeywordVideoExtraction = () => {
   };
 
   const handleExtraction = async () => {
+    // 🔧 FIXED: Check authentication first
+    if (!session || !user) {
+      setError('Please log in to use video extraction');
+      return;
+    }
+
     setIsProcessing(true);
     setError(null);
     
@@ -38,21 +48,38 @@ const KeywordVideoExtraction = () => {
     };
 
     try {
-      // 🔧 FIXED: Call Render backend instead of Vercel frontend
+      // 🔧 FIXED: Add authentication headers
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      };
+
+      // Add authorization header if available
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
+
+      console.log('🔐 Making authenticated request to:', `${API_BASE_URL}/api/video2promo/extract-targeted`);
+      console.log('🔐 Headers:', headers);
+      console.log('🔐 User:', user?.email);
+
+      // 🔧 FIXED: Call Render backend with authentication
       const response = await fetch(`${API_BASE_URL}/api/video2promo/extract-targeted`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers,
         body: JSON.stringify(payload)
       });
       
+      console.log('📡 Response status:', response.status);
+      
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Response error:', errorText);
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
       
       const data = await response.json();
+      console.log('✅ Response data:', data);
       
       if (data.success) {
         setResults({
@@ -91,6 +118,15 @@ const KeywordVideoExtraction = () => {
         <div className="mt-3 text-sm">
           <span className="text-gray-500">Backend: </span>
           <span className="text-green-600 font-medium">{API_BASE_URL}</span>
+          {user && (
+            <>
+              <span className="text-gray-500 ml-4">User: </span>
+              <span className="text-blue-600 font-medium">{user.email}</span>
+            </>
+          )}
+          {!session && (
+            <span className="text-red-600 font-medium ml-4">⚠️ Not authenticated</span>
+          )}
         </div>
       </div>
 
@@ -258,20 +294,27 @@ const KeywordVideoExtraction = () => {
 
       {/* Processing Button */}
       <div className="mb-6">
-        <button
-          onClick={handleExtraction}
-          disabled={!videoUrl || isProcessing || (extractionMode === 'targeted' && !keywords.some(k => k.trim()))}
-          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-4 px-6 rounded-lg transition-colors"
-        >
-          {isProcessing ? (
-            <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-              {extractionMode === 'targeted' ? 'Finding relevant segments...' : 'Processing video...'}
-            </div>
-          ) : (
-            `🚀 Start ${extractionMode === 'targeted' ? 'Targeted' : extractionMode === 'smart' ? 'Smart' : 'Complete'} Extraction`
-          )}
-        </button>
+        {!session ? (
+          <div className="text-center p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <p className="text-yellow-800 font-medium">Please log in to use video extraction</p>
+            <p className="text-yellow-600 text-sm mt-1">You need to be authenticated to access this feature</p>
+          </div>
+        ) : (
+          <button
+            onClick={handleExtraction}
+            disabled={!videoUrl || isProcessing || (extractionMode === 'targeted' && !keywords.some(k => k.trim()))}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-4 px-6 rounded-lg transition-colors"
+          >
+            {isProcessing ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                {extractionMode === 'targeted' ? 'Finding relevant segments...' : 'Processing video...'}
+              </div>
+            ) : (
+              `🚀 Start ${extractionMode === 'targeted' ? 'Targeted' : extractionMode === 'smart' ? 'Smart' : 'Complete'} Extraction`
+            )}
+          </button>
+        )}
       </div>
 
       {/* Expected Performance */}
