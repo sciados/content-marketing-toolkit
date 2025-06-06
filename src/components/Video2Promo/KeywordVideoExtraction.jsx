@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Clock, Target, Zap } from 'lucide-react';
-import useSupabase from '../hooks/useSupabase'; // Add authentication hook
+import useSupabase from '../../hooks/useSupabase'; // Add authentication hook
 
 const KeywordVideoExtraction = () => {
   const [videoUrl, setVideoUrl] = useState('');
