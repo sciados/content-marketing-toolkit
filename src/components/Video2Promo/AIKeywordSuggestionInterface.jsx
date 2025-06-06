@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Sparkles, Brain, Target, Clock, CheckCircle, Lightbulb } from 'lucide-react';
 import useSupabase from '../../hooks/useSupabase'; // Add authentication hook
 
@@ -14,6 +14,14 @@ const AIKeywordSuggestionInterface = () => {
 
   // 🔧 FIXED: Add authentication
   const { session, user } = useSupabase();
+
+  useEffect(() => {
+    console.log('🔍 Auth Debug:');
+    console.log('Session:', session);
+    console.log('User:', user);
+    console.log('Access Token:', session?.access_token ? 'Present' : 'Missing');
+    console.log('Session Keys:', session ? Object.keys(session) : 'No session');
+  }, [session, user]);
 
   // 🔧 FIXED: Use correct backend URL
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://aiworkers.onrender.com';
