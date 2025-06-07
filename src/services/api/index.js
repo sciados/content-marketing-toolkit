@@ -1,18 +1,32 @@
-// src/services/api/index.js - Complete API Services - FIXED
+// src/services/api/index.js - Enhanced API Services (Google STT Only - Whisper removed)
 import { apiClient } from './apiClient';
 
 /**
- * Video API Service - Video2Promo endpoints
+ * Enhanced Video API Service - Google STT Only
  */
 export const videoApi = {
   // Health check
   getHealth: () => apiClient.safeApiCall(apiClient.get, '/api/video2promo/health', {}, { auth: false }),
 
-  // ✅ FIXED: Extract video transcript using correct endpoint and field names
+  // Enhanced transcript extraction with Google STT and global cache
+  extractTranscriptEnhanced: (data) => apiClient.safeApiCall(apiClient.post, '/api/video2promo/extract-google-stt', {
+    url: data.url,
+    keywords: data.keywords || [],
+    extraction_mode: data.extraction_mode || 'google_stt_only',
+    enable_cache: data.enable_cache !== false,
+    force_refresh: data.force_refresh || false,
+    chunk_duration: data.chunk_duration || 300, // 5 minutes default
+    max_parallel: data.max_parallel || 3
+  }),
+
+  // Progress tracking for long video processing
+  getExtractionProgress: (extractionId) => apiClient.safeApiCall(apiClient.get, `/api/video2promo/extraction-progress/${extractionId}`),
+
+  // Extract video transcript using Google STT (updated endpoint and field names)
   extractTranscript: (data) => apiClient.safeApiCall(apiClient.post, '/api/video2promo/extract-targeted', {
-    url: data.videoUrl || data.url,  // ✅ Backend expects 'url'
-    keywords: data.keywords || [],   // ✅ Backend expects 'keywords'
-    extraction_mode: data.extractionMode || data.extraction_mode || 'smart'  // ✅ Backend expects 'extraction_mode'
+    url: data.videoUrl || data.url,
+    keywords: data.keywords || [],
+    extraction_mode: data.extractionMode || data.extraction_mode || 'google_stt_only'
   }),
 
   // Analyze video benefits
@@ -28,23 +42,46 @@ export const videoApi = {
     assetTypes: data.assetTypes || ['social_posts'],
     targetAudience: data.targetAudience || 'general',
     tone: data.tone || 'professional',
-    autoSave: data.autoSave !== false // Default to true
+    autoSave: data.autoSave !== false
   })
 };
 
 /**
- * Email API Service - Email Generator endpoints
+ * Enhanced Email API Service - AI-Powered Website Scanning
  */
 export const emailApi = {
   // Health check
   getHealth: () => apiClient.safeApiCall(apiClient.get, '/api/email-generator/health', {}, { auth: false }),
 
-  // Scan sales page
+  // AI-enhanced page scanning with Mercury API integration
+  scanPageEnhanced: (data) => apiClient.safeApiCall(apiClient.post, '/api/enhanced-page/scan-ai-enhanced', {
+    url: data.url,
+    keywords: data.keywords || [],
+    industry: data.industry || 'general',
+    analysis_mode: data.analysis_mode || 'ai_enhanced',
+    enable_cache: data.enable_cache !== false,
+    mercury_api: data.mercury_api !== false, // Use Mercury API by default
+    extract_content_angles: data.extract_content_angles !== false
+  }),
+
+  // Campaign-ready website scanning
+  scanPageForCampaign: (data) => apiClient.safeApiCall(apiClient.post, '/api/enhanced-page/scan-campaign-source', {
+    url: data.url,
+    keywords: data.keywords || [],
+    industry: data.industry || 'general',
+    campaign_id: data.campaign_id,
+    target_audience: data.target_audience || 'general'
+  }),
+
+  // Get cache statistics for page scanning
+  getPageCacheStats: () => apiClient.safeApiCall(apiClient.get, '/api/enhanced-page/cache-stats', {}, { auth: false }),
+
+  // Scan sales page (fallback to traditional method)
   scanPage: (data) => apiClient.safeApiCall(apiClient.post, '/api/email-generator/scan-page', {
     url: data.url,
     keywords: data.keywords || [],
     industry: data.industry || 'general',
-    autoSave: data.autoSave !== false // Default to true
+    autoSave: data.autoSave !== false
   }),
 
   // Generate emails
@@ -55,24 +92,23 @@ export const emailApi = {
     tone: data.tone || 'persuasive',
     industry: data.industry || 'general',
     affiliateLink: data.affiliateLink || '',
-    autoSave: data.autoSave !== false // Default to true
+    autoSave: data.autoSave !== false
   })
 };
 
 /**
- * Usage API Service - Usage tracking endpoints
+ * Usage API Service - Enhanced with cache tracking
  */
 export const usageApi = {
   // Health check
   getHealth: () => apiClient.safeApiCall(apiClient.get, '/api/usage/health', {}, { auth: false }),
 
-  // Get usage limits - FIXED: This is the correct endpoint
+  // Get usage limits
   getLimits: () => apiClient.safeApiCall(apiClient.get, '/api/usage/limits'),
 
-  // Track token usage - FIXED: With proper error handling
+  // Track token usage with enhanced metadata
   trackUsage: async (data) => {
     try {
-      // Validate required fields
       if (!data.feature) {
         console.warn('⚠️ trackUsage: feature is required, using default');
         data.feature = 'general';
@@ -86,24 +122,30 @@ export const usageApi = {
       const payload = {
         feature: data.feature,
         tokensUsed: data.tokensUsed,
-        metadata: data.metadata || {}
+        metadata: {
+          ...data.metadata,
+          // Enhanced metadata for cache and processing tracking
+          cached: data.cached || false,
+          processing_method: data.processing_method || 'google_stt',
+          cost_saved: data.cost_saved || 0,
+          processing_time: data.processing_time || 0,
+          timestamp: new Date().toISOString()
+        }
       };
 
-      console.log('📊 Tracking usage:', payload);
+      console.log('📊 Tracking enhanced usage:', payload);
       
       const result = await apiClient.safeApiCall(apiClient.post, '/api/usage/track', payload);
       
       if (result.success) {
-        console.log('✅ Usage tracked successfully:', result);
+        console.log('✅ Enhanced usage tracked successfully:', result);
         return result;
       } else {
         console.warn('⚠️ Usage tracking failed but continuing:', result.error);
-        // Don't throw error - allow app to continue
         return { success: false, error: result.error };
       }
     } catch (error) {
       console.warn('⚠️ Usage tracking error, continuing anyway:', error.message);
-      // Return a non-throwing error response
       return { 
         success: false, 
         error: error.message,
@@ -112,16 +154,17 @@ export const usageApi = {
     }
   },
 
-  // Get usage history - FIXED: Proper parameter handling
+  // Get usage history with enhanced filtering
   getHistory: (params = {}) => apiClient.safeApiCall(apiClient.get, '/api/usage/history', {
     days: params.days || 30,
     feature: params.feature || '',
-    limit: params.limit || 50
+    limit: params.limit || 50,
+    include_cache_stats: params.include_cache_stats || false
   }),
 }
 
 /**
- * Content Library API Service - Content management endpoints
+ * Content Library API Service - Enhanced campaign operations
  */
 export const contentLibraryApi = {
   // Health check
@@ -178,9 +221,7 @@ export const contentLibraryApi = {
 
   getTypes: () => apiClient.safeApiCall(apiClient.get, '/api/content-library/types'),
 
-  // NEW: Campaign Operations
-  
-  // Create a new campaign
+  // Campaign Operations
   createCampaign: (data) => apiClient.safeApiCall(apiClient.post, '/api/content-library/campaigns', {
     name: data.name,
     category: data.category,
@@ -189,7 +230,6 @@ export const contentLibraryApi = {
     input_sources: data.input_sources || []
   }),
 
-  // Get user's campaigns
   getCampaigns: (params = {}) => apiClient.safeApiCall(apiClient.get, '/api/content-library/campaigns', {
     category: params.category || '',
     status: params.status || '',
@@ -198,16 +238,12 @@ export const contentLibraryApi = {
     offset: params.offset || '0'
   }),
 
-  // Get specific campaign
   getCampaign: (id) => apiClient.safeApiCall(apiClient.get, `/api/content-library/campaigns/${id}`),
 
-  // Update campaign
   updateCampaign: (id, data) => apiClient.safeApiCall(apiClient.put, `/api/content-library/campaigns/${id}`, data),
 
-  // Delete campaign
   deleteCampaign: (id) => apiClient.safeApiCall(apiClient.delete, `/api/content-library/campaigns/${id}`),
 
-  // Check for existing content matches
   checkContentMatches: (data) => apiClient.safeApiCall(apiClient.post, '/api/content-library/check-matches', {
     type: data.type,
     url: data.url,
@@ -215,7 +251,6 @@ export const contentLibraryApi = {
     category: data.category
   }),
 
-  // Browse content by category
   browseByCategory: (params = {}) => apiClient.safeApiCall(apiClient.get, '/api/content-library/browse', {
     category: params.category || '',
     type: params.type || 'all',
@@ -225,14 +260,17 @@ export const contentLibraryApi = {
 };
 
 /**
- * System API Service - Health and system endpoints
+ * Enhanced System API Service - Cache and performance monitoring
  */
 export const systemApi = {
   // Main health check
   getHealth: () => apiClient.safeApiCall(apiClient.get, '/', {}, { auth: false }),
 
-  // Cache statistics
+  // Enhanced cache statistics with global cache metrics
   getCacheStats: () => apiClient.safeApiCall(apiClient.get, '/cache/stats', {}, { auth: false }),
+
+  // Global cache performance metrics
+  getGlobalCacheStats: () => apiClient.safeApiCall(apiClient.get, '/cache/global-stats', {}, { auth: false }),
 
   // System status
   getSystemStatus: () => apiClient.safeApiCall(apiClient.get, '/system/status', {}, { auth: false }),
@@ -241,11 +279,17 @@ export const systemApi = {
   testApi: () => apiClient.safeApiCall(apiClient.get, '/api/test', {}, { auth: false }),
 
   // Get API info
-  getApiInfo: () => apiClient.safeApiCall(apiClient.get, '/api', {}, { auth: false })
+  getApiInfo: () => apiClient.safeApiCall(apiClient.get, '/api', {}, { auth: false }),
+
+  // Google STT service status
+  getGoogleSTTStatus: () => apiClient.safeApiCall(apiClient.get, '/api/video2promo/google-stt-status', {}, { auth: false }),
+
+  // Mercury API status for enhanced page scanning
+  getMercuryAPIStatus: () => apiClient.safeApiCall(apiClient.get, '/api/enhanced-page/mercury-status', {}, { auth: false })
 };
 
 /**
- * Auth API Service - Authentication utilities
+ * Enhanced Auth API Service - Authentication utilities
  */
 export const authApi = {
   // Test current authentication
@@ -269,11 +313,36 @@ export const authApi = {
         error: error.message
       };
     }
+  },
+
+  // Check enhanced services status (Google STT only)
+  checkEnhancedServices: async () => {
+    try {
+      const [googleSTT, mercuryAPI, cacheStats] = await Promise.allSettled([
+        systemApi.getGoogleSTTStatus(),
+        systemApi.getMercuryAPIStatus(),
+        systemApi.getCacheStats()
+      ]);
+
+      return {
+        googleSTT: googleSTT.status === 'fulfilled' ? googleSTT.value : { available: false },
+        mercuryAPI: mercuryAPI.status === 'fulfilled' ? mercuryAPI.value : { available: false },
+        cache: cacheStats.status === 'fulfilled' ? cacheStats.value : { available: false },
+        processingMethod: 'google_stt_only'
+      };
+    } catch (error) {
+      return {
+        googleSTT: { available: false, error: error.message },
+        mercuryAPI: { available: false, error: error.message },
+        cache: { available: false, error: error.message },
+        processingMethod: 'google_stt_only'
+      };
+    }
   }
 };
 
 /**
- * Complete API object with all services
+ * Complete API object with all enhanced services
  */
 export const api = {
   video: videoApi,
@@ -286,7 +355,7 @@ export const api = {
 };
 
 /**
- * Convenience function to check all service health
+ * Convenience function to check all service health including enhanced features
  */
 export const checkAllServices = async () => {
   const services = ['video', 'email', 'usage', 'contentLibrary'];
@@ -299,7 +368,8 @@ export const checkAllServices = async () => {
         results[service] = {
           available: result.success,
           status: result.success ? 'healthy' : 'error',
-          message: result.message || result.error || 'Unknown status'
+          message: result.message || result.error || 'Unknown status',
+          processingMethod: 'google_stt_only'
         };
       } catch (error) {
         results[service] = {
@@ -310,6 +380,25 @@ export const checkAllServices = async () => {
       }
     })
   );
+
+  // Add enhanced services check
+  try {
+    const enhancedStatus = await authApi.checkEnhancedServices();
+    results.enhanced = {
+      googleSTT: enhancedStatus.googleSTT.available,
+      mercuryAPI: enhancedStatus.mercuryAPI.available,
+      cache: enhancedStatus.cache.available,
+      processingMethod: 'google_stt_only'
+    };
+  } catch (error) {
+    results.enhanced = {
+      googleSTT: false,
+      mercuryAPI: false,
+      cache: false,
+      processingMethod: 'google_stt_only',
+      error: error.message
+    };
+  }
 
   return results;
 };

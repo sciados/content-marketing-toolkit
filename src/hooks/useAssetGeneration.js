@@ -1,4 +1,4 @@
-// src/hooks/useAssetGeneration.js - UPDATED to use centralized API
+// src/hooks/useAssetGeneration.js - Google STT Only (Whisper removed)
 import { useState, useCallback } from 'react';
 import { videoApi, usageApi } from '../services/api';
 import { useErrorHandler } from './useErrorHandler';
@@ -8,6 +8,12 @@ export function useAssetGeneration() {
   const [generatedAssets, setGeneratedAssets] = useState([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
+
+  // Enhanced state for cache and processing tracking
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [processingStage, setProcessingStage] = useState('');
+  const [cacheStats, setCacheStats] = useState(null);
+  const [extractionMethod, setExtractionMethod] = useState(null);
 
   /**
    * Track AI token usage using centralized API
@@ -29,11 +35,194 @@ export function useAssetGeneration() {
   }, []);
 
   /**
-   * Generate assets using centralized API service
+   * Enhanced video processing with Google STT only, cache awareness, and progress tracking
+   */
+  const processVideoEnhanced = useCallback(async (videoUrl, keywords = [], options = {}) => {
+    setIsGenerating(true);
+    setError(null);
+    setProcessingProgress(0);
+    setProcessingStage('Initializing...');
+    setCacheStats(null);
+    setExtractionMethod(null);
+
+    try {
+      console.log('🚀 Starting enhanced video processing with Google STT...');
+      
+      // Progress updates
+      const updateProgress = (stage, progress) => {
+        setProcessingStage(stage);
+        setProcessingProgress(progress);
+      };
+
+      updateProgress('Checking for cached transcript...', 10);
+      await new Promise(r => setTimeout(r, 500));
+
+      // Use enhanced video API endpoint for Google STT processing
+      const safeApiCall = withErrorHandling(videoApi.extractTranscriptEnhanced);
+      const result = await safeApiCall({
+        url: videoUrl,
+        keywords: keywords || [],
+        extraction_mode: options.extractionMode || 'google_stt_only',
+        enable_cache: options.enableCache !== false, // Default to true
+        force_refresh: options.forceRefresh || false
+      });
+
+      if (!result.success) {
+        throw new Error(result.message || result.error || 'Video processing failed');
+      }
+
+      const data = result.data || result;
+
+      // Handle cache status and performance metrics
+      if (data.cached) {
+        updateProgress('⚡ Found cached transcript!', 100);
+        setCacheStats({
+          cached: true,
+          cacheSource: data.cache_source || 'unknown',
+          costSaved: data.cost_saved || 0,
+          processingTime: data.processing_time || 0.1
+        });
+      } else {
+        // Show progress for fresh extraction with Google STT
+        updateProgress('☁️ Processing with Google Speech-to-Text...', 30);
+        await new Promise(r => setTimeout(r, 1000));
+        updateProgress('🔄 Converting audio segments...', 60);
+        await new Promise(r => setTimeout(r, 1500));
+        updateProgress('📝 Assembling transcript...', 90);
+        await new Promise(r => setTimeout(r, 500));
+        
+        updateProgress('✅ Transcript ready!', 100);
+        setCacheStats({
+          cached: false,
+          processingTime: data.processing_time || 30,
+          method: data.method,
+          costEstimate: data.cost_estimate || 0.36
+        });
+      }
+
+      setExtractionMethod(data.method || 'google_stt');
+
+      console.log('✅ Enhanced video processing successful:', {
+        method: data.method,
+        cached: data.cached,
+        transcriptLength: data.transcript?.length || 0,
+        costSaved: data.cost_saved
+      });
+
+      return {
+        success: true,
+        transcript: data.transcript,
+        method: data.method,
+        cached: data.cached,
+        cacheSource: data.cache_source,
+        costSaved: data.cost_saved,
+        processingTime: data.processing_time,
+        wordCount: data.word_count,
+        videoTitle: data.video_title,
+        duration: data.duration
+      };
+
+    } catch (err) {
+      console.error('❌ Enhanced video processing error:', err);
+      setError(err.message);
+      setProcessingStage('❌ Processing failed');
+      
+      if (!err.errorInfo) {
+        throw err;
+      }
+      
+      return {
+        success: false,
+        error: err.message,
+        errorInfo: err.errorInfo
+      };
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [withErrorHandling]);
+
+  /**
+   * Enhanced website scanning with AI-powered analysis
+   */
+  const scanWebsiteEnhanced = useCallback(async (url, keywords = [], options = {}) => {
+    setIsGenerating(true);
+    setError(null);
+    setProcessingProgress(0);
+    setProcessingStage('Initializing website scan...');
+
+    try {
+      console.log('🌐 Starting enhanced website scanning with AI...');
+      
+      const updateProgress = (stage, progress) => {
+        setProcessingStage(stage);
+        setProcessingProgress(progress);
+      };
+
+      updateProgress('🔍 Analyzing page structure...', 20);
+      await new Promise(r => setTimeout(r, 500));
+
+      updateProgress('🧠 AI extracting insights...', 60);
+      
+      // Import from your existing API but with enhanced endpoint
+      const { emailApi } = await import('../services/api');
+      const safeApiCall = withErrorHandling(emailApi.scanPageEnhanced || emailApi.scanPage);
+      
+      const result = await safeApiCall({
+        url: url,
+        keywords: keywords || [],
+        industry: options.industry || 'general',
+        analysis_mode: options.analysisMode || 'ai_enhanced',
+        enable_cache: options.enableCache !== false
+      });
+
+      if (!result.success) {
+        throw new Error(result.message || result.error || 'Website scanning failed');
+      }
+
+      updateProgress('✅ Analysis complete!', 100);
+
+      const data = result.data || result;
+      
+      // Enhanced data structure for AI analysis
+      return {
+        success: true,
+        benefits: data.benefits || [],
+        features: data.features || [],
+        painPoints: data.pain_points || [],
+        targetAudience: data.target_audience || 'General audience',
+        contentAngles: data.content_angles || {},
+        websiteData: data.website_data || {},
+        cached: data.cached || false,
+        processingTime: data.processing_time || 3,
+        analysisMethod: data.analysis_method || 'ai_enhanced'
+      };
+
+    } catch (err) {
+      console.error('❌ Enhanced website scanning error:', err);
+      setError(err.message);
+      setProcessingStage('❌ Scanning failed');
+      
+      if (!err.errorInfo) {
+        throw err;
+      }
+      
+      return {
+        success: false,
+        error: err.message,
+        errorInfo: err.errorInfo
+      };
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [withErrorHandling]);
+
+  /**
+   * Generate assets using centralized API service (Enhanced with new data)
    */
   const generateAssets = useCallback(async (params) => {
     setIsGenerating(true);
     setError(null);
+    setProcessingStage('Generating content with AI...');
 
     try {
       const {
@@ -96,12 +285,10 @@ export function useAssetGeneration() {
       console.error('❌ Asset generation error:', err);
       setError(err.message);
       
-      // Don't show duplicate error if withErrorHandling already handled it
       if (!err.errorInfo) {
         throw err;
       }
       
-      // Return error result instead of throwing if error was handled
       return {
         success: false,
         error: err.message,
@@ -109,8 +296,21 @@ export function useAssetGeneration() {
       };
     } finally {
       setIsGenerating(false);
+      setProcessingStage('');
     }
   }, [trackAITokenUsage, withErrorHandling]);
+
+  // Get cache statistics
+  const getCacheStats = useCallback(async () => {
+    try {
+      const { systemApi } = await import('../services/api');
+      const result = await systemApi.getCacheStats();
+      return result.success ? result.data : null;
+    } catch (error) {
+      console.warn('⚠️ Failed to get cache stats:', error);
+      return null;
+    }
+  }, []);
 
   // Specialized generation methods using the main generateAssets function
   const generateEmailSeries = useCallback(async (params) => {
@@ -170,6 +370,10 @@ export function useAssetGeneration() {
   const clearAssets = useCallback(() => {
     setGeneratedAssets([]);
     setError(null);
+    setProcessingProgress(0);
+    setProcessingStage('');
+    setCacheStats(null);
+    setExtractionMethod(null);
   }, []);
 
   const removeAsset = useCallback((assetId) => {
@@ -260,11 +464,22 @@ export function useAssetGeneration() {
     isGenerating,
     error,
     
+    // Enhanced state for cache and progress tracking
+    processingProgress,
+    processingStage,
+    cacheStats,
+    extractionMethod,
+    
     // Main actions
     generateAssets,
     generateMultipleAssets,
     clearAssets,
     removeAsset,
+    
+    // Enhanced processing methods
+    processVideoEnhanced,
+    scanWebsiteEnhanced,
+    getCacheStats,
     
     // Specialized generation methods
     generateEmailSeries,
