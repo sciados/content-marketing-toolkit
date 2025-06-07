@@ -1,4 +1,4 @@
-// src/services/api/index.js - Complete API Services
+// src/services/api/index.js - Complete API Services - FIXED
 import { apiClient } from './apiClient';
 
 /**
@@ -8,11 +8,11 @@ export const videoApi = {
   // Health check
   getHealth: () => apiClient.safeApiCall(apiClient.get, '/api/video2promo/health', {}, { auth: false }),
 
-  // Extract video transcript
-  extractTranscript: (data) => apiClient.safeApiCall(apiClient.post, '/api/video2promo/extract-transcript', {
-    videoUrl: data.videoUrl,
-    forceRefresh: data.forceRefresh || false,
-    autoSave: data.autoSave !== false // Default to true
+  // ✅ FIXED: Extract video transcript using correct endpoint and field names
+  extractTranscript: (data) => apiClient.safeApiCall(apiClient.post, '/api/video2promo/extract-targeted', {
+    url: data.videoUrl || data.url,  // ✅ Backend expects 'url'
+    keywords: data.keywords || [],   // ✅ Backend expects 'keywords'
+    extraction_mode: data.extractionMode || data.extraction_mode || 'smart'  // ✅ Backend expects 'extraction_mode'
   }),
 
   // Analyze video benefits

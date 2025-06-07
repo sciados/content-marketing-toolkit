@@ -55,12 +55,15 @@ const KeywordVideoExtraction = () => {
     setIsProcessing(true);
     setError(null);
     
+    // ✅ FIXED: Send correct field names that match backend expectations
     const payload = {
-      videoUrl,
+      url: videoUrl,                    // ✅ Backend expects 'url'
       keywords: keywords.filter(k => k.trim()),
-      extractionMode,
-      targetDuration: extractionMode === 'targeted' ? 'auto' : 'full'
+      extraction_mode: extractionMode   // ✅ Backend expects 'extraction_mode'
+      // ✅ REMOVED: targetDuration (backend doesn't expect this)
     };
+
+    console.log('🔍 Sending payload:', payload);
 
     try {
       // 🔧 FIXED: Add authentication headers with better debugging
