@@ -1,7 +1,7 @@
-// src/shared/context/AuthContext.jsx - Complete Final Version with Safety Checks
+// src/shared/context/AuthContext.jsx - Complete Final Version with Correct Import Paths
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { auth } from '../../infrastructure/auth/auth';
-import { supabase } from '../../core/database/supabaseClient';
+import { supabase } from '../../services/supabase/supabaseClient'; // FIXED: Correct path
 
 // Create context with default value to prevent undefined errors
 const AuthContext = createContext({
@@ -78,14 +78,24 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
-  // Set up auth listener only if Supabase is available
+  // Set up auth listener with Supabase client (now with correct import)
   useEffect(() => {
     if (!supabase) {
-      console.warn('⚠️ Supabase not available, skipping auth listener');
+      console.warn('⚠️ Supabase client is null/undefined, skipping auth listener');
       return;
     }
 
-    console.log('🔧 Setting up auth listener...');
+    if (!supabase.auth) {
+      console.warn('⚠️ Supabase.auth is not available, skipping auth listener');
+      return;
+    }
+
+    if (typeof supabase.auth.onAuthStateChange !== 'function') {
+      console.warn('⚠️ Supabase.auth.onAuthStateChange is not a function, skipping auth listener');
+      return;
+    }
+
+    console.log('🔧 Setting up auth listener with correct Supabase client...');
     
     try {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -105,7 +115,9 @@ export const AuthProvider = ({ children }) => {
 
       return () => {
         console.log('🔧 Cleaning up auth listener');
-        subscription.unsubscribe();
+        if (subscription && typeof subscription.unsubscribe === 'function') {
+          subscription.unsubscribe();
+        }
       };
     } catch (err) {
       console.error('❌ Failed to set up auth listener:', err);
