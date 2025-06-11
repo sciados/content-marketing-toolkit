@@ -1,5 +1,5 @@
 // src/components/Layout/MainLayout.jsx - FIXED to fetch real profile data
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Navigate, NavLink } from 'react-router-dom';
 // import SupabaseContext from '../../context/SupabaseContext';
 import { useAuth } from '../shared/hooks/useAuth';
@@ -15,7 +15,7 @@ import {
 } from '../shared/utils/tierUtils';
 
 const MainLayout = () => {
-  const { user, loading: authLoading } = useContext(useAuth);
+  const { user, authLoading } = useAuth();
   const { logout } = useAuth();
   const { wsConnected } = useUsageTracking();
   const [showSystemStatus, setShowSystemStatus] = useState(false);

@@ -1,11 +1,11 @@
 // src/pages/Admin/AdminAds.jsx
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../shared/hooks/useAuth';
 import { useToast } from '../../shared/hooks/useToast';
 
 const AdminAds = () => {
-  const { user, loading } = useContext(useAuth);
+  const { user, loading } = useAuth();
   const { showToast } = useToast();
   const [ads, setAds] = useState([]);
   const [isLoading, setIsLoading] = useState(true);

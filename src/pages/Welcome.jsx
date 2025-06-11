@@ -1,5 +1,5 @@
 // src/pages/Welcome.jsx - Updated to use SupabaseProvider
-import React, { useEffect, useContext } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../shared/hooks/useAuth'
 import { 
@@ -13,7 +13,7 @@ import {
 
 const Welcome = () => {
   const navigate = useNavigate();
-  const { user, loading } = useContext(useAuth);
+  const { user, loading } = useAuth();
 
   // Redirect authenticated users to dashboard
   useEffect(() => {
