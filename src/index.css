@@ -1,0 +1,6 @@
+/* TODO: Move your existing index.css here */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Add your existing global styles */
