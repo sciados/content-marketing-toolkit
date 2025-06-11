@@ -1,8 +1,8 @@
 // src/pages/EmailSeriesDetailPage.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../core/database/supabaseClient';
-// import { useAuth } from '../shared/hooks/useAuth';
+// import { supabase } from '../core/database/supabaseClient';
+import { useAuth } from '../shared/hooks/useAuth';
 import { useToast } from '../shared/hooks/useToast';
 
 // Import components
@@ -12,7 +12,7 @@ import Button from '../shared/components/ui/Button';
 const EmailSeriesDetailPage = () => {
   const { seriesId } = useParams();
   const navigate = useNavigate();
-  const { user } = supabase();
+  const { user, from, supabase } = useAuth();
   const { showToast } = useToast();
   
   const [series, setSeries] = useState(null);
@@ -53,8 +53,7 @@ const EmailSeriesDetailPage = () => {
         
         // Fetch the series
         console.log("Fetching series with ID:", seriesId);
-        const { data: seriesData, error: seriesError } = await supabase
-          .from('email_series')
+        const { data: seriesData, error: seriesError } = await from('email_series')
           .select('*')
           .eq('id', seriesId)
           .single();
@@ -74,8 +73,7 @@ const EmailSeriesDetailPage = () => {
         
         // Fetch the emails in the series
         console.log("Fetching emails for series:", seriesId);
-        const { data: emailsData, error: emailsError } = await supabase
-          .from('emails')
+        const { data: emailsData, error: emailsError } = await from('emails')
           .select('*')
           .eq('series_id', seriesId)
           .order('email_number', { ascending: true });
@@ -118,8 +116,7 @@ const EmailSeriesDetailPage = () => {
       setSaving(true);
       console.log("Saving email with ID:", editingEmailId);
       
-      const { error } = await supabase
-        .from('emails')
+      const { error } = await from('emails')
         .update({
           subject: editedSubject,
           body: editedBody,
@@ -178,8 +175,7 @@ const EmailSeriesDetailPage = () => {
     
     try {
       console.log("Deleting email with ID:", emailId);
-      const { error } = await supabase
-        .from('emails')
+      const { error } = await from('emails')
         .delete()
         .eq('id', emailId);
       

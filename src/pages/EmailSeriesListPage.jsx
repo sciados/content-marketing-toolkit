@@ -1,8 +1,8 @@
 // src/pages/EmailSeriesListPage.jsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../core/database/supabaseClient';
-// import useAuth from '../shared/hooks/useAuth';
+// import { supabase } from '../core/database/supabaseClient';
+import useAuth from '../shared/hooks/useAuth';
 import { useToast } from '../shared/hooks/useToast';
 
 // Import common components
@@ -11,7 +11,7 @@ import Button from '../shared/components/ui/Button';
 import Loader from '../shared/components/ui/Loader';
 
 const EmailSeriesListPage = () => {
-  const { user } = supabase();
+  const { user, from, supabase } = useAuth();
   const { showToast } = useToast();
   
   const [emailSeries, setEmailSeries] = useState([]);
@@ -32,8 +32,7 @@ const EmailSeriesListPage = () => {
         setLoading(true);
         
         // Fetch series with counts of emails in each series
-        const { data, error } = await supabase
-          .from('email_series')
+        const { data, error } = await from('email_series')
           .select(`
             *,
             emails:emails(count)
@@ -112,18 +111,16 @@ const EmailSeriesListPage = () => {
       setLoading(true);
       
       // Delete emails in this series first (due to foreign key constraints)
-      const { error: emailsError } = await supabase
-        .from('emails')
+      const { error: emailsError } = await from('emails')
         .delete()
         .eq('series_id', seriesId);
       
       if (emailsError) throw emailsError;
       
       // Then delete the series
-      const { error: seriesError } = await supabase
-        .from('email_series')
-        .delete()
-        .eq('id', seriesId);
+      const { error: seriesError } = await from('email_series')
+  .delete()
+  .eq('id', seriesId);
       
       if (seriesError) throw seriesError;
       
