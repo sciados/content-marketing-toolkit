@@ -1,4 +1,4 @@
-// src/services/supabase/supabaseClient.js
+// src/core/database/supabaseClient.js
 import { createClient } from '@supabase/supabase-js';
 
 console.log('🔧 supabaseClient.js: Loading...');

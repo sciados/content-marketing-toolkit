@@ -1,7 +1,7 @@
 // src/shared/context/AuthContext.jsx - Complete Final Version with Correct Import Paths
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { auth } from '../../infrastructure/auth/auth';
-import { supabase } from '../../services/supabase/supabaseClient'; // FIXED: Correct path
+import { supabase } from '../../core/database/supabaseClient'; // FIXED: Correct path
 
 // Create context with default value to prevent undefined errors
 const AuthContext = createContext({
