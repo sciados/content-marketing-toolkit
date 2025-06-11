@@ -1,7 +1,7 @@
 // src/pages/EmailSeriesListPage.jsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../database/supabaseClient';
+import { supabase } from '../core/database/supabaseClient';
 // import useAuth from '../shared/hooks/useAuth';
 import { useToast } from '../shared/hooks/useToast';
 
