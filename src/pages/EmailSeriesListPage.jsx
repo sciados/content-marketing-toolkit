@@ -1,8 +1,8 @@
 // src/pages/EmailSeriesListPage.jsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-// import { supabase } from '../services/supabase/supabaseClient';
-import useAuth from '../shared/hooks/useAuth';
+import { supabase } from '../database/supabaseClient';
+// import useAuth from '../shared/hooks/useAuth';
 import { useToast } from '../shared/hooks/useToast';
 
 // Import common components
@@ -11,7 +11,7 @@ import Button from '../shared/components/ui/Button';
 import Loader from '../shared/components/ui/Loader';
 
 const EmailSeriesListPage = () => {
-  const { user } = useAuth();
+  const { user } = supabase();
   const { showToast } = useToast();
   
   const [emailSeries, setEmailSeries] = useState([]);
@@ -32,7 +32,7 @@ const EmailSeriesListPage = () => {
         setLoading(true);
         
         // Fetch series with counts of emails in each series
-        const { data, error } = await useAuth
+        const { data, error } = await supabase
           .from('email_series')
           .select(`
             *,
@@ -112,7 +112,7 @@ const EmailSeriesListPage = () => {
       setLoading(true);
       
       // Delete emails in this series first (due to foreign key constraints)
-      const { error: emailsError } = await useAuth
+      const { error: emailsError } = await supabase
         .from('emails')
         .delete()
         .eq('series_id', seriesId);
@@ -120,7 +120,7 @@ const EmailSeriesListPage = () => {
       if (emailsError) throw emailsError;
       
       // Then delete the series
-      const { error: seriesError } = await useAuth
+      const { error: seriesError } = await supabase
         .from('email_series')
         .delete()
         .eq('id', seriesId);
@@ -132,7 +132,7 @@ const EmailSeriesListPage = () => {
       showToast('Email series deleted successfully', 'success');
       
       // Update profile statistics with RPC call
-      await useAuth.rpc('update_profile_stats', { 
+      await supabase.rpc('update_profile_stats', { 
         uid: user.id, 
         series_count_delta: -1 
       });

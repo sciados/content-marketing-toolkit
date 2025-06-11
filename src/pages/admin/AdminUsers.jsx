@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
-// import { supabase } from '../../services/supabase/supabaseClient';
+// import { supabase } from '../../core/database/supabaseClient';
 import { useAuth } from '../../shared/hooks/useAuth';
 import { useToast } from '../../shared/hooks/useToast';
 

@@ -1,6 +1,6 @@
 // src/pages/Admin/FixsuperAdmin.jsx
 import React, { useState } from 'react';
-// import { supabase } from '../../services/supabase/supabaseClient';
+// import { supabase } from '../../core/database/supabaseClient';
 import { useAuth } from '../../shared/hooks/useAuth';
 
 const FixsuperAdmin = () => {
