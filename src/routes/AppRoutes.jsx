@@ -199,7 +199,7 @@ const Video2PromoPage = lazy(() => {
   });
 });
 
-// 🆕 NEW: Future Tools (ready for implementation)
+// 🆕 NEW: Future tools (ready for implementation)
 const Document2PromoPage = lazy(() => {
   const tracker = trackLazyLoading('Document2Promo');
   return import('../pages/tools/Document2PromoPage').catch(() => {
@@ -306,7 +306,7 @@ const Analytics = lazy(() => {
 // Future tool pages
 const AIWritingAssistant = lazy(() => {
   const tracker = trackLazyLoading('AIWritingAssistant');
-  return import('../pages/Tools/AIWritingAssistant').then(module => {
+  return import('../pages/tools/AIWritingAssistant').then(module => {
     if (tracker) tracker();
     return module;
   });
@@ -314,7 +314,7 @@ const AIWritingAssistant = lazy(() => {
 
 const CompetitorAnalysis = lazy(() => {
   const tracker = trackLazyLoading('CompetitorAnalysis');
-  return import('../pages/Tools/CompetitorAnalysis').then(module => {
+  return import('../pages/tools/CompetitorAnalysis').then(module => {
     if (tracker) tracker();
     return module;
   });
