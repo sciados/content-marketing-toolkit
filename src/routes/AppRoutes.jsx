@@ -37,46 +37,19 @@ export async function GET() {
   });
 };
 
-// Replace ALL admin imports in AppRoutes.jsx with these fallback versions:
-
-// 🚀 FIXED: Admin Pages with fallbacks for missing files
-const AdminUsers = lazy(() => {
-  const tracker = trackLazyLoading('AdminUsers');
-  return import('../pages/admin/AdminUsers').catch(() => {
-    return {
-      default: () => (
-        <div className="max-w-4xl mx-auto p-8 text-center">
-          <div className="text-6xl mb-4">👥</div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Admin Users</h2>
-          <p className="text-lg text-gray-600">User management interface</p>
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-4">
-            <p className="text-yellow-800">User management coming soon!</p>
-          </div>
-        </div>
-      )
-    };
-  }).then(module => {
+// 🚀 ENHANCED: Use SuperAdminPanel as main admin dashboard
+const AdminDashboard = lazy(() => {
+  const tracker = trackLazyLoading('SuperAdminPanel');
+  return import('../pages/admin/SuperAdminPanel').then(module => {
     if (tracker) tracker();
     return module;
   });
 });
 
-const AdminDashboard = lazy(() => {
-  const tracker = trackLazyLoading('SuperAdminPanel');
-  return import('../pages/admin/SuperAdminPanel').catch(() => {
-    return {
-      default: () => (
-        <div className="max-w-4xl mx-auto p-8 text-center">
-          <div className="text-6xl mb-4">⚡</div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Super Admin Panel</h2>
-          <p className="text-lg text-gray-600">Admin dashboard</p>
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mt-4">
-            <p className="text-purple-800">Admin dashboard coming soon!</p>
-          </div>
-        </div>
-      )
-    };
-  }).then(module => {
+// 🚀 UPDATED: Admin Pages with correct paths
+const AdminUsers = lazy(() => {
+  const tracker = trackLazyLoading('AdminUsers');
+  return import('../pages/admin/AdminUsers').then(module => {
     if (tracker) tracker();
     return module;
   });
@@ -84,20 +57,7 @@ const AdminDashboard = lazy(() => {
 
 const AdminAnalytics = lazy(() => {
   const tracker = trackLazyLoading('AdminAnalytics');
-  return import('../pages/admin/AdminAnalytics').catch(() => {
-    return {
-      default: () => (
-        <div className="max-w-4xl mx-auto p-8 text-center">
-          <div className="text-6xl mb-4">📊</div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Admin Analytics</h2>
-          <p className="text-lg text-gray-600">System analytics and insights</p>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
-            <p className="text-blue-800">Analytics dashboard coming soon!</p>
-          </div>
-        </div>
-      )
-    };
-  }).then(module => {
+  return import('../pages/admin/AdminAnalytics').then(module => {
     if (tracker) tracker();
     return module;
   });
@@ -105,41 +65,16 @@ const AdminAnalytics = lazy(() => {
 
 const FixSuperAdmin = lazy(() => {
   const tracker = trackLazyLoading('FixSuperAdmin');
-  return import('../pages/admin/FixSuperAdmin').catch(() => {
-    return {
-      default: () => (
-        <div className="max-w-4xl mx-auto p-8 text-center">
-          <div className="text-6xl mb-4">🔧</div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Fix Super Admin</h2>
-          <p className="text-lg text-gray-600">System maintenance tools</p>
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
-            <p className="text-green-800">Maintenance tools coming soon!</p>
-          </div>
-        </div>
-      )
-    };
-  }).then(module => {
+  return import('../pages/admin/FixSuperAdmin').then(module => {
     if (tracker) tracker();
     return module;
   });
 });
 
+// 🚀 UPDATED: Admin Ads with correct case-sensitive path
 const AdminAds = lazy(() => {
   const tracker = trackLazyLoading('AdminAds');
-  return import('../pages/admin/AdminAds').catch(() => {
-    return {
-      default: () => (
-        <div className="max-w-4xl mx-auto p-8 text-center">
-          <div className="text-6xl mb-4">📺</div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Admin Ads</h2>
-          <p className="text-lg text-gray-600">Advertisement management</p>
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mt-4">
-            <p className="text-indigo-800">Ad management coming soon!</p>
-          </div>
-        </div>
-      )
-    };
-  }).then(module => {
+  return import('../pages/admin/AdminAds').then(module => {
     if (tracker) tracker();
     return module;
   });
