@@ -1,6 +1,6 @@
 // src/shared/hooks/useAuth.js - Updated import path
 import { useContext } from 'react';
-import { AuthContext } from '../../infrastructure/auth/AuthProvider';
+import { AuthContext } from '../context/AuthContext';
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
