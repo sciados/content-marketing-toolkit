@@ -1,5 +1,5 @@
-// src/pages/Welcome.jsx - Updated to use SupabaseProvider
-import React, { useEffect } from 'react';
+// src/pages/Welcome.jsx - Fixed useAuth usage
+import React, { useEffect } from 'react';  // REMOVED useContext
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../shared/hooks/useAuth'
 import { 
@@ -13,7 +13,7 @@ import {
 
 const Welcome = () => {
   const navigate = useNavigate();
-  const { user, loading } = useAuth();
+  const { user, loading } = useAuth();  // CHANGED: Removed useContext()
 
   // Redirect authenticated users to dashboard
   useEffect(() => {

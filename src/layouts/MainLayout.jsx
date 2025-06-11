@@ -15,7 +15,7 @@ import {
 } from '../shared/utils/tierUtils';
 
 const MainLayout = () => {
-  const { user, authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { logout } = useAuth();
   const { wsConnected } = useUsageTracking();
   const [showSystemStatus, setShowSystemStatus] = useState(false);
