@@ -1,7 +1,8 @@
-// src/App.jsx - FINAL VERSION without PerformanceMonitor
+// src/App.jsx - UPDATED with AuthProvider
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router } from 'react-router-dom';
 import SupabaseProvider from './shared/context/SupabaseProvider';
+import { AuthProvider } from './shared/context/AuthContext';  // CHANGE THIS IMPORT
 import { ToastProvider } from './shared/context/ToastContext';
 import { ThemeProvider } from './shared/context/ThemeContext';
 import { WebSocketProvider } from './shared/context/WebSocketProvider';
@@ -63,15 +64,17 @@ const App = () => {
       {isDevelopment && <EmergencyReset />}
       
       <SupabaseProvider>
-        <ThemeProvider>
-          <ToastProvider>
-            <WebSocketProvider>
-              <Router>
-                <AppRoutes />              
-              </Router>
-            </WebSocketProvider>
-          </ToastProvider>
-        </ThemeProvider>
+        <AuthProvider>              {/* ADD THIS WRAPPER */}
+          <ThemeProvider>
+            <ToastProvider>
+              <WebSocketProvider>
+                <Router>
+                  <AppRoutes />              
+                </Router>
+              </WebSocketProvider>
+            </ToastProvider>
+          </ThemeProvider>
+        </AuthProvider>                {/* ADD THIS WRAPPER */}
       </SupabaseProvider>
     </ErrorBoundary>
   );

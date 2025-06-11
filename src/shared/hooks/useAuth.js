@@ -1,11 +1,7 @@
-// src/hooks/useAuth.js - Separate Auth Hook for Fast Refresh
+// src/shared/hooks/useAuth.js - Updated import path
 import { useContext } from 'react';
-import AuthContext from '../context/AuthContext';
+import { AuthContext } from '../../infrastructure/auth/AuthProvider';
 
-/**
- * Custom hook to access authentication context
- * Separated from AuthProvider for React Fast Refresh compatibility
- */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   
