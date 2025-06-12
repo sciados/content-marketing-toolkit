@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { AlertCircle, Save, Edit, Users, Settings, RefreshCw, Database, User, Shield } from 'lucide-react';
+import { AlertCircle, Save, Edit, Users, Settings, RefreshCw, Database, User, Shield, Activity, Monitor } from 'lucide-react';
+import EnterpriseMonitorDashboard from './EnterpriseMonitorDashboard'; // Import the new component
 
 const SuperAdminPanel = () => {
   const [activeTab, setActiveTab] = useState('tiers');
@@ -116,9 +117,11 @@ const SuperAdminPanel = () => {
       
       if (activeTab === 'tiers') {
         await loadTiers();
-      } else {
+      } else if (activeTab === 'users') {
         await loadUsers();
       }
+      // For enterprise monitoring tab, no additional data loading needed
+      // as the EnterpriseMonitorDashboard handles its own data fetching
     } catch (error) {
       console.error('Failed to load data:', error);
       setMessage('❌ Failed to load data: ' + error.message);
@@ -128,8 +131,10 @@ const SuperAdminPanel = () => {
   }, [activeTab, getCurrentUser, loadTiers, loadUsers]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (activeTab !== 'monitoring') {
+      loadData();
+    }
+  }, [activeTab, loadData]);
 
   // Check if user has admin access
   const hasAdminAccess = currentUser?.subscription_tier === 'superAdmin' || 
@@ -384,6 +389,11 @@ const SuperAdminPanel = () => {
     );
   };
 
+  // If we're on the monitoring tab, render the enterprise dashboard
+  if (activeTab === 'monitoring') {
+    return <EnterpriseMonitorDashboard />;
+  }
+
   return (
     <div className="max-w-7xl mx-auto p-6 bg-gray-50 min-h-screen">
       <div className="bg-white rounded-lg shadow-lg">
@@ -392,7 +402,7 @@ const SuperAdminPanel = () => {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Super Admin Panel</h1>
-              <p className="text-gray-600 mt-1">Real-time subscription tier and user management</p>
+              <p className="text-gray-600 mt-1">Real-time subscription tier and user management + Enterprise monitoring</p>
               {currentUser && (
                 <p className="text-sm text-green-600 mt-1">
                   ✅ Connected as: {currentUser.subscription_tier} (ID: {currentUser.user_id?.substring(0, 8)}...)
@@ -440,6 +450,15 @@ const SuperAdminPanel = () => {
               <div className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
                 User Management ({users.length})
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('monitoring')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'monitoring' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+            >
+              <div className="flex items-center gap-2">
+                <Monitor className="w-4 h-4" />
+                Enterprise Monitoring
               </div>
             </button>
           </nav>

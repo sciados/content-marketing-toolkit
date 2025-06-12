@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { preloadEmailComponents } from '../shared/utils/emailPreloaderUtils';
 import { trackLazyLoading, useRenderTime } from '../shared/utils/performanceUtils';
 import { ErrorBoundary } from '../shared/components/ui';
+import AIMonitoringDashboard from '../components/AIMonitoringDashboard';
 
 // Check if we're in development mode
 const isDevelopment = import.meta.env.DEV;
@@ -49,6 +50,15 @@ const AdminDashboard = lazy(() => {
 // 🚀 UPDATED: Admin Pages with correct paths
 const AdminUsers = lazy(() => {
   const tracker = trackLazyLoading('AdminUsers');
+  return import('../pages/admin/AdminUsers').then(module => {
+    if (tracker) tracker();
+    return module;
+  });
+});
+
+// 🚀 UPDATED: Admin Pages with correct paths
+const AIMonitoring = lazy(() => {
+  const tracker = trackLazyLoading('AIMonitoring');
   return import('../pages/admin/AdminUsers').then(module => {
     if (tracker) tracker();
     return module;
