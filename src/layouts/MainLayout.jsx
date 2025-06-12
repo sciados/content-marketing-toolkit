@@ -15,8 +15,7 @@ import {
 } from '../shared/utils/tierUtils';
 
 const MainLayout = () => {
-  const { user, loading: authLoading } = useAuth();
-  const { logout } = useAuth();
+  const { user, loading: authLoading, logout, from, supabase } = useAuth();
   const { wsConnected } = useUsageTracking();
   const [showSystemStatus, setShowSystemStatus] = useState(false);
   
@@ -25,62 +24,63 @@ const MainLayout = () => {
   const [profileLoading, setProfileLoading] = useState(true);
 
   // NEW: Fetch profile data the same way Dashboard.jsx does
-  useEffect(() => {
-    const getUserProfile = async () => {
-      try {
-        if (user) {
-          console.log('MainLayout: Fetching profile for user:', user.id);
-          
-          // Get user profile with subscription tier
-          const { data: profile, error } = await useAuth
-            .from('profiles')
-            .select('subscription_tier, subscription_status')
-            .eq('id', user.id)
-            .single();
-            
-          if (profile && !error) {
-            setUserTier(profile.subscription_tier);
-            console.log('MainLayout: Real user tier fetched:', {
-              userId: user.id,
-              email: user.email,
-              tier: profile.subscription_tier,
-              status: profile.subscription_status
-            });
-          } else {
-            console.log('MainLayout: Profile fetch error:', error);
-            // Fallback for testing
-            setUserTier('superAdmin');
-          }
-        } else {
-          console.log('MainLayout: No authenticated user');
-          setUserTier(null);
-        }
+useEffect(() => {
+  // Move getUserProfile function inside useEffect to avoid dependency issues
+  const getUserProfile = async () => {
+    try {
+      if (user) {
+        console.log('MainLayout: Fetching profile for user:', user.id);
         
-        setProfileLoading(false);
-      } catch (error) {
-        console.error('MainLayout: Error loading profile:', error);
-        // Fallback for testing
-        setUserTier('superAdmin');
-        setProfileLoading(false);
-      }
-    };
-    
-    getUserProfile();
-    
-    // Listen for auth changes
-    const { data: authListener } = useAuth.auth.onAuthStateChange((event, session) => {
-      if (session?.user) {
-        getUserProfile();
+        // Get user profile with subscription tier
+        const { data: profile, error } = await from('profiles')
+          .select('subscription_tier, subscription_status')
+          .eq('id', user.id)
+          .single();
+          
+        if (profile && !error) {
+          setUserTier(profile.subscription_tier);
+          console.log('MainLayout: Real user tier fetched:', {
+            userId: user.id,
+            email: user.email,
+            tier: profile.subscription_tier,
+            status: profile.subscription_status
+          });
+        } else {
+          console.log('MainLayout: Profile fetch error:', error);
+          // Fallback for testing
+          setUserTier('superAdmin');
+        }
       } else {
+        console.log('MainLayout: No authenticated user');
         setUserTier(null);
-        setProfileLoading(false);
       }
-    });
-    
-    return () => {
-      authListener?.subscription?.unsubscribe();
-    };
-  }, [user]);
+      
+      setProfileLoading(false);
+    } catch (error) {
+      console.error('MainLayout: Error loading profile:', error);
+      // Fallback for testing
+      setUserTier('superAdmin');
+      setProfileLoading(false);
+    }
+  };
+  
+  // Call the function immediately
+  getUserProfile();
+  
+  // Listen for auth changes
+  const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+    if (session?.user) {
+      getUserProfile();
+    } else {
+      setUserTier(null);
+      setProfileLoading(false);
+    }
+  });
+  
+  return () => {
+    authListener?.subscription?.unsubscribe();
+  };
+}, [user, from, supabase]); // Include all dependencies
 
   // FIXED: Use real tier data
   const currentTier = userTier || 'free'; // Use fetched tier instead of user?.subscription_tier
