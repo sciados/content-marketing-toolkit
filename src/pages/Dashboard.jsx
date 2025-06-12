@@ -9,8 +9,8 @@ import {
   Settings, 
   Zap, 
   Video, 
-  FileText, 
-  TrendingUp,
+  // FileText, 
+  // TrendingUp,
   CheckCircle,
   Clock,
   Sparkles

@@ -58,7 +58,7 @@ const EmailSeriesListPage = () => {
     };
     
     fetchEmailSeries();
-  }, [user, showToast]);
+  }, [user, from, supabase, showToast]);
   
   // Filter series based on search term
   const filteredSeries = searchTerm
