@@ -1,10 +1,8 @@
 // src/components/Layout/MainLayout.jsx - FIXED to fetch real profile data
 import React, { useState, useEffect } from 'react';
 import { Outlet, Navigate, NavLink } from 'react-router-dom';
-// import SupabaseContext from '../../context/SupabaseContext';
 import { useAuth } from '../shared/hooks/useAuth';
 import { useUsageTracking } from '../shared/hooks/useUsageTracking';
-// import { supabase } from '../../core/database/supabaseClient';
 import Sidebar from './Sidebar';
 import AdSidebar from './AdSidebar';
 import { ErrorBoundary, SystemStatus, UsageMeter } from '../shared/components/ui';
