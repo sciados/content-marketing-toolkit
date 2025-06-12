@@ -12,7 +12,7 @@ const isDevelopment = import.meta.env.DEV;
 // Layout components (keep these as regular imports since they're used on every page)
 import MainLayout from '../layouts/MainLayout';
 import AuthLayout from '../layouts/AuthLayout';
-import { AdminLayout } from '../layouts/AdminLayout';
+import AdminLayout from '../layouts/AdminLayout';
 import Loader from '../shared/components/ui/Loader';
 
 const ALLOWED_ORIGIN =
