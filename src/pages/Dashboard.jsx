@@ -17,8 +17,11 @@ import {
 } from 'lucide-react';
 
 const Dashboard = () => {
+  // FIXED: Get everything from useAuth in one call
+  const { user, loading: authLoading, from, supabase } = useAuth();
+  
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
+  // REMOVED: const [user, setUser] = useState(null); - now comes from useAuth
   const [userTier, setUserTier] = useState(null);
   const [realStats, setRealStats] = useState({
     dailyTokensUsed: 0,
@@ -36,16 +39,15 @@ const Dashboard = () => {
   useEffect(() => {
     const getUserData = async () => {
       try {
-        // Get authenticated user
-        const { data: { session } } = await useAuth.auth.getSession();
+        // FIXED: Use supabase from useAuth instead of useAuth.auth
+        const { data: { session } } = await supabase.auth.getSession();
         const authUser = session?.user;
         
         if (authUser) {
-          setUser(authUser);
+          // REMOVED: setUser(authUser); - user now comes from useAuth hook
           
-          // Get user profile with subscription tier
-          const { data: profile, error } = await useAuth
-            .from('profiles')
+          // FIXED: Use from() from useAuth instead of useAuth.from()
+          const { data: profile, error } = await from('profiles')
             .select('subscription_tier, subscription_status')
             .eq('id', authUser.id)
             .single();
@@ -127,13 +129,13 @@ const Dashboard = () => {
     
     getUserData();
     
-    // Listen for auth changes
-    const { data: authListener } = useAuth.auth.onAuthStateChange((event, session) => {
+    // FIXED: Use supabase from useAuth instead of useAuth.auth
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
-        setUser(session.user);
+        // REMOVED: setUser(session.user); - user now comes from useAuth hook
         getUserData();
       } else {
-        setUser(null);
+        // REMOVED: setUser(null); - user now comes from useAuth hook
         setUserTier(null);
         setRealStats({
           dailyTokensUsed: 0,
@@ -150,7 +152,7 @@ const Dashboard = () => {
     return () => {
       authListener?.subscription?.unsubscribe();
     };
-  }, []);
+  }, [user, from, supabase]); // FIXED: Added dependencies
 
   // Tier-based limits
   const getTierLimits = (tier) => {
@@ -180,7 +182,8 @@ const Dashboard = () => {
     realStats 
   });
 
-  if (loading) {
+  // FIXED: Use authLoading or loading state
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
         <div className="text-center">
