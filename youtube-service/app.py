@@ -171,13 +171,15 @@ class GoogleSTTService:
 # Initialize STT service (but don't create client yet)
 stt_service = GoogleSTTService()
 
+# YouTube Bot Detection Fix - Replace your download_and_process_youtube_audio function
+
 def download_and_process_youtube_audio(url, temp_dir):
-    """Download YouTube audio directly using yt-dlp and process it"""
+    """Download YouTube audio directly using yt-dlp with bot detection fixes"""
     try:
         # Output path for audio file
         audio_output = os.path.join(temp_dir, 'audio.%(ext)s')
         
-        # yt-dlp options for best audio extraction
+        # yt-dlp options with recent bot detection fixes
         ydl_opts = {
             'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio/best',
             'outtmpl': audio_output,
@@ -191,6 +193,25 @@ def download_and_process_youtube_audio(url, temp_dir):
             }],
             'quiet': True,
             'no_warnings': True,
+            
+            # NEW: Bot detection fixes
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['mweb', 'web'],  # Try mobile web client first
+                    'player_skip': ['configs'],  # Skip config requests that trigger detection
+                }
+            },
+            
+            # NEW: Mobile user agent to avoid datacenter IP detection
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            },
         }
         
         logger.info("Downloading and extracting audio using yt-dlp...")
@@ -216,7 +237,7 @@ def download_and_process_youtube_audio(url, temp_dir):
     except Exception as e:
         logger.error(f"Audio download error: {str(e)}")
         raise
-
+    
 def process_audio_file(audio_file_path):
     """Process downloaded audio file with pure ffmpeg - no pydub loading"""
     try:
