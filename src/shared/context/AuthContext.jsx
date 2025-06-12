@@ -1,7 +1,7 @@
 // src/shared/context/AuthContext.jsx - Complete Final Version with Correct Import Paths
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import { auth } from '../../infrastructure/auth/auth';
-import { supabase } from '../../core/database/supabaseClient'; // FIXED: Correct path
+import { supabase } from '../../services/supabase/supabaseClient'; // FIXED: Correct path
 
 // Create context with default value to prevent undefined errors
 const AuthContext = createContext({
@@ -78,27 +78,41 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
-  // Set up auth listener with Supabase client (now with correct import)
+  // Debug auth listener setup with extensive logging
   useEffect(() => {
+    console.log('🔧 Auth listener useEffect triggered');
+    console.log('🔧 Supabase status check:');
+    console.log('  - supabase exists:', !!supabase);
+    console.log('  - supabase type:', typeof supabase);
+    
     if (!supabase) {
-      console.warn('⚠️ Supabase client is null/undefined, skipping auth listener');
+      console.error('❌ Supabase client is null/undefined');
+      console.error('❌ This means the import failed or env vars are missing');
       return;
     }
 
+    console.log('  - supabase.auth exists:', !!supabase.auth);
+    console.log('  - supabase.auth type:', typeof supabase.auth);
+    
     if (!supabase.auth) {
-      console.warn('⚠️ Supabase.auth is not available, skipping auth listener');
+      console.error('❌ Supabase.auth is not available');
+      console.error('❌ This means the Supabase client is malformed');
       return;
     }
 
+    console.log('  - onAuthStateChange exists:', !!supabase.auth.onAuthStateChange);
+    console.log('  - onAuthStateChange type:', typeof supabase.auth.onAuthStateChange);
+    
     if (typeof supabase.auth.onAuthStateChange !== 'function') {
-      console.warn('⚠️ Supabase.auth.onAuthStateChange is not a function, skipping auth listener');
+      console.error('❌ Supabase.auth.onAuthStateChange is not a function');
+      console.error('❌ Actual type:', typeof supabase.auth.onAuthStateChange);
       return;
     }
 
-    console.log('🔧 Setting up auth listener with correct Supabase client...');
+    console.log('✅ All Supabase checks passed, setting up auth listener...');
     
     try {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      const result = supabase.auth.onAuthStateChange(
         (event, session) => {
           console.log('🔐 Auth state changed:', event, session ? 'with session' : 'no session');
           
@@ -112,15 +126,30 @@ export const AuthProvider = ({ children }) => {
           }
         }
       );
+      
+      console.log('🔧 onAuthStateChange result:', result);
+      
+      if (result?.data?.subscription) {
+        console.log('✅ Auth listener subscription created successfully');
+        
+        return () => {
+          console.log('🔧 Cleaning up auth listener');
+          if (result.data.subscription && typeof result.data.subscription.unsubscribe === 'function') {
+            result.data.subscription.unsubscribe();
+          }
+        };
+      } else {
+        console.error('❌ Auth listener setup returned unexpected result:', result);
+      }
 
-      return () => {
-        console.log('🔧 Cleaning up auth listener');
-        if (subscription && typeof subscription.unsubscribe === 'function') {
-          subscription.unsubscribe();
-        }
-      };
     } catch (err) {
-      console.error('❌ Failed to set up auth listener:', err);
+      console.error('❌ Exception setting up auth listener:', err);
+      console.error('❌ Error details:', {
+        message: err.message,
+        stack: err.stack,
+        supabaseExists: !!supabase,
+        authExists: !!supabase?.auth
+      });
     }
   }, []);
 
