@@ -40,7 +40,7 @@ export async function GET() {
 
 // 🚀 ENHANCED: Use SuperAdminPanel as main admin dashboard
 const AdminDashboard = lazy(() => {
-  const tracker = trackLazyLoading('SuperAdminPanel');
+  const tracker = trackLazyLoading('AdminDashboard');
   return import('../pages/admin/SuperAdminPanel').then(module => {
     if (tracker) tracker();
     return module;
