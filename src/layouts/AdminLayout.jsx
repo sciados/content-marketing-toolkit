@@ -7,8 +7,7 @@ const AdminLayout = () => {
   const { user } = useAuth();
 
   // Check if user has admin access
-  const hasAdminAccess = user?.subscription_tier === 'superAdmin' || 
-                        user?.subscription_tier === 'admin';
+  const hasAdminAccess = user?.subscription_tier === 'superAdmin' || user?.subscription_tier === 'admin';
 
   // If no admin access, redirect or show error
   if (!hasAdminAccess) {
